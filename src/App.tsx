@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import logo from "./src/assets/logo.png";
+import logo from "./assets/logo.png";
 type VehicleType = "truckSuv" | "sedan" | "coupe" | "";
 type PackageType = "basic" | "premium" | "";
 type ServiceType = "mobile" | "dropoff" | "";
