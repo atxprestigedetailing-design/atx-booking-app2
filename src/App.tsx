@@ -74,9 +74,9 @@ export default function App() {
   const packageHours = useMemo(() => {
     if (!vehicle || !pkg) return "Select vehicle first";
     if (vehicle === "truckSuv") return "3–5 hours avg";
-    if (vehicle === "sedan") return "3–4 hours avg";
-    if (vehicle === "coupe" && pkg === "premium") return "3–5 hours avg";
-    return "3–4 hours avg";
+    if (vehicle === "sedan") return pkg === "premium" ? "3–5 hours avg" : "3–4 hours avg";
+    if (vehicle === "coupe") return pkg === "premium" ? "3–5 hours avg" : "3–4 hours avg";
+    return "3–5 hours avg";
   }, [vehicle, pkg]);
 
   const addOnEstimate = useMemo(() => {
@@ -87,14 +87,14 @@ export default function App() {
   }, [addOns]);
 
   const estimateText = useMemo(() => {
-    if (hourlyRate) return `${formatCurrency(hourlyRate)}/hr`;
-    if (selectedVehicle) {
-      return `Basic ${formatCurrency(selectedVehicle.basicRate)}/hr · Premium ${formatCurrency(
-        selectedVehicle.premiumRate
-      )}/hr`;
-    }
-    return "$ per hour";
-  }, [hourlyRate, selectedVehicle]);
+    if (!hourlyRate) return "";
+    return `${formatCurrency(hourlyRate)}/hr`;
+  }, [hourlyRate]);
+
+  const addOnSummaryText = useMemo(() => {
+    if (!addOns.length) return "";
+    return addOns.join(", ");
+  }, [addOns]);
 
   function toggleAddOn(addOn: AddOn) {
     setAddOns((prev) =>
@@ -113,9 +113,8 @@ export default function App() {
   const styles = {
     page: {
       minHeight: "100vh",
-      background:
-        "radial-gradient(circle at top, #2b2b2b 0%, #141414 35%, #0b0b0b 100%)",
-      color: "#f5f5f5",
+      background: "radial-gradient(circle at top, #f4f1ea 0%, #ebe6dc 45%, #e2dbce 100%)",
+      color: "#1b1b1b",
       padding: "32px 16px",
       fontFamily:
         'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
@@ -135,7 +134,7 @@ export default function App() {
       letterSpacing: "-0.03em",
     },
     brandSub: {
-      color: "#b6b6b6",
+      color: "#5f5a52",
       fontSize: "0.98rem",
       marginTop: 10,
       marginBottom: 0,
@@ -146,29 +145,29 @@ export default function App() {
     progressText: {
       display: "flex",
       justifyContent: "space-between",
-      color: "#a8a8a8",
+      color: "#6f685f",
       fontSize: "0.9rem",
       marginBottom: 8,
     },
     progressBar: {
       height: 8,
-      background: "#222",
+      background: "#d8d0c3",
       borderRadius: 999,
       overflow: "hidden",
-      border: "1px solid #2e2e2e",
+      border: "1px solid #cfc5b6",
     } as const,
     progressFill: {
       height: "100%",
-      width: `${((step + 1) / 7) * 100}%`,
-      background: "linear-gradient(90deg, #d4af37 0%, #f1d98d 100%)",
+      width: `${((step + 1) / 8) * 100}%`,
+      background: "linear-gradient(90deg, #c59d2a 0%, #e4c56a 100%)",
       borderRadius: 999,
       transition: "width 0.25s ease",
     },
     card: {
-      background: "rgba(20, 20, 20, 0.92)",
-      border: "1px solid #2f2f2f",
+      background: "rgba(255, 252, 246, 0.97)",
+      border: "1px solid #d8cfc0",
       borderRadius: 24,
-      boxShadow: "0 16px 50px rgba(0,0,0,0.35)",
+      boxShadow: "0 18px 45px rgba(80, 62, 24, 0.10)",
       padding: 28,
     } as const,
     title: {
@@ -179,27 +178,27 @@ export default function App() {
       textAlign: "center" as const,
     },
     subtitle: {
-      color: "#b4b4b4",
+      color: "#6e675e",
       textAlign: "center" as const,
       marginTop: 0,
       marginBottom: 24,
       lineHeight: 1.5,
     },
     primaryButton: {
-      background: "linear-gradient(135deg, #d4af37 0%, #b9931b 100%)",
-      color: "#111",
+      background: "linear-gradient(135deg, #c59d2a 0%, #ae8420 100%)",
+      color: "#ffffff",
       border: "none",
       borderRadius: 14,
       padding: "14px 20px",
       fontSize: "1rem",
       fontWeight: 700,
       cursor: "pointer",
-      boxShadow: "0 10px 24px rgba(212, 175, 55, 0.22)",
+      boxShadow: "0 10px 24px rgba(197, 157, 42, 0.18)",
     } as const,
     secondaryButton: {
-      background: "#1a1a1a",
-      color: "#f5f5f5",
-      border: "1px solid #363636",
+      background: "#ffffff",
+      color: "#1b1b1b",
+      border: "1px solid #d2c7b7",
       borderRadius: 14,
       padding: "13px 18px",
       fontSize: "1rem",
@@ -222,8 +221,8 @@ export default function App() {
       marginBottom: 20,
     } as const,
     optionCard: {
-      background: "#111",
-      border: "1px solid #2f2f2f",
+      background: "#fffdf8",
+      border: "1px solid #d8cfc0",
       borderRadius: 18,
       padding: 18,
       cursor: "pointer",
@@ -231,9 +230,9 @@ export default function App() {
       transition: "all 0.2s ease",
     } as const,
     selectedCard: {
-      border: "1px solid #d4af37",
-      background: "linear-gradient(180deg, rgba(212,175,55,0.12), rgba(17,17,17,1))",
-      boxShadow: "0 0 0 1px rgba(212,175,55,0.18) inset",
+      border: "1px solid #c59d2a",
+      background: "linear-gradient(180deg, rgba(197,157,42,0.14), rgba(255,253,248,1))",
+      boxShadow: "0 0 0 1px rgba(197,157,42,0.22) inset",
     } as const,
     optionTitle: {
       fontWeight: 700,
@@ -241,35 +240,36 @@ export default function App() {
       marginBottom: 8,
     },
     optionMeta: {
-      color: "#b9b9b9",
+      color: "#6e675e",
       fontSize: "0.95rem",
       lineHeight: 1.45,
     },
     estimateBox: {
-      background: "#101010",
-      border: "1px solid #2c2c2c",
+      background: "#f8f3ea",
+      border: "1px solid #d9cfbf",
       borderRadius: 16,
       padding: 16,
       textAlign: "center" as const,
       marginTop: 6,
     } as const,
     estimateLabel: {
-      color: "#9d9d9d",
+      color: "#7a7268",
       fontSize: "0.95rem",
       marginBottom: 6,
     },
     estimateValue: {
-      fontSize: "1.2rem",
+      fontSize: "1.05rem",
       fontWeight: 800,
-      color: "#f5f5f5",
+      color: "#1b1b1b",
+      lineHeight: 1.5,
     },
     noteBox: {
       marginTop: 14,
-      background: "rgba(212,175,55,0.08)",
-      border: "1px solid rgba(212,175,55,0.18)",
+      background: "rgba(197,157,42,0.10)",
+      border: "1px solid rgba(197,157,42,0.24)",
       borderRadius: 16,
       padding: 14,
-      color: "#dfdfdf",
+      color: "#3b342c",
       textAlign: "center" as const,
       lineHeight: 1.45,
     } as const,
@@ -284,8 +284,8 @@ export default function App() {
       gap: 14,
       padding: 16,
       borderRadius: 16,
-      border: "1px solid #2d2d2d",
-      background: "#111",
+      border: "1px solid #ddd2c2",
+      background: "#fffdf8",
       cursor: "pointer",
       justifyContent: "space-between",
       flexWrap: "wrap" as const,
@@ -300,10 +300,10 @@ export default function App() {
     checkbox: {
       width: 18,
       height: 18,
-      accentColor: "#d4af37",
+      accentColor: "#c59d2a",
     },
     addOnPrice: {
-      color: "#d8d8d8",
+      color: "#3d352b",
       fontWeight: 700,
     },
     inputGrid: {
@@ -315,9 +315,9 @@ export default function App() {
     input: {
       width: "100%",
       boxSizing: "border-box" as const,
-      background: "#101010",
-      color: "#f4f4f4",
-      border: "1px solid #333",
+      background: "#fffdf8",
+      color: "#1b1b1b",
+      border: "1px solid #d8cdbd",
       borderRadius: 14,
       padding: "14px 16px",
       fontSize: "1rem",
@@ -342,14 +342,14 @@ export default function App() {
       marginTop: 22,
     } as const,
     summaryCard: {
-      background: "#101010",
-      border: "1px solid #2d2d2d",
+      background: "#fffdf8",
+      border: "1px solid #ddd2c2",
       borderRadius: 16,
       padding: 16,
     },
     summaryHeading: {
       fontSize: "0.92rem",
-      color: "#a9a9a9",
+      color: "#7b7368",
       marginBottom: 8,
       textTransform: "uppercase" as const,
       letterSpacing: "0.04em",
@@ -358,7 +358,7 @@ export default function App() {
       fontSize: "1rem",
       fontWeight: 700,
       lineHeight: 1.5,
-      color: "#f5f5f5",
+      color: "#1b1b1b",
       wordBreak: "break-word" as const,
     },
     submittedWrap: {
@@ -371,14 +371,12 @@ export default function App() {
     },
     successText: {
       fontSize: "1.05rem",
-      color: "#c9c9c9",
+      color: "#5f584f",
       lineHeight: 1.6,
       maxWidth: 620,
       margin: "0 auto 24px",
     },
   };
-
-  const totalSteps = 7;
 
   return (
     <div style={styles.page}>
@@ -393,9 +391,7 @@ export default function App() {
         <div style={styles.progressWrap}>
           <div style={styles.progressText}>
             <span>Booking Flow</span>
-            <span>
-              Step {step + 1} of {totalSteps}
-            </span>
+            <span>Step {step + 1} of 8</span>
           </div>
           <div style={styles.progressBar}>
             <div style={styles.progressFill} />
@@ -449,11 +445,6 @@ export default function App() {
                 })}
               </div>
 
-              <div style={styles.estimateBox}>
-                <div style={styles.estimateLabel}>Estimate</div>
-                <div style={styles.estimateValue}>{estimateText}</div>
-              </div>
-
               <div style={styles.buttonRow}>
                 <div />
                 <div style={styles.rightButtons}>
@@ -481,6 +472,21 @@ export default function App() {
                 {(["basic", "premium"] as PackageType[]).map((packageType) => {
                   const isSelected = pkg === packageType;
                   const label = packageType === "basic" ? "Basic Detail" : "Premium Detail";
+                  const rateText = selectedVehicle
+                    ? `${formatCurrency(
+                        packageType === "basic"
+                          ? selectedVehicle.basicRate
+                          : selectedVehicle.premiumRate
+                      )}/hr`
+                    : "Select vehicle first";
+                  const timeText = !vehicle
+                    ? "Average time shown after vehicle selection"
+                    : packageType === "premium"
+                    ? "3–5 hours avg"
+                    : vehicle === "truckSuv"
+                    ? "3–5 hours avg"
+                    : "3–4 hours avg";
+
                   return (
                     <button
                       key={packageType}
@@ -492,25 +498,9 @@ export default function App() {
                     >
                       <div style={styles.optionTitle}>{label}</div>
                       <div style={styles.optionMeta}>
-                        {hourlyRate && pkg === packageType
-                          ? `${formatCurrency(hourlyRate)}/hr`
-                          : selectedVehicle
-                          ? `${formatCurrency(
-                              packageType === "basic"
-                                ? selectedVehicle.basicRate
-                                : selectedVehicle.premiumRate
-                            )}/hr`
-                          : "Select vehicle first"}
+                        {rateText}
                         <br />
-                        {vehicle
-                          ? packageType === "premium"
-                            ? vehicle === "sedan"
-                              ? "3–5 hours avg"
-                              : "3–5 hours avg"
-                            : vehicle === "truckSuv"
-                            ? "3–5 hours avg"
-                            : "3–4 hours avg"
-                          : "Average time shown after vehicle selection"}
+                        {timeText}
                       </div>
                     </button>
                   );
@@ -519,7 +509,7 @@ export default function App() {
 
               <div style={styles.estimateBox}>
                 <div style={styles.estimateLabel}>Estimate</div>
-                <div style={styles.estimateValue}>{estimateText}</div>
+                <div style={styles.estimateValue}>{estimateText || "$ per hour"}</div>
               </div>
 
               <div style={styles.noteBox}>
@@ -572,7 +562,10 @@ export default function App() {
 
               <div style={styles.estimateBox}>
                 <div style={styles.estimateLabel}>Estimate</div>
-                <div style={styles.estimateValue}>{estimateText}</div>
+                <div style={styles.estimateValue}>
+                  {estimateText || "$ per hour"}
+                  {addOnSummaryText ? ` + ${addOnSummaryText}` : ""}
+                </div>
               </div>
 
               <div style={styles.buttonRow}>
@@ -698,7 +691,7 @@ export default function App() {
                     onClick={next}
                     disabled={!name || !phone || !email}
                   >
-                    Review Request
+                    Review Booking
                   </button>
                 </div>
               </div>
@@ -706,6 +699,76 @@ export default function App() {
           )}
 
           {step === 6 && (
+            <>
+              <h2 style={styles.title}>Review Booking</h2>
+              <p style={styles.subtitle}>Review the request details before submitting.</p>
+
+              <div style={styles.summaryGrid}>
+                <div style={styles.summaryCard}>
+                  <div style={styles.summaryHeading}>Customer</div>
+                  <div style={styles.summaryValue}>
+                    {name}
+                    <br />
+                    {phone}
+                    <br />
+                    {email}
+                  </div>
+                </div>
+
+                <div style={styles.summaryCard}>
+                  <div style={styles.summaryHeading}>Service</div>
+                  <div style={styles.summaryValue}>
+                    {selectedVehicle?.label || "N/A"}
+                    <br />
+                    {pkg === "basic" ? "Basic Detail" : pkg === "premium" ? "Premium Detail" : "N/A"}
+                    <br />
+                    {estimateText || "N/A"}
+                  </div>
+                </div>
+
+                <div style={styles.summaryCard}>
+                  <div style={styles.summaryHeading}>Add-Ons</div>
+                  <div style={styles.summaryValue}>
+                    {addOns.length ? addOns.join(", ") : "No add-ons selected"}
+                  </div>
+                </div>
+
+                <div style={styles.summaryCard}>
+                  <div style={styles.summaryHeading}>Appointment Type</div>
+                  <div style={styles.summaryValue}>
+                    {serviceType === "mobile"
+                      ? `Mobile Service${address ? ` — ${address}` : ""}`
+                      : serviceType === "dropoff"
+                      ? "Drop-Off Service"
+                      : "N/A"}
+                  </div>
+                </div>
+
+                <div style={styles.summaryCard}>
+                  <div style={styles.summaryHeading}>Estimated Add-Ons</div>
+                  <div style={styles.summaryValue}>{formatCurrency(addOnEstimate)}</div>
+                </div>
+
+                <div style={styles.summaryCard}>
+                  <div style={styles.summaryHeading}>Avg Package Time</div>
+                  <div style={styles.summaryValue}>{packageHours}</div>
+                </div>
+              </div>
+
+              <div style={styles.buttonRow}>
+                <button style={styles.secondaryButton} onClick={back}>
+                  Back
+                </button>
+                <div style={styles.rightButtons}>
+                  <button style={styles.primaryButton} onClick={next}>
+                    Submit Booking
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
+
+          {step === 7 && (
             <>
               <div style={styles.submittedWrap}>
                 <div style={styles.successBadge}>✅</div>
@@ -735,7 +798,7 @@ export default function App() {
                     <br />
                     {pkg === "basic" ? "Basic Detail" : pkg === "premium" ? "Premium Detail" : "N/A"}
                     <br />
-                    {estimateText}
+                    {estimateText || "N/A"}
                   </div>
                 </div>
 
