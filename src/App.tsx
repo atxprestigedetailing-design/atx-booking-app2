@@ -124,35 +124,35 @@ export default function App() {
     margin: "0 auto",
   } as const,
   brand: {
-    textAlign: "center" as const,
-    marginBottom: 24,
-  },
-  brandRow: {
   display: "flex",
+  flexDirection: "column" as const,
   alignItems: "center",
   justifyContent: "center",
-  gap: 12,
-  marginBottom: 8,
+  marginBottom: 28,
 },
 
 logo: {
-  width: 80,
-  height: 80,
+  width: 120,
+  height: 120,
   objectFit: "contain" as const,
-  filter: "drop-shadow(0 2px 6px rgba(0,0,0,0.15))",
+  marginBottom: 10,
+  filter: "drop-shadow(0 4px 10px rgba(0,0,0,0.10))",
 },
   brandTitle: {
-  fontSize: "2rem",
+  fontSize: "2.15rem",
   fontWeight: 700,
-  letterSpacing: "-0.5px",
+  letterSpacing: "-0.6px",
   color: "#111827",
+  margin: 0,
+  textAlign: "center" as const,
 },
   brandSub: {
-    color: "#6b7280",
-    fontSize: "0.98rem",
-    marginTop: 10,
-    marginBottom: 0,
-  },
+  color: "#6b7280",
+  fontSize: "1rem",
+  marginTop: 8,
+  marginBottom: 0,
+  textAlign: "center" as const,
+},
   progressWrap: {
     marginBottom: 20,
   },
@@ -396,15 +396,11 @@ logo: {
     <div style={styles.page}>
       <div style={styles.container}>
 <div style={styles.brand}>
-  <div style={styles.brandRow}>
-    <img src={logo} alt="ATX Prestige Detailing logo" style={styles.logo} />
-    <div>
-      <h1 style={styles.brandTitle}>ATX Prestige Detailing</h1>
-      <p style={styles.brandSub}>
-        Private build version — refining the experience before launch
-      </p>
-    </div>
-  </div>
+  <img src={logo} alt="ATX Prestige Detailing logo" style={styles.logo} />
+  <h1 style={styles.brandTitle}>ATX Prestige Detailing</h1>
+  <p style={styles.brandSub}>
+    Private build version — refining the experience before launch
+  </p>
 </div>
 
         <div style={styles.progressWrap}>
