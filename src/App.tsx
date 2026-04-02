@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-
+import logo from "./src/assets/logo.png";
 type VehicleType = "truckSuv" | "sedan" | "coupe" | "";
 type PackageType = "basic" | "premium" | "";
 type ServiceType = "mobile" | "dropoff" | "";
@@ -127,12 +127,26 @@ export default function App() {
     textAlign: "center" as const,
     marginBottom: 24,
   },
+  brandRow: {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 12,
+  marginBottom: 8,
+},
+
+logo: {
+  width: 80,
+  height: 80,
+  objectFit: "contain" as const,
+  filter: "drop-shadow(0 2px 6px rgba(0,0,0,0.15))",
+},
   brandTitle: {
-    fontSize: "clamp(2rem, 5vw, 3.25rem)",
-    fontWeight: 800,
-    margin: 0,
-    letterSpacing: "-0.03em",
-  },
+  fontSize: "2rem",
+  fontWeight: 700,
+  letterSpacing: "-0.5px",
+  color: "#111827",
+},
   brandSub: {
     color: "#6b7280",
     fontSize: "0.98rem",
@@ -381,12 +395,17 @@ export default function App() {
   return (
     <div style={styles.page}>
       <div style={styles.container}>
-        <div style={styles.brand}>
-          <h1 style={styles.brandTitle}>ATX Prestige Detailing</h1>
-          <p style={styles.brandSub}>
-            Private build version — refining the experience before launch
-          </p>
-        </div>
+<div style={styles.brand}>
+  <div style={styles.brandRow}>
+    <img src={logo} alt="ATX Prestige Detailing logo" style={styles.logo} />
+    <div>
+      <h1 style={styles.brandTitle}>ATX Prestige Detailing</h1>
+      <p style={styles.brandSub}>
+        Private build version — refining the experience before launch
+      </p>
+    </div>
+  </div>
+</div>
 
         <div style={styles.progressWrap}>
           <div style={styles.progressText}>
