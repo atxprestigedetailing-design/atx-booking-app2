@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import logo from "./assets/logo.png";
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwbGkPF9HaX6SE3cuphh0Ynj__Q1VdThuU6SLpFbWf0axsvXYStfTpszpQ3y9vZ9O8GhQ/exec";
 type VehicleType = "truckSuv" | "sedan" | "coupe" | "";
 type PackageType = "basic" | "premium" | "";
 type ServiceType = "mobile" | "dropoff" | "";
@@ -774,11 +775,45 @@ logo: {
                 <button style={styles.secondaryButton} onClick={back}>
                   Back
                 </button>
-                <div style={styles.rightButtons}>
-                  <button style={styles.primaryButton} onClick={next}>
-                    Submit Booking
-                  </button>
-                </div>
+<div style={styles.rightButtons}>
+  <button
+    style={styles.primaryButton}
+    onClick={async () => {
+      try {
+        const res = await fetch(SCRIPT_URL, {
+          method: "POST",
+          body: JSON.stringify({
+            name,
+            phone,
+            email,
+            vehicle,
+            packageType: pkg,
+            hourlyRate,
+            addOns: addOns.join(", "),
+            addOnEstimate,
+            serviceType,
+            address,
+            avgTime: packageHours,
+          }),
+        });
+
+        const data = await res.json();
+
+        if (data.success) {
+          alert("Booking submitted successfully!");
+          next(); // go to success screen
+        } else {
+          alert("Something went wrong.");
+        }
+      } catch (err) {
+        console.error(err);
+        alert("Error submitting booking.");
+      }
+    }}
+  >
+    Submit Booking
+  </button>
+</div>
               </div>
             </>
           )}
