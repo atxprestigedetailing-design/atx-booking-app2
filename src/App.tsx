@@ -112,6 +112,76 @@ const [placeId, setPlaceId] = useState("");
 const [lat, setLat] = useState("");
 const [lng, setLng] = useState("");
 const [addressSelected, setAddressSelected] = useState(false);
+const currentYear = new Date().getFullYear();
+const yearOptions = Array.from(
+  { length: currentYear - 1995 + 1 },
+  (_, i) => String(currentYear - i)
+);
+
+const [makeOptions, setMakeOptions] = useState<string[]>([]);
+const [modelOptions, setModelOptions] = useState<string[]>([]);
+const [loadingMakes, setLoadingMakes] = useState(false);
+const [loadingModels, setLoadingModels] = useState(false);
+
+useEffect(() => {
+  const loadMakes = async () => {
+    try {
+      setLoadingMakes(true);
+      const res = await fetch(
+        "https://vpic.nhtsa.dot.gov/api/vehicles/GetAllMakes?format=json"
+      );
+      const data = await res.json();
+
+      const makes =
+        data.Results?.map((item: any) => item.Make_Name)
+          .filter(Boolean)
+          .sort((a: string, b: string) => a.localeCompare(b)) || [];
+
+      setMakeOptions(makes);
+    } catch (err) {
+      console.error("Error loading makes", err);
+      setMakeOptions([]);
+    } finally {
+      setLoadingMakes(false);
+    }
+  };
+
+  loadMakes();
+}, []);
+
+useEffect(() => {
+  const loadModels = async () => {
+    if (!year || !make) {
+      setModelOptions([]);
+      return;
+    }
+
+    try {
+      setLoadingModels(true);
+
+      const res = await fetch(
+        `https://vpic.nhtsa.dot.gov/api/vehicles/GetModelsForMakeYear/make/${encodeURIComponent(
+          make
+        )}/modelyear/${year}?format=json`
+      );
+      const data = await res.json();
+
+      const models =
+        data.Results?.map((item: any) => item.Model_Name)
+          .filter(Boolean)
+          .sort((a: string, b: string) => a.localeCompare(b)) || [];
+
+      setModelOptions(models);
+    } catch (err) {
+      console.error("Error loading models", err);
+      setModelOptions([]);
+    } finally {
+      setLoadingModels(false);
+    }
+  };
+
+  loadModels();
+}, [year, make]);
 
 useEffect(() => {
   if (step !== 4 || serviceType !== "mobile") return;
@@ -965,27 +1035,61 @@ vehicleRow: {
 <div style={{ marginTop: 24 }}>
   <div style={styles.sectionLabel}>Vehicle Information</div>
 
-  <div style={{ display: "flex", gap: 12, marginTop: 10 }}>
-    <input
-      style={{ ...styles.input, flex: 1 }}
-      placeholder="Year"
+  <div style={{ display: "flex", gap: 12, marginTop: 10, flexWrap: "wrap" as const }}>
+    <select
+      style={{ ...styles.input, flex: 1, minWidth: 120, backgroundColor: "#fff", color: "#111827" }}
       value={year}
-      onChange={(e) => setYear(e.target.value)}
-    />
+      onChange={(e) => {
+        setYear(e.target.value);
+        setModel("");
+        setModelOptions([]);
+      }}
+    >
+      <option value="">Year</option>
+      {yearOptions.map((yr) => (
+        <option key={yr} value={yr}>
+          {yr}
+        </option>
+      ))}
+    </select>
 
-    <input
-      style={{ ...styles.input, flex: 2 }}
-      placeholder="Make"
+    <select
+      style={{ ...styles.input, flex: 2, minWidth: 180, backgroundColor: "#fff", color: "#111827" }}
       value={make}
-      onChange={(e) => setMake(e.target.value)}
-    />
+      onChange={(e) => {
+        setMake(e.target.value);
+        setModel("");
+        setModelOptions([]);
+      }}
+      disabled={loadingMakes}
+    >
+      <option value="">{loadingMakes ? "Loading makes..." : "Make"}</option>
+      {makeOptions.map((mk) => (
+        <option key={mk} value={mk}>
+          {mk}
+        </option>
+      ))}
+    </select>
 
-    <input
-      style={{ ...styles.input, flex: 2 }}
-      placeholder="Model"
+    <select
+      style={{ ...styles.input, flex: 2, minWidth: 180, backgroundColor: "#fff", color: "#111827" }}
       value={model}
       onChange={(e) => setModel(e.target.value)}
-    />
+      disabled={!year || !make || loadingModels}
+    >
+      <option value="">
+        {!year || !make
+          ? "Select year and make first"
+          : loadingModels
+          ? "Loading models..."
+          : "Model"}
+      </option>
+      {modelOptions.map((mdl) => (
+        <option key={mdl} value={mdl}>
+          {mdl}
+        </option>
+      ))}
+    </select>
   </div>
 </div>
 
