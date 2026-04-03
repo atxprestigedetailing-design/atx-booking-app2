@@ -717,24 +717,33 @@ vehicleRow: {
                 />
               </div> <div style={{ display: "flex", gap: 8 }}>
                 <div style={styles.sectionLabel}>Vehicle Information</div>
-  <input
-    style={{ ...styles.input, flex: 1 }}
-    placeholder="Year"
-    value={year}
-    onChange={(e) => setYear(e.target.value)}
-  />
-  <input
-    style={{ ...styles.input, flex: 2 }}
-    placeholder="Make"
-    value={make}
-    onChange={(e) => setMake(e.target.value)}
-  />
-  <input
-    style={{ ...styles.input, flex: 2 }}
-    placeholder="Model"
-    value={model}
-    onChange={(e) => setModel(e.target.value)}
-  />
+  </div>
+
+<div style={{ marginTop: 24 }}>
+  <div style={styles.sectionLabel}>Vehicle Information</div>
+
+  <div style={{ display: "flex", gap: 12, marginTop: 10 }}>
+    <input
+      style={{ ...styles.input, flex: 1 }}
+      placeholder="Year"
+      value={year}
+      onChange={(e) => setYear(e.target.value)}
+    />
+
+    <input
+      style={{ ...styles.input, flex: 2 }}
+      placeholder="Make"
+      value={make}
+      onChange={(e) => setMake(e.target.value)}
+    />
+
+    <input
+      style={{ ...styles.input, flex: 2 }}
+      placeholder="Model"
+      value={model}
+      onChange={(e) => setModel(e.target.value)}
+    />
+  </div>
 </div>
 
               <div style={styles.buttonRow}>
