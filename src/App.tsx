@@ -933,12 +933,25 @@ vehicleRow: {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                 />
-                <input
-                  style={styles.input}
-                  placeholder="Phone number"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                />
+           <input
+  style={styles.input}
+  placeholder="Phone number"
+  value={phone}
+  type="tel"
+  inputMode="numeric"
+  onChange={(e) => {
+    const raw = e.target.value.replace(/\D/g, "").slice(0, 10);
+
+    const formatted =
+      raw.length > 6
+        ? `(${raw.slice(0, 3)}) ${raw.slice(3, 6)}-${raw.slice(6)}`
+        : raw.length > 3
+        ? `(${raw.slice(0, 3)}) ${raw.slice(3)}`
+        : raw;
+
+    setPhone(formatted);
+  }}
+/>
                 <input
                   style={styles.input}
                   placeholder="Email address"
