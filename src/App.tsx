@@ -925,6 +925,23 @@ vehicleRow: {
                 </div>
 
                 <div style={styles.summaryCard}>
+  <div style={styles.summaryHeading}>Appointment Type</div>
+  <div style={styles.summaryValue}>
+    {serviceType === "mobile" ? "Mobile Service" : serviceType === "dropoff" ? "Drop-Off Service" : "N/A"}
+    <br />
+    {address || "No address provided"}
+  </div>
+</div>
+                <div style={styles.summaryCard}>
+  <div style={styles.summaryHeading}>Vehicle</div>
+  <div style={styles.summaryValue}>
+    {year || "N/A"} {make || ""} {model || ""}
+    <br />
+    {selectedVehicle?.label || "N/A"}
+  </div>
+</div>
+
+                <div style={styles.summaryCard}>
                   <div style={styles.summaryHeading}>Add-Ons</div>
                   <div style={styles.summaryValue}>
                     {addOns.length ? addOns.join(", ") : "No add-ons selected"}
@@ -1049,6 +1066,23 @@ const data = await res.json();
                     {estimateText || "N/A"}
                   </div>
                 </div>
+                <div style={styles.summaryCard}>
+
+                  <div style={styles.summaryCard}>
+  <div style={styles.summaryHeading}>Appointment Type</div>
+  <div style={styles.summaryValue}>
+    {serviceType === "mobile" ? "Mobile Service" : serviceType === "dropoff" ? "Drop-Off Service" : "N/A"}
+    <br />
+    {address || "No address provided"}
+  </div>
+</div>
+  <div style={styles.summaryHeading}>Vehicle</div>
+  <div style={styles.summaryValue}>
+    {year || "N/A"} {make || ""} {model || ""}
+    <br />
+    {selectedVehicle?.label || "N/A"}
+  </div>
+</div>
 
                 <div style={styles.summaryCard}>
                   <div style={styles.summaryHeading}>Add-Ons</div>
