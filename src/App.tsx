@@ -1,5 +1,7 @@
 import { useMemo, useState } from "react";
 import logo from "./assets/logo.png";
+const SCRIPT_URL =
+   "https://script.google.com/macros/s/AKfycbwbGkPF9HaX6SE3cuphh0Ynj__Q1VdThuU6SLpFbWf0axsvXYStfTpszpQ3y9vZ9O8GhQ/exec";
 type VehicleType = "truckSuv" | "sedan" | "coupe" | "";
 type PackageType = "basic" | "premium" | "";
 type ServiceType = "mobile" | "dropoff" | "";
@@ -364,6 +366,20 @@ logo: {
     borderRadius: 16,
     padding: 16,
   },
+  sectionLabel: {
+  fontSize: "0.95rem",
+  fontWeight: 700,
+  color: "#374151",
+  marginTop: 6,
+  marginBottom: -4,
+  textAlign: "left" as const,
+},
+
+vehicleRow: {
+  display: "flex",
+  gap: 10,
+  alignItems: "center",
+} as const,
   summaryHeading: {
     fontSize: "0.92rem",
     color: "#6b7280",
@@ -699,6 +715,7 @@ logo: {
                   onChange={(e) => setEmail(e.target.value)}
                 />
               </div> <div style={{ display: "flex", gap: 8 }}>
+                <div style={styles.sectionLabel}>Vehicle Information</div>
   <input
     style={{ ...styles.input, flex: 1 }}
     placeholder="Year"
@@ -801,9 +818,47 @@ logo: {
                   Back
                 </button>
                 <div style={styles.rightButtons}>
-                  <button style={styles.primaryButton} onClick={next}>
-                    Submit Booking
-                  </button>
+                  <button
+  style={styles.primaryButton}
+  onClick={async () => {
+    try {
+      const res = await fetch(SCRIPT_URL, {
+        method: "POST",
+        body: JSON.stringify({
+          name,
+          phone,
+          email,
+          year,
+          make,
+          model,
+          vehicle,
+          packageType: pkg,
+          hourlyRate,
+          addOns: addOns.join(", "),
+          addOnEstimate,
+          serviceType,
+          address,
+          avgTime: packageHours,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (data.success) {
+        alert("Booking submitted successfully!");
+        next();
+      } else {
+        alert("Something went wrong.");
+        console.error(data);
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Error submitting booking.");
+    }
+  }}
+>
+  Submit Booking
+</button>
                 </div>
               </div>
             </>
