@@ -627,6 +627,7 @@ vehicleRow: {
   color: "#111827",
   textDecoration: "none",
   fontWeight: 600,
+  fontStyle:"italic",
   borderBottom: "1px solid #d1d5db",
 }}
 >
