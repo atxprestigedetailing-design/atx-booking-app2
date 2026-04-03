@@ -904,6 +904,14 @@ vehicleRow: {
                     {email}
                   </div>
                 </div>
+                <div style={styles.summaryCard}>
+  <div style={styles.summaryHeading}>Appointment</div>
+  <div style={styles.summaryValue}>
+    {selectedDate || "N/A"}
+    <br />
+    {selectedTime || "N/A"}
+  </div>
+</div>
 
                 <div style={styles.summaryCard}>
                   <div style={styles.summaryHeading}>Service</div>
@@ -1022,6 +1030,14 @@ const data = await res.json();
                     {email}
                   </div>
                 </div>
+                <div style={styles.summaryCard}>
+  <div style={styles.summaryHeading}>Appointment</div>
+  <div style={styles.summaryValue}>
+    {selectedDate || "N/A"}
+    <br />
+    {selectedTime || "N/A"}
+  </div>
+</div>
 
                 <div style={styles.summaryCard}>
                   <div style={styles.summaryHeading}>Service</div>
