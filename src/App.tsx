@@ -1,7 +1,20 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import logo from "./assets/logo.png";
 const SCRIPT_URL =
    "https://script.google.com/macros/s/AKfycbwbGkPF9HaX6SE3cuphh0Ynj__Q1VdThuU6SLpFbWf0axsvXYStfTpszpQ3y9vZ9O8GhQ/exec";
+   type AvailabilitySlot = {
+  date: string;
+  time: string;
+  available?: boolean;
+  notes?: string;
+};
+  async function fetchAvailability(date: string): Promise<AvailabilitySlot[]> {
+  const res = await fetch(
+    `${SCRIPT_URL}?action=getAvailability&date=${encodeURIComponent(date)}`
+  );
+  const data = await res.json();
+  return data.slots || [];
+}
 type VehicleType = "truckSuv" | "sedan" | "coupe" | "";
 type PackageType = "basic" | "premium" | "";
 type ServiceType = "mobile" | "dropoff" | "";
@@ -68,6 +81,24 @@ export default function App() {
   const [year, setYear] = useState("");
 const [make, setMake] = useState("");
 const [model, setModel] = useState("");
+const [selectedDate, setSelectedDate] = useState("");
+const [availableSlots, setAvailableSlots] = useState<AvailabilitySlot[]>([]);
+const [selectedTime, setSelectedTime] = useState("");
+useEffect(() => {
+  if (!selectedDate) return;
+
+  const loadSlots = async () => {
+    try {
+      const slots = await fetchAvailability(selectedDate);
+      setAvailableSlots(slots);
+    } catch (err) {
+      console.error("Error loading availability", err);
+      setAvailableSlots([]);
+    }
+  };
+
+  loadSlots();
+}, [selectedDate]);
 
   const selectedVehicle = vehicleOptions.find((v) => v.id === vehicle);
 
@@ -697,6 +728,38 @@ vehicleRow: {
               </p>
 
               <div style={styles.inputGrid}>
+                <div style={{ marginTop: 20 }}>
+  <div style={styles.sectionLabel}>Select Appointment Date</div>
+
+  <input
+    type="date"
+    style={styles.input}
+    value={selectedDate}
+    onChange={(e) => {
+      setSelectedDate(e.target.value);
+      setSelectedTime("");
+    }}
+  />
+</div>
+
+<div style={{ marginTop: 20 }}>
+  <div style={styles.sectionLabel}>Available Time</div>
+
+  <select
+    style={styles.input}
+    value={selectedTime}
+    onChange={(e) => setSelectedTime(e.target.value)}
+    disabled={!availableSlots.length}
+  >
+    <option value="">Select a time</option>
+
+    {availableSlots.map((slot, index) => (
+      <option key={index} value={slot.time}>
+        {slot.time}
+      </option>
+    ))}
+  </select>
+</div>
                 <input
                   style={styles.input}
                   placeholder="Full name"
@@ -849,6 +912,8 @@ vehicleRow: {
           serviceType,
           address,
           avgTime: packageHours,
+          date: selectedDate,
+time: selectedTime,
         }),
       });
 
