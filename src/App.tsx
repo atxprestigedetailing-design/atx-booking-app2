@@ -171,36 +171,43 @@ useEffect(() => {
     maxWidth: 920,
     margin: "0 auto",
   } as const,
-  brand: {
-    textAlign: "center" as const,
-    marginBottom: 24,
-  },
-  brandRow: {
+ brand: {
+  display: "flex",
+  justifyContent: "center",
+  marginBottom: 28,
+} as const,
+brandRow: {
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
-  gap: 12,
-  marginBottom: 8,
+  gap: 18,
+  flexWrap: "wrap" as const,
+  textAlign: "left" as const,
 },
 
+
 logo: {
-  width: 80,
-  height: 80,
+  width: 96,
+  height: 96,
   objectFit: "contain" as const,
-  filter: "drop-shadow(0 2px 6px rgba(0,0,0,0.15))",
+  opacity: 1,
+  filter: "drop-shadow(0 3px 10px rgba(0,0,0,0.12))",
 },
-  brandTitle: {
-  fontSize: "2rem",
-  fontWeight: 700,
-  letterSpacing: "-0.5px",
+ brandTitle: {
+  fontSize: "2.6rem",
+  fontWeight: 800,
+  letterSpacing: "-0.8px",
   color: "#111827",
+  margin: 0,
+  lineHeight: 1.1,
 },
-  brandSub: {
-    color: "#6b7280",
-    fontSize: "0.98rem",
-    marginTop: 10,
-    marginBottom: 0,
-  },
+ brandSub: {
+  color: "#6b7280",
+  fontSize: "1.05rem",
+  marginTop: 8,
+  marginBottom: 0,
+  lineHeight: 1.4,
+},
   progressWrap: {
     marginBottom: 20,
   },
