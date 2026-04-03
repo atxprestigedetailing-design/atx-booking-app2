@@ -1108,14 +1108,14 @@ const data = await res.json();
                 </div>
                 <div style={styles.summaryCard}>
 
-                  <div style={styles.summaryCard}>
-  <div style={styles.summaryHeading}>Appointment Type</div>
-  <div style={styles.summaryValue}>
-    {serviceType === "mobile" ? "Mobile Service" : serviceType === "dropoff" ? "Drop-Off Service" : "N/A"}
-    <br />
-    {address || "No address provided"}
+  <div style={styles.summaryCard}>
+    <div style={styles.summaryHeading}>Appointment Type</div>
+    <div style={styles.summaryValue}>
+      {serviceType === "mobile" ? "Mobile Service" : serviceType === "dropoff" ? "Drop-Off Service" : "N/A"}
+      <br />
+      {address || "No address provided"}
+    </div>
   </div>
-</div>
   <div style={styles.summaryHeading}>Vehicle</div>
   <div style={styles.summaryValue}>
     {year || "N/A"} {make || ""} {model || ""}
