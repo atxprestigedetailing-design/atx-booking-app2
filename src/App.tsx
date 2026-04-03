@@ -127,13 +127,17 @@ useEffect(() => {
   const loadMakes = async () => {
     try {
       setLoadingMakes(true);
+
+      const vehicleTypeForApi =
+        vehicle === "truckSuv" ? "truck" : "car";
+
       const res = await fetch(
-        "https://vpic.nhtsa.dot.gov/api/vehicles/GetAllMakes?format=json"
+        `https://vpic.nhtsa.dot.gov/api/vehicles/GetMakesForVehicleType/${vehicleTypeForApi}?format=json`
       );
       const data = await res.json();
 
       const makes =
-        data.Results?.map((item: any) => item.Make_Name)
+        data.Results?.map((item: any) => item.MakeName || item.Make_Name)
           .filter(Boolean)
           .sort((a: string, b: string) => a.localeCompare(b)) || [];
 
@@ -146,12 +150,16 @@ useEffect(() => {
     }
   };
 
-  loadMakes();
-}, []);
+  if (vehicle) {
+    loadMakes();
+  } else {
+    setMakeOptions([]);
+  }
+}, [vehicle]);
 
 useEffect(() => {
   const loadModels = async () => {
-    if (!year || !make) {
+    if (!year || !make || !vehicle) {
       setModelOptions([]);
       return;
     }
@@ -159,10 +167,13 @@ useEffect(() => {
     try {
       setLoadingModels(true);
 
+      const vehicleTypeForApi =
+        vehicle === "truckSuv" ? "truck" : "car";
+
       const res = await fetch(
         `https://vpic.nhtsa.dot.gov/api/vehicles/GetModelsForMakeYear/make/${encodeURIComponent(
           make
-        )}/modelyear/${year}?format=json`
+        )}/modelyear/${year}/vehicletype/${vehicleTypeForApi}?format=json`
       );
       const data = await res.json();
 
@@ -181,7 +192,7 @@ useEffect(() => {
   };
 
   loadModels();
-}, [year, make]);
+}, [year, make, vehicle]);
 
 useEffect(() => {
   if (step !== 4 || serviceType !== "mobile") return;
@@ -676,9 +687,15 @@ vehicleRow: {
                         ...(isSelected ? styles.selectedCard : {}),
                       }}
                       onClick={() => {
-                        setVehicle(option.id);
-                        setPkg("");
-                      }}
+  setVehicle(option.id);
+  setPkg("");
+
+  // 👇 ADD THIS
+  setMake("");
+  setModel("");
+  setMakeOptions([]);
+  setModelOptions([]);
+}}
                     >
                       <div style={styles.optionTitle}>{option.label}</div>
                       <div style={styles.optionMeta}>
@@ -1040,10 +1057,12 @@ vehicleRow: {
       style={{ ...styles.input, flex: 1, minWidth: 120, backgroundColor: "#fff", color: "#111827" }}
       value={year}
       onChange={(e) => {
-        setYear(e.target.value);
-        setModel("");
-        setModelOptions([]);
-      }}
+  setYear(e.target.value);
+
+  // 👇 ADD THIS
+  setModel("");
+  setModelOptions([]);
+}}
     >
       <option value="">Year</option>
       {yearOptions.map((yr) => (
@@ -1057,10 +1076,12 @@ vehicleRow: {
       style={{ ...styles.input, flex: 2, minWidth: 180, backgroundColor: "#fff", color: "#111827" }}
       value={make}
       onChange={(e) => {
-        setMake(e.target.value);
-        setModel("");
-        setModelOptions([]);
-      }}
+  setMake(e.target.value);
+
+  // 👇 ADD THIS
+  setModel("");
+  setModelOptions([]);
+}}
       disabled={loadingMakes}
     >
       <option value="">{loadingMakes ? "Loading makes..." : "Make"}</option>
