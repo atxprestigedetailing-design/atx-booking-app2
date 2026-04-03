@@ -1189,13 +1189,20 @@ vehicleRow: {
                     {estimateText || "N/A"}
                   </div>
                 </div>
-
-                <div style={styles.summaryCard}>
+<div style={styles.summaryCard}>
   <div style={styles.summaryHeading}>Appointment Type</div>
   <div style={styles.summaryValue}>
-    {serviceType === "mobile" ? "Mobile Service" : serviceType === "dropoff" ? "Drop-Off Service" : "N/A"}
-    <br />
-    {address || "No address provided"}
+    {serviceType === "mobile"
+      ? "Mobile Service"
+      : serviceType === "dropoff"
+      ? "Drop-Off Service"
+      : "N/A"}
+    {serviceType === "mobile" && address && (
+      <>
+        <br />
+        {address}
+      </>
+    )}
   </div>
 </div>
                 <div style={styles.summaryCard}>
@@ -1214,16 +1221,7 @@ vehicleRow: {
                   </div>
                 </div>
 
-                <div style={styles.summaryCard}>
-                  <div style={styles.summaryHeading}>Appointment Type</div>
-                  <div style={styles.summaryValue}>
-                    {serviceType === "mobile"
-                      ? `Mobile Service${address ? ` — ${address}` : ""}`
-                      : serviceType === "dropoff"
-                      ? "Drop-Off Service"
-                      : "N/A"}
-                  </div>
-                </div>
+              
 
                 <div style={styles.summaryCard}>
                   <div style={styles.summaryHeading}>Estimated Add-Ons</div>
