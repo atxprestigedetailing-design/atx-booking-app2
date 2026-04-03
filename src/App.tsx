@@ -1,7 +1,5 @@
 import { useMemo, useState } from "react";
 import logo from "./assets/logo.png";
-const SCRIPT_URL =
-  "https://script.google.com/macros/s/AKfycbwbGkPF9HaX6SE3cuphh0Ynj__Q1VdThuU6SLpFbWf0axsvXYStfTpszpQ3y9vZ9O8GhQ/exec";
 type VehicleType = "truckSuv" | "sedan" | "coupe" | "";
 type PackageType = "basic" | "premium" | "";
 type ServiceType = "mobile" | "dropoff" | "";
