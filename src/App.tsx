@@ -46,6 +46,16 @@ const vehicleOptions = [
   },
 ];
 
+function formatDateLabel(dateStr: string) {
+  const date = new Date(dateStr);
+
+  return date.toLocaleDateString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  });
+}
+
 const addOnOptions: {
   label: AddOn;
   priceText: string;
@@ -171,45 +181,44 @@ useEffect(() => {
     maxWidth: 920,
     margin: "0 auto",
   } as const,
- brand: {
+brand: {
   display: "flex",
   justifyContent: "center",
-  marginBottom: 28,
+  marginBottom: 32,
 } as const,
 brandRow: {
   display: "grid",
-  gridTemplateColumns: "100px auto",
+  gridTemplateColumns: "110px auto",
   alignItems: "center",
-  gap: 18,
-  maxWidth: 780,
+  gap: 20,
+  maxWidth: 760,
   width: "100%",
-},
+} as const,
 
 
 logo: {
-  width: 96,
-  height: 96,
+  width: 110,
+  height: 110,
   objectFit: "contain" as const,
   opacity: 1,
-  filter: "drop-shadow(0 3px 10px rgba(0,0,0,0.12))",
 },
  brandTitle: {
-  fontSize: "2.6rem",
+  fontSize: "2.8rem",
   fontWeight: 800,
-  letterSpacing: "-0.8px",
+  letterSpacing: "-1px",
   color: "#111827",
   margin: 0,
-  lineHeight: 1.1,
+  lineHeight: 1.05,
 },
  brandSub: {
   color: "#6b7280",
   fontSize: "1.05rem",
-  marginTop: 8,
+  marginTop: 10,
   marginBottom: 0,
-  lineHeight: 1.4,
+  lineHeight: 1.45,
 },
   progressWrap: {
-    marginBottom: 20,
+    marginBottom: 28,
   },
   progressText: {
     display: "flex",
@@ -467,7 +476,11 @@ vehicleRow: {
       <div style={styles.container}>
 <div style={styles.brand}>
   <div style={styles.brandRow}>
-    <img src={logo} alt="ATX Prestige Detailing logo" style={styles.logo} />
+    <img
+      src={logo}
+      alt="ATX Prestige Detailing logo"
+      style={styles.logo}
+    />
     <div>
       <h1 style={styles.brandTitle}>ATX Prestige Detailing</h1>
       <p style={styles.brandSub}>
@@ -765,11 +778,11 @@ vehicleRow: {
   >
     <option value="">Select a date</option>
 
-    {availableDates.map((date, index) => (
-      <option key={index} value={date}>
-        {date}
-      </option>
-    ))}
+   {availableDates.map((date, index) => (
+  <option key={index} value={date}>
+    {formatDateLabel(date)}
+  </option>
+))}
   </select>
 </div>
 
@@ -911,10 +924,10 @@ vehicleRow: {
                     {email}
                   </div>
                 </div>
-                <div style={styles.summaryCard}>
+               <div style={styles.summaryCard}>
   <div style={styles.summaryHeading}>Appointment</div>
   <div style={styles.summaryValue}>
-    {selectedDate || "N/A"}
+    {selectedDate ? formatDateLabel(selectedDate) : "N/A"}
     <br />
     {selectedTime || "N/A"}
   </div>
@@ -1054,10 +1067,10 @@ const data = await res.json();
                     {email}
                   </div>
                 </div>
-                <div style={styles.summaryCard}>
+              <div style={styles.summaryCard}>
   <div style={styles.summaryHeading}>Appointment</div>
   <div style={styles.summaryValue}>
-    {selectedDate || "N/A"}
+    {selectedDate ? formatDateLabel(selectedDate) : "N/A"}
     <br />
     {selectedTime || "N/A"}
   </div>
