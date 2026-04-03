@@ -12,7 +12,7 @@ const SCRIPT_URL =
   const res = await fetch(
     `${SCRIPT_URL}?action=getAvailability&date=${encodeURIComponent(date)}`
   );
-  const data = await res.json();
+  const data: { slots: AvailabilitySlot[] } = await res.json();
   return data.slots || [];
 }
 type VehicleType = "truckSuv" | "sedan" | "coupe" | "";
@@ -817,10 +817,30 @@ vehicleRow: {
                   <button
                     style={{
                       ...styles.primaryButton,
-                      ...((!name || !phone || !email) ? styles.disabledButton : {}),
+                     ...(
+  (!name ||
+    !phone ||
+    !email ||
+    !year ||
+    !make ||
+    !model ||
+    !selectedDate ||
+    !selectedTime)
+    ? styles.disabledButton
+    : {}
+),
                     }}
                     onClick={next}
-                    disabled={!name || !phone || !email || !year || !make || !model}
+                    disabled={
+  !name ||
+  !phone ||
+  !email ||
+  !year ||
+  !make ||
+  !model ||
+  !selectedDate ||
+  !selectedTime
+}
                   >
                     Review Booking
                   </button>
@@ -895,29 +915,31 @@ vehicleRow: {
   style={styles.primaryButton}
   onClick={async () => {
     try {
-      const res = await fetch(SCRIPT_URL, {
-        method: "POST",
-        body: JSON.stringify({
-          name,
-          phone,
-          email,
-          year,
-          make,
-          model,
-          vehicle,
-          packageType: pkg,
-          hourlyRate,
-          addOns: addOns.join(", "),
-          addOnEstimate,
-          serviceType,
-          address,
-          avgTime: packageHours,
-          date: selectedDate,
-time: selectedTime,
-        }),
-      });
+ const res = await fetch(SCRIPT_URL, {
+  method: "POST",
+  body: JSON.stringify({
+    action: "bookAppointment",
+    name,
+    phone,
+    email,
+    date: selectedDate,
+    time: selectedTime,
+    year,
+    make,
+    model,
+    vehicle,
+    packageType: pkg,
+    hourlyRate,
+    addOns: addOns.join(", "),
+    addOnEstimate,
+    serviceType,
+    address,
+    avgTime: packageHours,
+  }),
+});
 
-      const data = await res.json();
+const data = await res.json();
+
 
       if (data.success) {
         alert("Booking submitted successfully!");
