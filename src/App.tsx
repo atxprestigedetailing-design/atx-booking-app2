@@ -1,7 +1,14 @@
-import { useMemo, useState, useEffect } from "react";
+
 import logo from "./assets/logo.png";
+import { useEffect, useMemo, useRef, useState } from "react";
+declare global {
+  interface Window {
+    google: any;
+  }
+}
+const addressInputRef = useRef(null);
 const SCRIPT_URL =
-   "https://script.google.com/macros/s/AKfycbwOg4Dce1RqtxbRbYAAcp30fyvlXD1ynzcz_Ezlr1znSAT3AmUzQ0h0dLz1fNpg_FQPjA/exec";
+   "https://script.google.com/macros/s/AKfycbwzc5YR9p1-FfoU5fGent2NJwnlUO24uqivy4SRbYCahfNzdjfFu1Sg-Ry0ltuCIoH8bw/exec";
    type AvailabilitySlot = {
   date: string;
   time: string;
@@ -84,7 +91,6 @@ export default function App() {
   const [pkg, setPkg] = useState<PackageType>("");
   const [addOns, setAddOns] = useState<AddOn[]>([]);
   const [serviceType, setServiceType] = useState<ServiceType>("");
-  const [address, setAddress] = useState("");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
@@ -96,6 +102,62 @@ const [availableSlots, setAvailableSlots] = useState<AvailabilitySlot[]>([]);
 const [allAvailableSlots, setAllAvailableSlots] = useState<AvailabilitySlot[]>([]);
 const [availableDates, setAvailableDates] = useState<string[]>([]);
 const [selectedTime, setSelectedTime] = useState("");
+const [address, setAddress] = useState("");
+const [street, setStreet] = useState("");
+const [city, setCity] = useState("");
+const [stateRegion, setStateRegion] = useState("");
+const [zip, setZip] = useState("");
+const [placeId, setPlaceId] = useState("");
+const [lat, setLat] = useState("");
+const [lng, setLng] = useState("");
+const [addressSelected, setAddressSelected] = useState(false);
+
+useEffect(() => {
+  if (!window.google || !window.google.maps || !window.google.maps.places) return;
+  if (!addressInputRef.current) return;
+
+  const autocomplete = new window.google.maps.places.Autocomplete(addressInputRef.current, {
+    types: ["address"],
+    componentRestrictions: { country: "us" },
+    fields: ["address_components", "formatted_address", "geometry", "place_id"],
+  });
+
+  autocomplete.addListener("place_changed", () => {
+    const place = autocomplete.getPlace();
+
+    if (!place || !place.address_components) return;
+
+    let streetNumber = "";
+    let route = "";
+    let locality = "";
+    let adminArea = "";
+    let postalCode = "";
+
+   place.address_components.forEach((component: any) => {
+      const types = component.types;
+
+      if (types.includes("street_number")) streetNumber = component.long_name;
+      if (types.includes("route")) route = component.long_name;
+      if (types.includes("locality")) locality = component.long_name;
+      if (types.includes("administrative_area_level_1")) adminArea = component.short_name;
+      if (types.includes("postal_code")) postalCode = component.long_name;
+    });
+
+    const streetValue = [streetNumber, route].filter(Boolean).join(" ");
+
+    setAddress(place.formatted_address || "");
+    setStreet(streetValue);
+    setCity(locality);
+    setStateRegion(adminArea);
+    setZip(postalCode);
+    setPlaceId(place.place_id || "");
+    setLat(place.geometry?.location?.lat?.() ?? "");
+    setLng(place.geometry?.location?.lng?.() ?? "");
+    setAddressSelected(true);
+  });
+}, []);
+
+
 useEffect(() => {
   const loadAllAvailability = async () => {
     try {
@@ -746,11 +808,16 @@ vehicleRow: {
               {serviceType === "mobile" && (
                 <div style={{ marginTop: 18 }}>
                   <input
-                    style={styles.input}
-                    placeholder="Enter service address"
-                    value={address}
-                    onChange={(e) => setAddress(e.target.value)}
-                  />
+  ref={addressInputRef}
+  type="text"
+  value={address}
+  onChange={(e) => {
+    setAddress(e.target.value);
+    setAddressSelected(false);
+  }}
+  placeholder="Start typing your service address"
+  style={styles.input}
+/>
                 </div>
               )}
 
@@ -1018,45 +1085,63 @@ vehicleRow: {
                   <button
   style={styles.primaryButton}
   onClick={async () => {
-    try {
- const res = await fetch(SCRIPT_URL, {
-  method: "POST",
-  body: JSON.stringify({
-    action: "bookAppointment",
-    name,
-    phone,
-    email,
-    date: selectedDate,
-    time: selectedTime,
-    year,
-    make,
-    model,
-    vehicle,
-    packageType: pkg,
-    hourlyRate,
-    addOns: addOns.join(", "),
-    addOnEstimate,
-    serviceType,
-    address,
-    avgTime: packageHours,
-  }),
-});
-
-const data = await res.json();
-
-
-      if (data.success) {
-        alert("Booking submitted successfully!");
-        next();
-      } else {
-        alert("Something went wrong.");
-        console.error(data);
+  try {
+    if (serviceType === "mobile") {
+      if (!address.trim()) {
+        alert("Please enter your service address.");
+        return;
       }
-    } catch (err) {
-      console.error(err);
-      alert("Error submitting booking.");
+
+      if (!addressSelected) {
+        alert("Please select a valid address from the dropdown.");
+        return;
+      }
     }
-  }}
+
+    const res = await fetch(SCRIPT_URL, {
+      method: "POST",
+      body: JSON.stringify({
+        action: "bookAppointment",
+        name,
+        phone,
+        email,
+        date: selectedDate,
+        time: selectedTime,
+        year,
+        make,
+        model,
+        vehicle,
+        packageType: pkg,
+        hourlyRate,
+        addOns: addOns.join(", "),
+        addOnEstimate,
+        serviceType,
+        address,
+        street,
+        city,
+        state: stateRegion,
+        zip,
+        placeId,
+        lat,
+        lng,
+        avgTime: packageHours,
+      }),
+    });
+
+    const data = await res.json();
+
+    if (data.success) {
+      alert("Booking submitted successfully!");
+      next();
+    } else {
+      alert("Something went wrong.");
+      console.error(data);
+    }
+  } catch (err) {
+    alert("Something went wrong.");
+    console.error(err);
+  }
+}}
 >
   Submit Booking
 </button>
