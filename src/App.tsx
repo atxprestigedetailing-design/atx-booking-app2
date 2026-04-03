@@ -747,20 +747,30 @@ vehicleRow: {
 <div style={{ marginTop: 20 }}>
   <div style={styles.sectionLabel}>Available Time</div>
 
-  <select
-    style={styles.input}
-    value={selectedTime}
-    onChange={(e) => setSelectedTime(e.target.value)}
-    disabled={!availableSlots.length}
-  >
-    <option value="">Select a time</option>
+ <select
+  style={{
+    ...styles.input,
+    backgroundColor: "#ffffff",
+    color: "#111827",
+    cursor: "pointer",
+  }}
+  value={selectedTime}
+  onChange={(e) => setSelectedTime(e.target.value)}
+  disabled={false}
+>
+  <option value="">Select a time</option>
 
-    {availableSlots.map((slot, index) => (
-      <option key={index} value={slot.time}>
-        {slot.time}
-      </option>
-    ))}
-  </select>
+  {availableSlots.map((slot, index) => (
+    <option key={index} value={slot.time}>
+      {slot.time}
+    </option>
+  ))}
+</select>
+<div style={{ marginTop: 8, fontSize: "0.95rem", color: "#111827" }}>
+  {availableSlots.map((slot, index) => (
+    <div key={index}>{slot.time}</div>
+  ))}
+</div>
   {selectedDate && availableSlots.length === 0 && (
   <div style={{ marginTop: 8, color: "#b91c1c", fontSize: "0.95rem" }}>
     No available times found for this date.
