@@ -90,6 +90,8 @@ useEffect(() => {
   const loadSlots = async () => {
     try {
       const slots = await fetchAvailability(selectedDate);
+      console.log("selectedDate:", selectedDate);
+      console.log("slots:", slots);
       setAvailableSlots(slots);
     } catch (err) {
       console.error("Error loading availability", err);
@@ -759,6 +761,11 @@ vehicleRow: {
       </option>
     ))}
   </select>
+  {selectedDate && availableSlots.length === 0 && (
+  <div style={{ marginTop: 8, color: "#b91c1c", fontSize: "0.95rem" }}>
+    No available times found for this date.
+  </div>
+)}
 </div>
                 <input
                   style={styles.input}
