@@ -611,6 +611,15 @@ vehicleRow: {
                 })}
               </div>
 
+              <div style={{
+  marginTop: 8,
+  fontSize: "0.9rem",
+  color: "#6b7280",
+  fontStyle: "italic"
+}}>
+  Estimated time is based on the condition of the vehicle and may vary at the time of service.
+</div>
+
               <div style={styles.estimateBox}>
                 <div style={styles.estimateLabel}>Estimate</div>
                 <div style={styles.estimateValue}>{estimateText || "$ per hour"}</div>
