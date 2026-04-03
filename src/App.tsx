@@ -8,10 +8,9 @@ const SCRIPT_URL =
   available?: boolean;
   notes?: string;
 };
-  async function fetchAvailability(date: string): Promise<AvailabilitySlot[]> {
-  const res = await fetch(
-    `${SCRIPT_URL}?action=getAvailability&date=${encodeURIComponent(date)}`
-  );
+ 
+async function fetchAllAvailability(): Promise<AvailabilitySlot[]> {
+  const res = await fetch(`${SCRIPT_URL}?action=getAllAvailability`);
   const data: { slots: AvailabilitySlot[] } = await res.json();
   return data.slots || [];
 }
@@ -83,24 +82,35 @@ const [make, setMake] = useState("");
 const [model, setModel] = useState("");
 const [selectedDate, setSelectedDate] = useState("");
 const [availableSlots, setAvailableSlots] = useState<AvailabilitySlot[]>([]);
+const [allAvailableSlots, setAllAvailableSlots] = useState<AvailabilitySlot[]>([]);
+const [availableDates, setAvailableDates] = useState<string[]>([]);
 const [selectedTime, setSelectedTime] = useState("");
 useEffect(() => {
-  if (!selectedDate) return;
-
-  const loadSlots = async () => {
+  const loadAllAvailability = async () => {
     try {
-      const slots = await fetchAvailability(selectedDate);
-      console.log("selectedDate:", selectedDate);
-      console.log("slots:", slots);
-      setAvailableSlots(slots);
+      const slots = await fetchAllAvailability();
+      setAllAvailableSlots(slots);
+
+      const uniqueDates = [...new Set(slots.map((slot) => slot.date))];
+      setAvailableDates(uniqueDates);
     } catch (err) {
-      console.error("Error loading availability", err);
-      setAvailableSlots([]);
+      console.error("Error loading all availability", err);
+      setAllAvailableSlots([]);
+      setAvailableDates([]);
     }
   };
 
-  loadSlots();
-}, [selectedDate]);
+  loadAllAvailability();
+}, []);
+useEffect(() => {
+  if (!selectedDate) {
+    setAvailableSlots([]);
+    return;
+  }
+
+  const filtered = allAvailableSlots.filter((slot) => slot.date === selectedDate);
+  setAvailableSlots(filtered);
+}, [selectedDate, allAvailableSlots]);
 
   const selectedVehicle = vehicleOptions.find((v) => v.id === vehicle);
 
@@ -730,18 +740,30 @@ vehicleRow: {
               </p>
 
               <div style={styles.inputGrid}>
-                <div style={{ marginTop: 20 }}>
-  <div style={styles.sectionLabel}>Select Appointment Date</div>
+  <div style={{ marginTop: 20 }}>
+    <div style={styles.sectionLabel}>Select Appointment Date</div>
 
-  <input
-    type="date"
-    style={styles.input}
+  <select
+    style={{
+      ...styles.input,
+      backgroundColor: "#ffffff",
+      color: "#111827",
+      cursor: "pointer",
+    }}
     value={selectedDate}
     onChange={(e) => {
       setSelectedDate(e.target.value);
       setSelectedTime("");
     }}
-  />
+  >
+    <option value="">Select a date</option>
+
+    {availableDates.map((date, index) => (
+      <option key={index} value={date}>
+        {date}
+      </option>
+    ))}
+  </select>
 </div>
 
 <div style={{ marginTop: 20 }}>
