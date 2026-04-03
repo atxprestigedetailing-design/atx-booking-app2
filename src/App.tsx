@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import logo from "./assets/logo.png";
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwbGkPF9HaX6SE3cuphh0Ynj__Q1VdThuU6SLpFbWf0axsvXYStfTpszpQ3y9vZ9O8GhQ/exec";
+const SCRIPT_URL =
+  "https://script.google.com/macros/s/AKfycbwbGkPF9HaX6SE3cuphh0Ynj__Q1VdThuU6SLpFbWf0axsvXYStfTpszpQ3y9vZ9O8GhQ/exec";
 type VehicleType = "truckSuv" | "sedan" | "coupe" | "";
 type PackageType = "basic" | "premium" | "";
 type ServiceType = "mobile" | "dropoff" | "";
@@ -64,6 +65,9 @@ export default function App() {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
+  const [year, setYear] = useState("");
+const [make, setMake] = useState("");
+const [model, setModel] = useState("");
 
   const selectedVehicle = vehicleOptions.find((v) => v.id === vehicle);
 
@@ -125,35 +129,35 @@ export default function App() {
     margin: "0 auto",
   } as const,
   brand: {
+    textAlign: "center" as const,
+    marginBottom: 24,
+  },
+  brandRow: {
   display: "flex",
-  flexDirection: "column" as const,
   alignItems: "center",
   justifyContent: "center",
-  marginBottom: 28,
+  gap: 12,
+  marginBottom: 8,
 },
 
 logo: {
-  width: 120,
-  height: 120,
+  width: 80,
+  height: 80,
   objectFit: "contain" as const,
-  marginBottom: 10,
-  filter: "drop-shadow(0 4px 10px rgba(0,0,0,0.10))",
+  filter: "drop-shadow(0 2px 6px rgba(0,0,0,0.15))",
 },
   brandTitle: {
-  fontSize: "2.15rem",
+  fontSize: "2rem",
   fontWeight: 700,
-  letterSpacing: "-0.6px",
+  letterSpacing: "-0.5px",
   color: "#111827",
-  margin: 0,
-  textAlign: "center" as const,
 },
   brandSub: {
-  color: "#6b7280",
-  fontSize: "1rem",
-  marginTop: 8,
-  marginBottom: 0,
-  textAlign: "center" as const,
-},
+    color: "#6b7280",
+    fontSize: "0.98rem",
+    marginTop: 10,
+    marginBottom: 0,
+  },
   progressWrap: {
     marginBottom: 20,
   },
@@ -397,11 +401,15 @@ logo: {
     <div style={styles.page}>
       <div style={styles.container}>
 <div style={styles.brand}>
-  <img src={logo} alt="ATX Prestige Detailing logo" style={styles.logo} />
-  <h1 style={styles.brandTitle}>ATX Prestige Detailing</h1>
-  <p style={styles.brandSub}>
-    Private build version — refining the experience before launch
-  </p>
+  <div style={styles.brandRow}>
+    <img src={logo} alt="ATX Prestige Detailing logo" style={styles.logo} />
+    <div>
+      <h1 style={styles.brandTitle}>ATX Prestige Detailing</h1>
+      <p style={styles.brandSub}>
+        Private build version — refining the experience before launch
+      </p>
+    </div>
+  </div>
 </div>
 
         <div style={styles.progressWrap}>
@@ -692,7 +700,26 @@ logo: {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                 />
-              </div>
+              </div> <div style={{ display: "flex", gap: 8 }}>
+  <input
+    style={{ ...styles.input, flex: 1 }}
+    placeholder="Year"
+    value={year}
+    onChange={(e) => setYear(e.target.value)}
+  />
+  <input
+    style={{ ...styles.input, flex: 2 }}
+    placeholder="Make"
+    value={make}
+    onChange={(e) => setMake(e.target.value)}
+  />
+  <input
+    style={{ ...styles.input, flex: 2 }}
+    placeholder="Model"
+    value={model}
+    onChange={(e) => setModel(e.target.value)}
+  />
+</div>
 
               <div style={styles.buttonRow}>
                 <button style={styles.secondaryButton} onClick={back}>
@@ -705,7 +732,7 @@ logo: {
                       ...((!name || !phone || !email) ? styles.disabledButton : {}),
                     }}
                     onClick={next}
-                    disabled={!name || !phone || !email}
+                    disabled={!name || !phone || !email || !year || !make || !model}
                   >
                     Review Booking
                   </button>
@@ -775,45 +802,11 @@ logo: {
                 <button style={styles.secondaryButton} onClick={back}>
                   Back
                 </button>
-<div style={styles.rightButtons}>
-  <button
-    style={styles.primaryButton}
-    onClick={async () => {
-      try {
-        const res = await fetch(SCRIPT_URL, {
-          method: "POST",
-          body: JSON.stringify({
-            name,
-            phone,
-            email,
-            vehicle,
-            packageType: pkg,
-            hourlyRate,
-            addOns: addOns.join(", "),
-            addOnEstimate,
-            serviceType,
-            address,
-            avgTime: packageHours,
-          }),
-        });
-
-        const data = await res.json();
-
-        if (data.success) {
-          alert("Booking submitted successfully!");
-          next(); // go to success screen
-        } else {
-          alert("Something went wrong.");
-        }
-      } catch (err) {
-        console.error(err);
-        alert("Error submitting booking.");
-      }
-    }}
-  >
-    Submit Booking
-  </button>
-</div>
+                <div style={styles.rightButtons}>
+                  <button style={styles.primaryButton} onClick={next}>
+                    Submit Booking
+                  </button>
+                </div>
               </div>
             </>
           )}
