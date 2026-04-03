@@ -485,7 +485,7 @@ vehicleRow: {
     <div>
       <h1 style={styles.brandTitle}>ATX Prestige Detailing</h1>
       <p style={styles.brandSub}>
-        Private build version — refining the experience before launch
+        Defined by Detail, Driven by Standards, Trusted for Prestige
       </p>
     </div>
   </div>
