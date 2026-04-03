@@ -716,7 +716,7 @@ vehicleRow: {
                   onChange={(e) => setEmail(e.target.value)}
                 />
               </div> <div style={{ display: "flex", gap: 8 }}>
-                <div style={styles.sectionLabel}>Vehicle Information</div>
+                
   </div>
 
 <div style={{ marginTop: 24 }}>
