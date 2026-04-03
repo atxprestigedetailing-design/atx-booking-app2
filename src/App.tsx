@@ -6,7 +6,7 @@ declare global {
     google: any;
   }
 }
-const addressInputRef = useRef(null);
+
 const SCRIPT_URL =
    "https://script.google.com/macros/s/AKfycbwzc5YR9p1-FfoU5fGent2NJwnlUO24uqivy4SRbYCahfNzdjfFu1Sg-Ry0ltuCIoH8bw/exec";
    type AvailabilitySlot = {
@@ -86,6 +86,7 @@ function formatCurrency(value: number) {
 }
 
 export default function App() {
+  const addressInputRef = useRef(null);
   const [step, setStep] = useState(0);
   const [vehicle, setVehicle] = useState<VehicleType>("");
   const [pkg, setPkg] = useState<PackageType>("");
