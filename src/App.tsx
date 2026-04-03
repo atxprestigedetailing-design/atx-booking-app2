@@ -809,11 +809,7 @@ vehicleRow: {
     </option>
   ))}
 </select>
-<div style={{ marginTop: 8, fontSize: "0.95rem", color: "#111827" }}>
-  {availableSlots.map((slot, index) => (
-    <div key={index}>{slot.time}</div>
-  ))}
-</div>
+
   {selectedDate && availableSlots.length === 0 && (
   <div style={{ marginTop: 8, color: "#b91c1c", fontSize: "0.95rem" }}>
     No available times found for this date.
