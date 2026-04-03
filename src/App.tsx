@@ -177,12 +177,12 @@ useEffect(() => {
   marginBottom: 28,
 } as const,
 brandRow: {
-  display: "flex",
+  display: "grid",
+  gridTemplateColumns: "100px auto",
   alignItems: "center",
-  justifyContent: "center",
   gap: 18,
-  flexWrap: "wrap" as const,
-  textAlign: "left" as const,
+  maxWidth: 780,
+  width: "100%",
 },
 
 
