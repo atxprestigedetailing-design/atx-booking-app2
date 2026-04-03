@@ -1132,17 +1132,6 @@ const data = await res.json();
                 </div>
 
                 <div style={styles.summaryCard}>
-                  <div style={styles.summaryHeading}>Appointment Type</div>
-                  <div style={styles.summaryValue}>
-                    {serviceType === "mobile"
-                      ? `Mobile Service${address ? ` — ${address}` : ""}`
-                      : serviceType === "dropoff"
-                      ? "Drop-Off Service"
-                      : "N/A"}
-                  </div>
-                </div>
-
-                <div style={styles.summaryCard}>
                   <div style={styles.summaryHeading}>Estimated Add-Ons</div>
                   <div style={styles.summaryValue}>{formatCurrency(addOnEstimate)}</div>
                 </div>
