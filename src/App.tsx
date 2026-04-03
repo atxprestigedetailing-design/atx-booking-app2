@@ -619,7 +619,19 @@ vehicleRow: {
               <div style={styles.noteBox}>
                 If wanting to see what’s included in basic/premium packages go to
                 <br />
-                <strong>atxprestigedetailing.com</strong>
+                <a
+  href="https://ATXPrestigeDetailing.com"
+  target="_blank"
+  rel="noopener noreferrer"
+  style={{
+  color: "#111827",
+  textDecoration: "none",
+  fontWeight: 600,
+  borderBottom: "1px solid #d1d5db",
+}}
+>
+  ATXPrestigeDetailing.com
+</a>
               </div>
 
               <div style={styles.buttonRow}>
