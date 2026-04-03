@@ -217,6 +217,7 @@ logo: {
   marginTop: 10,
   marginBottom: 0,
   lineHeight: 1.45,
+  fontStyle: "italic",
 },
   progressWrap: {
     marginBottom: 28,
