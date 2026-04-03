@@ -1,7 +1,7 @@
 import { useMemo, useState, useEffect } from "react";
 import logo from "./assets/logo.png";
 const SCRIPT_URL =
-   "https://script.google.com/macros/s/AKfycbxGUyx910WdyqD4NOfevCBFo3Nx0tFBmn9MpOKnzsU4_KP7VpHwXyFzahd9Oi4N52o89g/exec";
+   "https://script.google.com/macros/s/AKfycbynzO5kZ4E8jWtTRjYKwcowpW97CEeXW4gFONB1RZUkB5AsSWQOWmee6-ymbMexgCy0Fw/exec";
    type AvailabilitySlot = {
   date: string;
   time: string;
