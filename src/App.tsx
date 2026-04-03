@@ -114,19 +114,22 @@ const [lng, setLng] = useState("");
 const [addressSelected, setAddressSelected] = useState(false);
 
 useEffect(() => {
-  if (!window.google || !window.google.maps || !window.google.maps.places) return;
+  if (step !== 4 || serviceType !== "mobile") return;
+  if (!window.google?.maps?.places) return;
   if (!addressInputRef.current) return;
 
-  const autocomplete = new window.google.maps.places.Autocomplete(addressInputRef.current, {
-    types: ["address"],
-    componentRestrictions: { country: "us" },
-    fields: ["address_components", "formatted_address", "geometry", "place_id"],
-  });
+  const autocomplete = new window.google.maps.places.Autocomplete(
+    addressInputRef.current,
+    {
+      types: ["address"],
+      componentRestrictions: { country: "us" },
+      fields: ["address_components", "formatted_address", "geometry", "place_id"],
+    }
+  );
 
-  autocomplete.addListener("place_changed", () => {
+  const listener = autocomplete.addListener("place_changed", () => {
     const place = autocomplete.getPlace();
-
-    if (!place || !place.address_components) return;
+    if (!place?.address_components) return;
 
     let streetNumber = "";
     let route = "";
@@ -134,7 +137,7 @@ useEffect(() => {
     let adminArea = "";
     let postalCode = "";
 
-   place.address_components.forEach((component: any) => {
+    place.address_components.forEach((component: any) => {
       const types = component.types;
 
       if (types.includes("street_number")) streetNumber = component.long_name;
@@ -156,7 +159,13 @@ useEffect(() => {
     setLng(place.geometry?.location?.lng?.() ?? "");
     setAddressSelected(true);
   });
-}, []);
+
+  return () => {
+    if (listener) {
+      window.google.maps.event.removeListener(listener);
+    }
+  };
+}, [step, serviceType]);
 
 
 useEffect(() => {
@@ -781,7 +790,10 @@ vehicleRow: {
                     ...styles.optionCard,
                     ...(serviceType === "mobile" ? styles.selectedCard : {}),
                   }}
-                  onClick={() => setServiceType("mobile")}
+                  onClick={() => {
+  setServiceType("mobile");
+  setAddressSelected(false);
+}}
                 >
                   <div style={styles.optionTitle}>Mobile Service</div>
                   <div style={styles.optionMeta}>
@@ -795,9 +807,17 @@ vehicleRow: {
                     ...(serviceType === "dropoff" ? styles.selectedCard : {}),
                   }}
                   onClick={() => {
-                    setServiceType("dropoff");
-                    setAddress("");
-                  }}
+  setServiceType("dropoff");
+  setAddress("");
+  setStreet("");
+  setCity("");
+  setStateRegion("");
+  setZip("");
+  setPlaceId("");
+  setLat("");
+  setLng("");
+  setAddressSelected(false);
+}}
                 >
                   <div style={styles.optionTitle}>Drop-Off Service</div>
                   <div style={styles.optionMeta}>
