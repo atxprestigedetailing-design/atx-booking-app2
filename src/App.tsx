@@ -659,10 +659,6 @@ vehicleRow: {
           {step === 0 && (
             <>
               <h2 style={styles.title}>Book a Detail Service</h2>
-              <p style={styles.subtitle}>
-                Simple guided booking flow for mobile detailing, package selection,
-                add-ons, and appointment requests.
-              </p>
               <div style={styles.heroButtonWrap}>
                 <button style={styles.primaryButton} onClick={next}>
                   Book Detail Service
@@ -1157,7 +1153,7 @@ vehicleRow: {
           {step === 6 && (
             <>
               <h2 style={styles.title}>Review Booking</h2>
-              <p style={styles.subtitle}>Review the request details before submitting.</p>
+              <p style={styles.subtitle}>Provide contact and vehicle details for appointment confirmation.</p>
 
               <div style={styles.summaryGrid}>
                 <div style={styles.summaryCard}>
