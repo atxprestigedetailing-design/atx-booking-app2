@@ -1362,22 +1362,7 @@ vehicleRow: {
   </div>
 </div>
 
-<div style={styles.summaryCard}>
-  <div style={styles.summaryHeading}>Appointment Type</div>
-  <div style={styles.summaryValue}>
-    {serviceType === "mobile"
-      ? "Mobile Service"
-      : serviceType === "dropoff"
-      ? "Drop-Off Service"
-      : "N/A"}
-    {serviceType === "mobile" && (
-      <>
-        <br />
-        {address || "No address provided"}
-      </>
-    )}
-  </div>
-</div>
+
 
 <div style={styles.summaryCard}>
   <div style={styles.summaryHeading}>Vehicle</div>
