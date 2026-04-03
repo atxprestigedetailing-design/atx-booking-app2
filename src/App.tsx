@@ -951,7 +951,7 @@ vehicleRow: {
             <>
               <h2 style={styles.title}>Customer Information</h2>
               <p style={styles.subtitle}>
-                Capture contact details for appointment confirmation.
+                Provide contact and vehicle details for appointment confirmation.
               </p>
 
               <div style={styles.inputGrid}>
@@ -1153,7 +1153,7 @@ vehicleRow: {
           {step === 6 && (
             <>
               <h2 style={styles.title}>Review Booking</h2>
-              <p style={styles.subtitle}>Provide contact and vehicle details for appointment confirmation.</p>
+              <p style={styles.subtitle}>Review the request details before submitting.</p>
 
               <div style={styles.summaryGrid}>
                 <div style={styles.summaryCard}>
