@@ -54,7 +54,9 @@ const vehicleOptions = [
 ];
 
 function formatDateLabel(dateStr: string) {
-  const date = new Date(dateStr);
+  const [year, month, day] = dateStr.split("-").map(Number);
+
+  const date = new Date(year, month - 1, day); // 👈 LOCAL date (no timezone shift)
 
   return date.toLocaleDateString("en-US", {
     weekday: "short",
@@ -1250,7 +1252,8 @@ vehicleRow: {
         return;
       }
     }
-
+const [yearPart, monthPart, dayPart] = selectedDate.split("-");
+const safeDate = `${monthPart}/${dayPart}/${yearPart}`;
     const res = await fetch(SCRIPT_URL, {
       method: "POST",
       body: JSON.stringify({
@@ -1258,7 +1261,7 @@ vehicleRow: {
         name,
         phone,
         email,
-        date: selectedDate,
+        date: safeDate,
         time: selectedTime,
         year,
         make,
