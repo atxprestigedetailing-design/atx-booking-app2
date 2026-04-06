@@ -1261,7 +1261,8 @@ const safeDate = `${monthPart}/${dayPart}/${yearPart}`;
         name,
         phone,
         email,
-        date: safeDate,
+       date: selectedDate,        // for backend slot matching
+       displayDate: safeDate,     // for email / human-readable use
         time: selectedTime,
         year,
         make,
