@@ -269,7 +269,7 @@ export default function App() {
     document.body.appendChild(script);
   }, []);
 
-  useEffect(() => {
+ useEffect(() => {
   if (!googleScriptLoaded || googleUser) return;
   if (!window.google?.accounts?.id) return;
 
@@ -277,12 +277,15 @@ export default function App() {
     client_id: GOOGLE_CLIENT_ID,
     callback: handleGoogleCredential,
   });
+}, [googleScriptLoaded, googleUser]);
 
-  // Retry rendering the button until the div is in the DOM
-  let attempts = 0;
-  const tryRender = () => {
+useEffect(() => {
+  if (!googleScriptLoaded || googleUser) return;
+  if (!window.google?.accounts?.id) return;
+
+  const interval = setInterval(() => {
     const btnEl = document.getElementById("google-signin-btn");
-    if (btnEl) {
+    if (btnEl && btnEl.childElementCount === 0) {
       window.google.accounts.id.renderButton(btnEl, {
         theme: "outline",
         size: "large",
@@ -290,12 +293,13 @@ export default function App() {
         text: "signin_with",
         logo_alignment: "left",
       });
-    } else if (attempts < 10) {
-      attempts++;
-      setTimeout(tryRender, 100);
     }
-  };
-  tryRender();
+    if (btnEl && btnEl.childElementCount > 0) {
+      clearInterval(interval);
+    }
+  }, 150);
+
+  return () => clearInterval(interval);
 }, [googleScriptLoaded, googleUser, view, step]);
 
   function handleGoogleCredential(response: any) {
