@@ -13,7 +13,9 @@ const GOOGLE_CLIENT_ID =
   "447699234633-ivo2e1c2q843scj32k5323o2rkq6h7dp.apps.googleusercontent.com";
 
 const SCRIPT_URL =
-  "https://script.google.com/macros/s/AKfycbxspP9xrPYBcLfPDoEt94WNJ8R9SMEiONrDXxzpSmO9lgar3HW1I5LB6czPs7sbelVNJg/exec";
+  "https://script.google.com/macros/s/AKfycbzbxyRymykGfdAdMO8vXxuC5FepgqAOY5QiZ1pw1laEgytzTt7yjPPbE4upADhFdlptsg/exec";
+
+const TOTAL_STEPS = 9;
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -27,6 +29,9 @@ type AvailabilitySlot = {
 type VehicleType = "truckSuv" | "sedan" | "coupe" | "boat" | "";
 type PackageType = "basic" | "premium" | "";
 type ServiceType = "mobile" | "dropoff" | "";
+type ClientType = "oneTime" | "maintenance" | "";
+type FrequencyType = "biweekly" | "monthly" | "";
+
 type AddOn =
   | "Headlight Restoration"
   | "Stain Removal"
@@ -99,8 +104,7 @@ function formatDateLabel(dateStr: string) {
   const parts = dateStr.includes("-") ? dateStr.split("-").map(Number) : null;
   if (!parts) return dateStr;
   const [y, m, d] = parts;
-  const date = new Date(y, m - 1, d);
-  return date.toLocaleDateString("en-US", {
+  return new Date(y, m - 1, d).toLocaleDateString("en-US", {
     weekday: "short", month: "short", day: "numeric", year: "numeric",
   });
 }
@@ -116,10 +120,8 @@ function isUpcoming(dateStr: string) {
   const parts = dateStr.includes("-") ? dateStr.split("-").map(Number) : null;
   if (!parts) return false;
   const [y, m, d] = parts;
-  const apptDate = new Date(y, m - 1, d);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  return apptDate >= today;
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  return new Date(y, m - 1, d) >= today;
 }
 
 async function fetchAllAvailability(): Promise<AvailabilitySlot[]> {
@@ -129,18 +131,14 @@ async function fetchAllAvailability(): Promise<AvailabilitySlot[]> {
 }
 
 async function fetchBookingsForEmail(email: string): Promise<Booking[]> {
-  const res = await fetch(
-    `${SCRIPT_URL}?action=getBookingsByEmail&email=${encodeURIComponent(email)}`
-  );
+  const res = await fetch(`${SCRIPT_URL}?action=getBookingsByEmail&email=${encodeURIComponent(email)}`);
   const data: { bookings: Booking[] } = await res.json();
   return data.bookings || [];
 }
 
 // ─── BookingCard ─────────────────────────────────────────────────────────────
 
-function BookingCard({
-  booking, upcoming, onRequestChange,
-}: {
+function BookingCard({ booking, upcoming, onRequestChange }: {
   booking: Booking; upcoming: boolean; onRequestChange: (b: Booking) => void;
 }) {
   const vehicleLabel =
@@ -149,17 +147,11 @@ function BookingCard({
       : [booking.year, booking.make, booking.model].filter(Boolean).join(" ");
 
   return (
-    <div style={{
-      background: "#ffffff",
-      border: upcoming ? "1.5px solid #2563eb" : "1px solid #e5e7eb",
-      borderRadius: 16, padding: 18, position: "relative" as const,
-    }}>
+    <div style={{ background: "#fff", border: upcoming ? "1.5px solid #2563eb" : "1px solid #e5e7eb", borderRadius: 16, padding: 18, position: "relative" as const }}>
       {upcoming && (
-        <span style={{
-          position: "absolute" as const, top: 14, right: 14,
-          background: "#eff6ff", color: "#2563eb",
-          fontSize: "0.75rem", fontWeight: 700, borderRadius: 999, padding: "3px 10px",
-        }}>UPCOMING</span>
+        <span style={{ position: "absolute" as const, top: 14, right: 14, background: "#eff6ff", color: "#2563eb", fontSize: "0.75rem", fontWeight: 700, borderRadius: 999, padding: "3px 10px" }}>
+          UPCOMING
+        </span>
       )}
       <div style={{ fontSize: "1rem", fontWeight: 700, color: "#111827", marginBottom: 4 }}>
         {formatDateLabel(booking.date)}{booking.time ? ` @ ${booking.time}` : ""}
@@ -167,17 +159,14 @@ function BookingCard({
       <div style={{ fontSize: "0.92rem", color: "#6b7280", lineHeight: 1.6 }}>
         {vehicleLabel && <div>🚗 {vehicleLabel}</div>}
         <div>📦 {booking.packageType === "basic" ? "Basic Detail" : booking.packageType === "premium" ? "Premium Detail" : booking.packageType}</div>
-        {booking.serviceType && (
-          <div>📍 {booking.serviceType === "mobile" ? `Mobile${booking.address ? ` — ${booking.address}` : ""}` : "Drop-Off"}</div>
-        )}
+        {booking.serviceType && <div>📍 {booking.serviceType === "mobile" ? `Mobile${booking.address ? ` — ${booking.address}` : ""}` : "Drop-Off"}</div>}
         {booking.addOns && <div>✨ {booking.addOns}</div>}
         {booking.notes && <div>📝 {booking.notes}</div>}
       </div>
       {upcoming && (
-        <button onClick={() => onRequestChange(booking)} style={{
-          marginTop: 14, background: "#111827", color: "#fff", border: "none",
-          borderRadius: 10, padding: "9px 16px", fontSize: "0.9rem", fontWeight: 600, cursor: "pointer",
-        }}>Request a Change</button>
+        <button onClick={() => onRequestChange(booking)} style={{ marginTop: 14, background: "#111827", color: "#fff", border: "none", borderRadius: 10, padding: "9px 16px", fontSize: "0.9rem", fontWeight: 600, cursor: "pointer" }}>
+          Request a Change
+        </button>
       )}
     </div>
   );
@@ -185,9 +174,7 @@ function BookingCard({
 
 // ─── MaintenanceCard ──────────────────────────────────────────────────────────
 
-function MaintenanceCard({
-  booking, onRequestChange,
-}: {
+function MaintenanceCard({ booking, onRequestChange }: {
   booking: Booking; onRequestChange: (b: Booking) => void;
 }) {
   const vehicleLabel =
@@ -203,32 +190,24 @@ function MaintenanceCard({
   const upcoming = isUpcoming(booking.date);
 
   return (
-    <div style={{
-      background: "#ffffff", border: "1.5px solid #059669",
-      borderRadius: 16, padding: 18, position: "relative" as const,
-    }}>
-      <span style={{
-        position: "absolute" as const, top: 14, right: 14,
-        background: "#ecfdf5", color: "#059669",
-        fontSize: "0.75rem", fontWeight: 700, borderRadius: 999, padding: "3px 10px",
-      }}>{freqLabel.toUpperCase()}</span>
+    <div style={{ background: "#fff", border: "1.5px solid #059669", borderRadius: 16, padding: 18, position: "relative" as const }}>
+      <span style={{ position: "absolute" as const, top: 14, right: 14, background: "#ecfdf5", color: "#059669", fontSize: "0.75rem", fontWeight: 700, borderRadius: 999, padding: "3px 10px" }}>
+        {freqLabel.toUpperCase()}
+      </span>
       <div style={{ fontSize: "1rem", fontWeight: 700, color: "#111827", marginBottom: 4 }}>
         {formatDateLabel(booking.date)}{booking.time ? ` @ ${booking.time}` : ""}
       </div>
       <div style={{ fontSize: "0.92rem", color: "#6b7280", lineHeight: 1.6 }}>
         {vehicleLabel && <div>🚗 {vehicleLabel}</div>}
         <div>📦 {booking.packageType === "basic" ? "Basic Detail" : booking.packageType === "premium" ? "Premium Detail" : booking.packageType}</div>
-        {booking.serviceType && (
-          <div>📍 {booking.serviceType === "mobile" ? `Mobile${booking.address ? ` — ${booking.address}` : ""}` : "Drop-Off"}</div>
-        )}
+        {booking.serviceType && <div>📍 {booking.serviceType === "mobile" ? `Mobile${booking.address ? ` — ${booking.address}` : ""}` : "Drop-Off"}</div>}
         {booking.addOns && <div>✨ {booking.addOns}</div>}
         {booking.notes && <div>📝 {booking.notes}</div>}
       </div>
       {upcoming && (
-        <button onClick={() => onRequestChange(booking)} style={{
-          marginTop: 14, background: "#059669", color: "#fff", border: "none",
-          borderRadius: 10, padding: "9px 16px", fontSize: "0.9rem", fontWeight: 600, cursor: "pointer",
-        }}>Request a Change</button>
+        <button onClick={() => onRequestChange(booking)} style={{ marginTop: 14, background: "#059669", color: "#fff", border: "none", borderRadius: 10, padding: "9px 16px", fontSize: "0.9rem", fontWeight: 600, cursor: "pointer" }}>
+          Request a Change
+        </button>
       )}
     </div>
   );
@@ -240,184 +219,158 @@ export default function App() {
   const addressInputRef = useRef(null);
 
   // ── Auth ──
-  const [googleUser, setGoogleUser]           = useState<GoogleUser | null>(null);
-  const [googleScriptLoaded, setGoogleScriptLoaded] = useState(false);
+  const [googleUser, setGoogleUser]                     = useState<GoogleUser | null>(null);
+  const [googleScriptLoaded, setGoogleScriptLoaded]     = useState(false);
 
   // ── View ──
-  const [view, setView]                       = useState<"booking" | "myBookings" | "requestChange">("booking");
-  const [bookingsTab, setBookingsTab]         = useState<"appointments" | "maintenance">("appointments");
-  const [userBookings, setUserBookings]       = useState<Booking[]>([]);
-  const [bookingsLoading, setBookingsLoading] = useState(false);
-  const [changeTarget, setChangeTarget]       = useState<Booking | null>(null);
-  const [changeNote, setChangeNote]           = useState("");
-  const [changeSubmitted, setChangeSubmitted] = useState(false);
-  const [changeSubmitting, setChangeSubmitting] = useState(false);
+  const [view, setView]                                 = useState<"booking" | "myBookings" | "requestChange">("booking");
+  const [bookingsTab, setBookingsTab]                   = useState<"appointments" | "maintenance">("appointments");
+  const [userBookings, setUserBookings]                 = useState<Booking[]>([]);
+  const [bookingsLoading, setBookingsLoading]           = useState(false);
+  const [changeTarget, setChangeTarget]                 = useState<Booking | null>(null);
+  const [changeNote, setChangeNote]                     = useState("");
+  const [changeSubmitted, setChangeSubmitted]           = useState(false);
+  const [changeSubmitting, setChangeSubmitting]         = useState(false);
 
   // ── Booking flow ──
-  const [step, setStep]                       = useState(0);
-  const [vehicle, setVehicle]                 = useState<VehicleType>("");
-  const [pkg, setPkg]                         = useState<PackageType>("");
-  const [addOns, setAddOns]                   = useState<AddOn[]>([]);
-  const [serviceType, setServiceType]         = useState<ServiceType>("");
-  const [name, setName]                       = useState("");
-  const [phone, setPhone]                     = useState("");
-  const [email, setEmail]                     = useState("");
-  const [year, setYear]                       = useState("");
-  const [make, setMake]                       = useState("");
-  const [model, setModel]                     = useState("");
-  const [boatMake, setBoatMake]               = useState("");
-  const [boatModel, setBoatModel]             = useState("");
-  const [boatSize, setBoatSize]               = useState("");
-  const [bookingNotes, setBookingNotes]       = useState("");
-  const [selectedDate, setSelectedDate]       = useState("");
-  const [availableSlots, setAvailableSlots]   = useState<AvailabilitySlot[]>([]);
-  const [allAvailableSlots, setAllAvailableSlots] = useState<AvailabilitySlot[]>([]);
-  const [availableDates, setAvailableDates]   = useState<string[]>([]);
-  const [selectedTime, setSelectedTime]       = useState("");
-  const [address, setAddress]                 = useState("");
-  const [street, setStreet]                   = useState("");
-  const [city, setCity]                       = useState("");
-  const [stateRegion, setStateRegion]         = useState("");
-  const [zip, setZip]                         = useState("");
-  const [placeId, setPlaceId]                 = useState("");
-  const [lat, setLat]                         = useState("");
-  const [lng, setLng]                         = useState("");
-  const [addressSelected, setAddressSelected] = useState(false);
-  const [makeOptions, setMakeOptions]         = useState<string[]>([]);
-  const [modelOptions, setModelOptions]       = useState<string[]>([]);
-  const [loadingMakes, setLoadingMakes]       = useState(false);
-  const [loadingModels, setLoadingModels]     = useState(false);
+  const [step, setStep]                                 = useState(0);
+  const [vehicle, setVehicle]                           = useState<VehicleType>("");
+  const [clientType, setClientType]                     = useState<ClientType>("");       // NEW
+  const [frequency, setFrequency]                       = useState<FrequencyType>("");    // NEW
+  const [pkg, setPkg]                                   = useState<PackageType>("");
+  const [addOns, setAddOns]                             = useState<AddOn[]>([]);
+  const [serviceType, setServiceType]                   = useState<ServiceType>("");
+  const [name, setName]                                 = useState("");
+  const [phone, setPhone]                               = useState("");
+  const [email, setEmail]                               = useState("");
+  const [year, setYear]                                 = useState("");
+  const [make, setMake]                                 = useState("");
+  const [model, setModel]                               = useState("");
+  const [boatMake, setBoatMake]                         = useState("");
+  const [boatModel, setBoatModel]                       = useState("");
+  const [boatSize, setBoatSize]                         = useState("");
+  const [bookingNotes, setBookingNotes]                 = useState("");
+  const [selectedDate, setSelectedDate]                 = useState("");
+  const [availableSlots, setAvailableSlots]             = useState<AvailabilitySlot[]>([]);
+  const [allAvailableSlots, setAllAvailableSlots]       = useState<AvailabilitySlot[]>([]);
+  const [availableDates, setAvailableDates]             = useState<string[]>([]);
+  const [selectedTime, setSelectedTime]                 = useState("");
+  const [address, setAddress]                           = useState("");
+  const [street, setStreet]                             = useState("");
+  const [city, setCity]                                 = useState("");
+  const [stateRegion, setStateRegion]                   = useState("");
+  const [zip, setZip]                                   = useState("");
+  const [placeId, setPlaceId]                           = useState("");
+  const [lat, setLat]                                   = useState("");
+  const [lng, setLng]                                   = useState("");
+  const [addressSelected, setAddressSelected]           = useState(false);
+  const [makeOptions, setMakeOptions]                   = useState<string[]>([]);
+  const [modelOptions, setModelOptions]                 = useState<string[]>([]);
+  const [loadingMakes, setLoadingMakes]                 = useState(false);
+  const [loadingModels, setLoadingModels]               = useState(false);
 
   const currentYear = new Date().getFullYear();
   const yearOptions = Array.from({ length: currentYear - 1995 + 1 }, (_, i) => String(currentYear - i));
 
-  // ── Load Google Identity Services ──
+  // ── Google Identity Services ──
   useEffect(() => {
     if (document.getElementById("google-gsi-script")) { setGoogleScriptLoaded(true); return; }
     const script = document.createElement("script");
     script.id = "google-gsi-script";
     script.src = "https://accounts.google.com/gsi/client";
-    script.async = true;
-    script.defer = true;
+    script.async = true; script.defer = true;
     script.onload = () => setGoogleScriptLoaded(true);
     document.body.appendChild(script);
   }, []);
 
-  // ── Render Google Sign-In button ──
   useEffect(() => {
     if (!googleScriptLoaded || googleUser) return;
     if (!window.google?.accounts?.id) return;
-    window.google.accounts.id.initialize({
-      client_id: GOOGLE_CLIENT_ID,
-      callback: handleGoogleCredential,
-    });
+    window.google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: handleGoogleCredential });
     const btnEl = document.getElementById("google-signin-btn");
-    if (btnEl) {
-      window.google.accounts.id.renderButton(btnEl, {
-        theme: "outline", size: "large", shape: "rectangular",
-        text: "signin_with", logo_alignment: "left",
-      });
-    }
+    if (btnEl) window.google.accounts.id.renderButton(btnEl, { theme: "outline", size: "large", shape: "rectangular", text: "signin_with", logo_alignment: "left" });
   }, [googleScriptLoaded, googleUser, view, step]);
 
   function handleGoogleCredential(response: any) {
     try {
       const payload = JSON.parse(atob(response.credential.split(".")[1]));
-      const user: GoogleUser = {
-        name: payload.name || "",
-        email: payload.email || "",
-        picture: payload.picture || "",
-      };
-      setGoogleUser(user);
-      setEmail(user.email);
-    } catch (e) {
-      console.error("Google sign-in error", e);
-    }
+      setGoogleUser({ name: payload.name || "", email: payload.email || "", picture: payload.picture || "" });
+      setEmail(payload.email || "");
+    } catch (e) { console.error("Google sign-in error", e); }
   }
 
   function handleSignOut() {
     if (window.google?.accounts?.id) window.google.accounts.id.disableAutoSelect();
-    setGoogleUser(null);
-    setEmail("");
-    setView("booking");
-    setUserBookings([]);
+    setGoogleUser(null); setEmail(""); setView("booking"); setUserBookings([]);
   }
 
-  // ── Fetch user bookings ──
+  // ── Load bookings ──
   const loadMyBookings = useCallback(async () => {
     if (!googleUser) return;
     setBookingsLoading(true);
     try {
       const bookings = await fetchBookingsForEmail(googleUser.email);
       setUserBookings(bookings);
-    } catch (e) {
-      console.error("Failed to load bookings", e);
-    } finally {
-      setBookingsLoading(false);
-    }
+    } catch (e) { console.error("Failed to load bookings", e); }
+    finally { setBookingsLoading(false); }
   }, [googleUser]);
 
   function openMyBookings() {
-    setView("myBookings");
-    setBookingsTab("appointments");
-    loadMyBookings();
+    setView("myBookings"); setBookingsTab("appointments"); loadMyBookings();
   }
 
   // ── Vehicle makes/models ──
   useEffect(() => {
-    const loadMakes = async () => {
+    const load = async () => {
       try {
         setLoadingMakes(true);
-        const vehicleTypeForApi = vehicle === "truckSuv" ? "truck" : "car";
-        const res = await fetch(`https://vpic.nhtsa.dot.gov/api/vehicles/GetMakesForVehicleType/${vehicleTypeForApi}?format=json`);
+        const t = vehicle === "truckSuv" ? "truck" : "car";
+        const res = await fetch(`https://vpic.nhtsa.dot.gov/api/vehicles/GetMakesForVehicleType/${t}?format=json`);
         const data = await res.json();
-        const makes = data.Results?.map((item: any) => item.MakeName || item.Make_Name).filter(Boolean).sort((a: string, b: string) => a.localeCompare(b)) || [];
-        setMakeOptions(makes);
-      } catch (err) { setMakeOptions([]); }
+        setMakeOptions(data.Results?.map((i: any) => i.MakeName || i.Make_Name).filter(Boolean).sort((a: string, b: string) => a.localeCompare(b)) || []);
+      } catch { setMakeOptions([]); }
       finally { setLoadingMakes(false); }
     };
-    if (vehicle && vehicle !== "boat") { loadMakes(); } else { setMakeOptions([]); }
+    if (vehicle && vehicle !== "boat") { load(); } else { setMakeOptions([]); }
   }, [vehicle]);
 
   useEffect(() => {
-    const loadModels = async () => {
+    const load = async () => {
       if (!year || !make || !vehicle || vehicle === "boat") { setModelOptions([]); return; }
       try {
         setLoadingModels(true);
-        const vehicleTypeForApi = vehicle === "truckSuv" ? "truck" : "car";
-        const res = await fetch(`https://vpic.nhtsa.dot.gov/api/vehicles/GetModelsForMakeYear/make/${encodeURIComponent(make)}/modelyear/${year}/vehicletype/${vehicleTypeForApi}?format=json`);
+        const t = vehicle === "truckSuv" ? "truck" : "car";
+        const res = await fetch(`https://vpic.nhtsa.dot.gov/api/vehicles/GetModelsForMakeYear/make/${encodeURIComponent(make)}/modelyear/${year}/vehicletype/${t}?format=json`);
         const data = await res.json();
-        const models = data.Results?.map((item: any) => item.Model_Name).filter(Boolean).sort((a: string, b: string) => a.localeCompare(b)) || [];
-        setModelOptions(models);
-      } catch (err) { setModelOptions([]); }
+        setModelOptions(data.Results?.map((i: any) => i.Model_Name).filter(Boolean).sort((a: string, b: string) => a.localeCompare(b)) || []);
+      } catch { setModelOptions([]); }
       finally { setLoadingModels(false); }
     };
-    loadModels();
+    load();
   }, [year, make, vehicle]);
 
   // ── Google Maps autocomplete ──
   useEffect(() => {
-    if (step !== 4 || serviceType !== "mobile") return;
+    if (step !== 5 || serviceType !== "mobile") return;
     if (!window.google?.maps?.places || !addressInputRef.current) return;
-    const autocomplete = new window.google.maps.places.Autocomplete(addressInputRef.current, {
+    const ac = new window.google.maps.places.Autocomplete(addressInputRef.current, {
       types: ["address"], componentRestrictions: { country: "us" },
       fields: ["address_components", "formatted_address", "geometry", "place_id"],
     });
-    const listener = autocomplete.addListener("place_changed", () => {
-      const place = autocomplete.getPlace();
+    const listener = ac.addListener("place_changed", () => {
+      const place = ac.getPlace();
       if (!place?.address_components) return;
-      let streetNumber = "", route = "", locality = "", adminArea = "", postalCode = "";
-      place.address_components.forEach((component: any) => {
-        const types = component.types;
-        if (types.includes("street_number")) streetNumber = component.long_name;
-        if (types.includes("route")) route = component.long_name;
-        if (types.includes("locality")) locality = component.long_name;
-        if (types.includes("administrative_area_level_1")) adminArea = component.short_name;
-        if (types.includes("postal_code")) postalCode = component.long_name;
+      let sn = "", rt = "", loc = "", aa = "", pc = "";
+      place.address_components.forEach((c: any) => {
+        if (c.types.includes("street_number")) sn = c.long_name;
+        if (c.types.includes("route")) rt = c.long_name;
+        if (c.types.includes("locality")) loc = c.long_name;
+        if (c.types.includes("administrative_area_level_1")) aa = c.short_name;
+        if (c.types.includes("postal_code")) pc = c.long_name;
       });
       setAddress(place.formatted_address || "");
-      setStreet([streetNumber, route].filter(Boolean).join(" "));
-      setCity(locality); setStateRegion(adminArea); setZip(postalCode);
+      setStreet([sn, rt].filter(Boolean).join(" "));
+      setCity(loc); setStateRegion(aa); setZip(pc);
       setPlaceId(place.place_id || "");
       setLat(place.geometry?.location?.lat?.() ?? "");
       setLng(place.geometry?.location?.lng?.() ?? "");
@@ -459,7 +412,7 @@ export default function App() {
     return addOns.reduce((sum, a) => sum + (all.find((o) => o.label === a)?.fixedPrice ?? 0), 0);
   }, [addOns]);
 
-  const estimateText  = useMemo(() => hourlyRate ? `${formatCurrency(hourlyRate)}/hr` : "", [hourlyRate]);
+  const estimateText     = useMemo(() => hourlyRate ? `${formatCurrency(hourlyRate)}/hr` : "", [hourlyRate]);
   const addOnSummaryText = useMemo(() => addOns.join(", "), [addOns]);
 
   function toggleAddOn(addOn: AddOn) {
@@ -473,7 +426,17 @@ export default function App() {
       ? [boatSize, boatMake, boatModel].filter(Boolean).join(" ") || "N/A"
       : [year, make, model].filter(Boolean).join(" ") || "N/A";
 
-  const step5Disabled =
+  // Step 2 next: if maintenance, go to step 3 (frequency). if oneTime, skip to step 3 anyway but frequency stays blank.
+  // Steps: 0=landing, 1=vehicle, 2=clientType, 3=frequency(maintenance only)/package(oneTime), ...
+  // To keep it simple we use a linear step count and just skip the frequency card visually for oneTime.
+  // Actual steps:
+  // 0 landing | 1 vehicle | 2 service plan | 3 frequency (maintenance) | 4 package | 5 mobile/dropoff | 6 customer info | 7 review | 8 confirm
+
+  const step2NextDisabled = !clientType;
+  const step3NextDisabled = clientType === "maintenance" ? !frequency : false;
+
+  // For step 6 customer info
+  const step6Disabled =
     !name || !phone || !email || !selectedDate || !selectedTime ||
     (vehicle === "boat" ? !boatSize || !boatMake || !boatModel : !year || !make || !model);
 
@@ -486,15 +449,14 @@ export default function App() {
   const upcomingMaintenance = maintenanceBookings.filter((b) => isUpcoming(b.date)).sort((a, b) => a.date.localeCompare(b.date));
   const pastMaintenance     = maintenanceBookings.filter((b) => !isUpcoming(b.date)).sort((a, b) => b.date.localeCompare(a.date));
 
-  // ── Change request submit ──
+  // ── Change request ──
   async function submitChangeRequest() {
     if (!changeTarget || !changeNote.trim()) return;
     setChangeSubmitting(true);
     try {
-      const vehicleLabel =
-        changeTarget.vehicle === "boat"
-          ? [changeTarget.boatSize, changeTarget.make, changeTarget.model].filter(Boolean).join(" ")
-          : [changeTarget.year, changeTarget.make, changeTarget.model].filter(Boolean).join(" ");
+      const vl = changeTarget.vehicle === "boat"
+        ? [changeTarget.boatSize, changeTarget.make, changeTarget.model].filter(Boolean).join(" ")
+        : [changeTarget.year, changeTarget.make, changeTarget.model].filter(Boolean).join(" ");
       await fetch(SCRIPT_URL, {
         method: "POST",
         body: JSON.stringify({
@@ -503,23 +465,20 @@ export default function App() {
           customerName: googleUser?.name || "",
           bookingDate: changeTarget.date,
           bookingTime: changeTarget.time,
-          vehicle: vehicleLabel,
+          vehicle: vl,
           packageType: changeTarget.packageType,
           changeNote,
         }),
       });
       setChangeSubmitted(true);
-    } catch (e) {
-      console.error("Change request failed", e);
-    } finally {
-      setChangeSubmitting(false);
-    }
+    } catch (e) { console.error("Change request failed", e); }
+    finally { setChangeSubmitting(false); }
   }
 
   // ─── Styles ───────────────────────────────────────────────────────────────
 
   const S = {
-    page:           { minHeight: "100vh", background: "linear-gradient(180deg, #f7f7f8 0%, #efeff1 100%)", color: "#171717", padding: "32px 16px", fontFamily: 'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' } as const,
+    page:           { minHeight: "100vh", background: "linear-gradient(180deg,#f7f7f8 0%,#efeff1 100%)", color: "#171717", padding: "32px 16px", fontFamily: 'Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif' } as const,
     container:      { maxWidth: 920, margin: "0 auto" } as const,
     card:           { background: "rgba(255,255,255,0.96)", border: "1px solid #e5e7eb", borderRadius: 24, boxShadow: "0 18px 45px rgba(17,24,39,0.08)", padding: 28 } as const,
     title:          { fontSize: "2.4rem", fontWeight: 800, letterSpacing: "-1px", color: "#111827", margin: "0 0 14px", textAlign: "center" as const },
@@ -530,6 +489,7 @@ export default function App() {
     optionGrid:     { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 14, marginBottom: 20 } as const,
     optionCard:     { background: "#fff", border: "1px solid #e5e7eb", borderRadius: 18, padding: 18, cursor: "pointer", textAlign: "left" as const, transition: "all 0.2s ease" },
     selectedCard:   { border: "2px solid #2563eb", background: "#eff6ff", boxShadow: "0 0 0 2px rgba(37,99,235,0.1)" },
+    selectedGreen:  { border: "2px solid #059669", background: "#ecfdf5", boxShadow: "0 0 0 2px rgba(5,150,105,0.1)" },
     optionTitle:    { fontWeight: 700, fontSize: "1.05rem", marginBottom: 8, color: "#111827" },
     optionMeta:     { color: "#6b7280", fontSize: "0.95rem", lineHeight: 1.45 },
     estimateBox:    { background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: 16, padding: 16, textAlign: "center" as const, marginTop: 6 } as const,
@@ -553,13 +513,9 @@ export default function App() {
     successWrap:    { textAlign: "center" as const, padding: "10px 0" },
     successBadge:   { fontSize: "3rem", marginBottom: 6 },
     successText:    { fontSize: "1.05rem", color: "#4b5563", lineHeight: 1.6, maxWidth: 620, margin: "0 auto 24px" },
-    progressWrap:   { marginBottom: 28 },
-    progressText:   { display: "flex", justifyContent: "space-between", color: "#6b7280", fontSize: "0.9rem", marginBottom: 8 },
-    progressBar:    { height: 8, background: "#e5e7eb", borderRadius: 999, overflow: "hidden", border: "1px solid #d1d5db" } as const,
-    progressFill:   { height: "100%", width: `${((step + 1) / 8) * 100}%`, background: "linear-gradient(90deg,#6b7280,#9ca3af)", borderRadius: 999, transition: "width 0.25s ease" },
   };
 
-  // ─── Shared Header ────────────────────────────────────────────────────────
+  // ─── Header ───────────────────────────────────────────────────────────────
 
   const Header = () => (
     <div style={{ display: "flex", justifyContent: "center", marginBottom: 32 }}>
@@ -569,7 +525,6 @@ export default function App() {
           <h1 style={{ fontSize: "2.8rem", fontWeight: 800, letterSpacing: "-1px", color: "#111827", margin: 0, lineHeight: 1.05 }}>ATX Prestige Detailing</h1>
           <p style={{ color: "#6b7280", fontSize: "1.05rem", marginTop: 10, marginBottom: 0, lineHeight: 1.45, fontStyle: "italic" }}>Defined by Detail, Driven by Standards, Trusted for Prestige</p>
         </div>
-        {/* Auth */}
         <div style={{ display: "flex", flexDirection: "column" as const, alignItems: "flex-end", gap: 8, minWidth: 180 }}>
           {googleUser ? (
             <>
@@ -580,14 +535,26 @@ export default function App() {
                   <div style={{ fontSize: "0.75rem", color: "#6b7280" }}>{googleUser.email}</div>
                 </div>
               </div>
-              <button onClick={handleSignOut} style={{ fontSize: "0.8rem", color: "#6b7280", background: "none", border: "none", cursor: "pointer", textDecoration: "underline" }}>
-                Sign out
-              </button>
+              <button onClick={handleSignOut} style={{ fontSize: "0.8rem", color: "#6b7280", background: "none", border: "none", cursor: "pointer", textDecoration: "underline" }}>Sign out</button>
             </>
           ) : (
             <div id="google-signin-btn" />
           )}
         </div>
+      </div>
+    </div>
+  );
+
+  // ─── Progress Bar ─────────────────────────────────────────────────────────
+
+  const ProgressBar = () => (
+    <div style={{ marginBottom: 28 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", color: "#6b7280", fontSize: "0.9rem", marginBottom: 8 }}>
+        <span>Booking Flow</span>
+        <span>Step {step} of {TOTAL_STEPS - 1}</span>
+      </div>
+      <div style={{ height: 8, background: "#e5e7eb", borderRadius: 999, overflow: "hidden", border: "1px solid #d1d5db" }}>
+        <div style={{ height: "100%", width: `${(step / (TOTAL_STEPS - 1)) * 100}%`, background: "linear-gradient(90deg,#6b7280,#9ca3af)", borderRadius: 999, transition: "width 0.25s ease" }} />
       </div>
     </div>
   );
@@ -603,24 +570,18 @@ export default function App() {
             <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 24, flexWrap: "wrap" as const }}>
               <button onClick={() => setView("booking")} style={{ ...S.secondary, padding: "9px 14px", fontSize: "0.9rem" }}>← Back</button>
               <h2 style={{ ...S.title, margin: 0, fontSize: "1.8rem" }}>My Bookings</h2>
-              <button onClick={() => { setView("booking"); setStep(1); }} style={{ ...S.primary, marginLeft: "auto", padding: "10px 16px", fontSize: "0.9rem" }}>
-                + Book New Service
-              </button>
+              <button onClick={() => { setView("booking"); setStep(1); }} style={{ ...S.primary, marginLeft: "auto", padding: "10px 16px", fontSize: "0.9rem" }}>+ Book New Service</button>
             </div>
 
             {/* Tabs */}
             <div style={{ display: "flex", gap: 4, marginBottom: 24, borderBottom: "2px solid #e5e7eb" }}>
-              <button onClick={() => setBookingsTab("appointments")} style={{
-                background: "none", border: "none", cursor: "pointer", padding: "10px 18px", fontSize: "0.95rem", fontWeight: 700,
-                color: bookingsTab === "appointments" ? "#111827" : "#9ca3af",
-                borderBottom: bookingsTab === "appointments" ? "3px solid #111827" : "3px solid transparent", marginBottom: -2,
-              }}>My Appointments</button>
+              <button onClick={() => setBookingsTab("appointments")} style={{ background: "none", border: "none", cursor: "pointer", padding: "10px 18px", fontSize: "0.95rem", fontWeight: 700, color: bookingsTab === "appointments" ? "#111827" : "#9ca3af", borderBottom: bookingsTab === "appointments" ? "3px solid #111827" : "3px solid transparent", marginBottom: -2 }}>
+                My Appointments
+              </button>
               {isMaintenance && (
-                <button onClick={() => setBookingsTab("maintenance")} style={{
-                  background: "none", border: "none", cursor: "pointer", padding: "10px 18px", fontSize: "0.95rem", fontWeight: 700,
-                  color: bookingsTab === "maintenance" ? "#059669" : "#9ca3af",
-                  borderBottom: bookingsTab === "maintenance" ? "3px solid #059669" : "3px solid transparent", marginBottom: -2,
-                }}>🔄 Maintenance Plan</button>
+                <button onClick={() => setBookingsTab("maintenance")} style={{ background: "none", border: "none", cursor: "pointer", padding: "10px 18px", fontSize: "0.95rem", fontWeight: 700, color: bookingsTab === "maintenance" ? "#059669" : "#9ca3af", borderBottom: bookingsTab === "maintenance" ? "3px solid #059669" : "3px solid transparent", marginBottom: -2 }}>
+                  🔄 Maintenance Plan
+                </button>
               )}
             </div>
 
@@ -633,11 +594,8 @@ export default function App() {
                   <>
                     {upcomingStandard.length === 0 && pastStandard.length === 0 && (
                       <div style={{ textAlign: "center", padding: 40, color: "#6b7280" }}>
-                        No bookings found for {googleUser?.email}.
-                        <br />
-                        <button onClick={() => { setView("booking"); setStep(1); }} style={{ ...S.primary, marginTop: 16, display: "inline-block" }}>
-                          Book Your First Service
-                        </button>
+                        No bookings found for {googleUser?.email}.<br />
+                        <button onClick={() => { setView("booking"); setStep(1); }} style={{ ...S.primary, marginTop: 16, display: "inline-block" }}>Book Your First Service</button>
                       </div>
                     )}
                     {upcomingStandard.length > 0 && (
@@ -654,9 +612,7 @@ export default function App() {
                       <>
                         <div style={{ fontWeight: 700, color: "#9ca3af", fontSize: "0.95rem", marginBottom: 12, textTransform: "uppercase" as const, letterSpacing: "0.04em" }}>Past Services</div>
                         <div style={{ display: "grid", gap: 14 }}>
-                          {pastStandard.map((b, i) => (
-                            <BookingCard key={i} booking={b} upcoming={false} onRequestChange={() => {}} />
-                          ))}
+                          {pastStandard.map((b, i) => <BookingCard key={i} booking={b} upcoming={false} onRequestChange={() => {}} />)}
                         </div>
                       </>
                     )}
@@ -686,9 +642,7 @@ export default function App() {
                       <>
                         <div style={{ fontWeight: 700, color: "#9ca3af", fontSize: "0.95rem", marginBottom: 12, textTransform: "uppercase" as const, letterSpacing: "0.04em" }}>Past Maintenance Services</div>
                         <div style={{ display: "grid", gap: 14 }}>
-                          {pastMaintenance.map((b, i) => (
-                            <MaintenanceCard key={i} booking={b} onRequestChange={() => {}} />
-                          ))}
+                          {pastMaintenance.map((b, i) => <MaintenanceCard key={i} booking={b} onRequestChange={() => {}} />)}
                         </div>
                       </>
                     )}
@@ -705,20 +659,16 @@ export default function App() {
   // ─── REQUEST A CHANGE VIEW ────────────────────────────────────────────────
 
   if (view === "requestChange" && changeTarget) {
-    const vehicleLabel =
-      changeTarget.vehicle === "boat"
-        ? [changeTarget.boatSize, changeTarget.make, changeTarget.model].filter(Boolean).join(" ")
-        : [changeTarget.year, changeTarget.make, changeTarget.model].filter(Boolean).join(" ");
+    const vl = changeTarget.vehicle === "boat"
+      ? [changeTarget.boatSize, changeTarget.make, changeTarget.model].filter(Boolean).join(" ")
+      : [changeTarget.year, changeTarget.make, changeTarget.model].filter(Boolean).join(" ");
 
     return (
       <div style={S.page}>
         <div style={S.container}>
           <Header />
           <div style={S.card}>
-            <button onClick={() => setView("myBookings")} style={{ ...S.secondary, padding: "9px 14px", fontSize: "0.9rem", marginBottom: 20 }}>
-              ← Back to My Bookings
-            </button>
-
+            <button onClick={() => setView("myBookings")} style={{ ...S.secondary, padding: "9px 14px", fontSize: "0.9rem", marginBottom: 20 }}>← Back to My Bookings</button>
             {changeSubmitted ? (
               <div style={S.successWrap}>
                 <div style={S.successBadge}>✅</div>
@@ -734,24 +684,22 @@ export default function App() {
                   <div style={S.summaryHeading}>Appointment</div>
                   <div style={S.summaryValue}>
                     {formatDateLabel(changeTarget.date)}{changeTarget.time ? ` @ ${changeTarget.time}` : ""}<br />
-                    {vehicleLabel}<br />
+                    {vl}<br />
                     {changeTarget.packageType === "basic" ? "Basic Detail" : changeTarget.packageType === "premium" ? "Premium Detail" : changeTarget.packageType}
                   </div>
                 </div>
                 <div style={{ maxWidth: 560, margin: "0 auto" }}>
                   <div style={S.sectionLabel}>What would you like to change?</div>
-                  <textarea
-                    style={{ ...S.input, marginTop: 10, minHeight: 130, resize: "vertical" as const, fontFamily: "inherit", lineHeight: 1.5 }}
+                  <textarea style={{ ...S.input, marginTop: 10, minHeight: 130, resize: "vertical" as const, fontFamily: "inherit", lineHeight: 1.5 }}
                     placeholder="e.g. Can we move this to Saturday instead? Or change the time to 10am?"
-                    value={changeNote} onChange={(e) => setChangeNote(e.target.value)}
-                  />
+                    value={changeNote} onChange={(e) => setChangeNote(e.target.value)} />
                 </div>
                 <div style={{ ...S.buttonRow, maxWidth: 560, margin: "20px auto 0" }}>
                   <button style={S.secondary} onClick={() => setView("myBookings")}>Cancel</button>
-                  <button
-                    style={{ ...S.primary, ...(!changeNote.trim() || changeSubmitting ? S.disabled : {}) }}
-                    onClick={submitChangeRequest} disabled={!changeNote.trim() || changeSubmitting}
-                  >{changeSubmitting ? "Sending…" : "Send Request"}</button>
+                  <button style={{ ...S.primary, ...(!changeNote.trim() || changeSubmitting ? S.disabled : {}) }}
+                    onClick={submitChangeRequest} disabled={!changeNote.trim() || changeSubmitting}>
+                    {changeSubmitting ? "Sending…" : "Send Request"}
+                  </button>
                 </div>
               </>
             )}
@@ -767,17 +715,10 @@ export default function App() {
     <div style={S.page}>
       <div style={S.container}>
         <Header />
-
-        {step > 0 && step < 7 && (
-          <div style={S.progressWrap}>
-            <div style={S.progressText}><span>Booking Flow</span><span>Step {step + 1} of 8</span></div>
-            <div style={S.progressBar}><div style={S.progressFill} /></div>
-          </div>
-        )}
-
+        {step > 0 && step < TOTAL_STEPS - 1 && <ProgressBar />}
         <div style={S.card}>
 
-          {/* STEP 0 */}
+          {/* ── STEP 0: Landing ── */}
           {step === 0 && (
             <>
               <h2 style={S.title}>Book a Detail Service</h2>
@@ -785,9 +726,7 @@ export default function App() {
               <div style={{ display: "flex", justifyContent: "center", gap: 12, padding: "10px 0 2px", flexWrap: "wrap" as const }}>
                 <button style={S.primary} onClick={() => setStep(1)}>Book Detail Service</button>
                 {googleUser && (
-                  <button style={{ ...S.secondary, display: "flex", alignItems: "center", gap: 8 }} onClick={openMyBookings}>
-                    📋 My Bookings
-                  </button>
+                  <button style={{ ...S.secondary, display: "flex", alignItems: "center", gap: 8 }} onClick={openMyBookings}>📋 My Bookings</button>
                 )}
               </div>
               {!googleUser && (
@@ -798,7 +737,7 @@ export default function App() {
             </>
           )}
 
-          {/* STEP 1 */}
+          {/* ── STEP 1: Vehicle Type ── */}
           {step === 1 && (
             <>
               <h2 style={S.title}>Choose a Vehicle Type</h2>
@@ -823,15 +762,83 @@ export default function App() {
             </>
           )}
 
-          {/* STEP 2 */}
+          {/* ── STEP 2: Service Plan (One-Time vs Maintenance) ── */}
           {step === 2 && (
+            <>
+              <h2 style={S.title}>Choose Your Service Plan</h2>
+              <p style={S.subtitle}>Is this a one-time detail or are you setting up a maintenance plan?</p>
+              <div style={S.optionGrid}>
+                <button
+                  style={{ ...S.optionCard, ...(clientType === "oneTime" ? S.selectedCard : {}) }}
+                  onClick={() => { setClientType("oneTime"); setFrequency(""); }}
+                >
+                  <div style={S.optionTitle}>⚡ One-Time Service</div>
+                  <div style={S.optionMeta}>
+                    A single detail appointment. Great for a deep clean, special occasion, or trying us out for the first time.
+                  </div>
+                </button>
+                <button
+                  style={{ ...S.optionCard, ...(clientType === "maintenance" ? S.selectedGreen : {}) }}
+                  onClick={() => setClientType("maintenance")}
+                >
+                  <div style={{ ...S.optionTitle, color: clientType === "maintenance" ? "#065f46" : "#111827" }}>🔄 Maintenance Plan</div>
+                  <div style={S.optionMeta}>
+                    Regular recurring details to keep your vehicle in pristine condition year-round. Choose bi-weekly or monthly.
+                  </div>
+                </button>
+              </div>
+
+              {/* Frequency picker — only shows when maintenance is selected */}
+              {clientType === "maintenance" && (
+                <div style={{ marginTop: 4, marginBottom: 8 }}>
+                  <div style={{ fontWeight: 700, color: "#374151", fontSize: "0.95rem", marginBottom: 12, textAlign: "center" as const }}>
+                    How often would you like service?
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                    <button
+                      style={{ ...S.optionCard, ...(frequency === "biweekly" ? S.selectedGreen : {}), textAlign: "center" as const }}
+                      onClick={() => setFrequency("biweekly")}
+                    >
+                      <div style={{ fontSize: "1.8rem", marginBottom: 6 }}>📅</div>
+                      <div style={{ ...S.optionTitle, textAlign: "center" as const, color: frequency === "biweekly" ? "#065f46" : "#111827" }}>Bi-Weekly</div>
+                      <div style={S.optionMeta}>Every two weeks — ideal for high-use vehicles or boats.</div>
+                    </button>
+                    <button
+                      style={{ ...S.optionCard, ...(frequency === "monthly" ? S.selectedGreen : {}), textAlign: "center" as const }}
+                      onClick={() => setFrequency("monthly")}
+                    >
+                      <div style={{ fontSize: "1.8rem", marginBottom: 6 }}>🗓️</div>
+                      <div style={{ ...S.optionTitle, textAlign: "center" as const, color: frequency === "monthly" ? "#065f46" : "#111827" }}>Monthly</div>
+                      <div style={S.optionMeta}>Once a month — a great balance of care and convenience.</div>
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              <div style={S.buttonRow}>
+                <button style={S.secondary} onClick={back}>Back</button>
+                <div style={S.rightButtons}>
+                  <button
+                    style={{ ...S.primary, ...(step2NextDisabled || (clientType === "maintenance" && !frequency) ? S.disabled : {}) }}
+                    onClick={next}
+                    disabled={step2NextDisabled || (clientType === "maintenance" && !frequency)}
+                  >Next</button>
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* ── STEP 3: Package ── */}
+          {step === 3 && (
             <>
               <h2 style={S.title}>Choose a Detail Package</h2>
               <p style={S.subtitle}>Pick the service level that fits the vehicle.</p>
               <div style={S.optionGrid}>
                 {(["basic", "premium"] as PackageType[]).map((packageType) => {
                   const label = packageType === "basic" ? "Basic Detail" : "Premium Detail";
-                  const rateText = selectedVehicle ? `${formatCurrency(packageType === "basic" ? selectedVehicle.basicRate : selectedVehicle.premiumRate)}/hr` : "Select vehicle first";
+                  const rateText = selectedVehicle
+                    ? `${formatCurrency(packageType === "basic" ? selectedVehicle.basicRate : selectedVehicle.premiumRate)}/hr`
+                    : "Select vehicle first";
                   const timeText = !vehicle ? "Average time shown after vehicle selection"
                     : vehicle === "boat" ? (packageType === "premium" ? "5–8 hours avg" : "3–6 hours avg")
                     : packageType === "premium" ? "3–5 hours avg"
@@ -844,7 +851,9 @@ export default function App() {
                   );
                 })}
               </div>
-              <div style={{ marginTop: 8, fontSize: "0.9rem", color: "#6b7280", fontStyle: "italic" }}>Estimated time is based on the condition of the vehicle and may vary at the time of service.</div>
+              <div style={{ marginTop: 8, fontSize: "0.9rem", color: "#6b7280", fontStyle: "italic" }}>
+                Estimated time is based on the condition of the vehicle and may vary at the time of service.
+              </div>
               <div style={S.estimateBox}><div style={S.estimateLabel}>Estimate</div><div style={S.estimateValue}>{estimateText || "$ per hour"}</div></div>
               <div style={S.noteBox}>
                 If wanting to see what's included in basic/premium packages go to{" "}
@@ -857,8 +866,8 @@ export default function App() {
             </>
           )}
 
-          {/* STEP 3 */}
-          {step === 3 && (
+          {/* ── STEP 4: Add-Ons ── */}
+          {step === 4 && (
             <>
               <h2 style={S.title}>Choose Add-Ons</h2>
               <p style={S.subtitle}>{vehicle === "boat" ? "Optional marine upgrades for the appointment." : "Optional upgrades for the appointment."}</p>
@@ -884,8 +893,8 @@ export default function App() {
             </>
           )}
 
-          {/* STEP 4 */}
-          {step === 4 && (
+          {/* ── STEP 5: Mobile or Drop-Off ── */}
+          {step === 5 && (
             <>
               <h2 style={S.title}>Mobile or Drop-Off Service</h2>
               <p style={S.subtitle}>Choose where the service will happen.</p>
@@ -917,8 +926,8 @@ export default function App() {
             </>
           )}
 
-          {/* STEP 5 */}
-          {step === 5 && (
+          {/* ── STEP 6: Customer Information ── */}
+          {step === 6 && (
             <>
               <h2 style={S.title}>Customer Information</h2>
               <p style={S.subtitle}>Provide contact and vehicle details for appointment confirmation.</p>
@@ -945,8 +954,8 @@ export default function App() {
                 <input style={S.input} placeholder="Phone number" value={phone} type="tel" inputMode="numeric"
                   onChange={(e) => {
                     const raw = e.target.value.replace(/\D/g, "").slice(0, 10);
-                    const formatted = raw.length > 6 ? `(${raw.slice(0,3)}) ${raw.slice(3,6)}-${raw.slice(6)}` : raw.length > 3 ? `(${raw.slice(0,3)}) ${raw.slice(3)}` : raw;
-                    setPhone(formatted);
+                    const fmt = raw.length > 6 ? `(${raw.slice(0,3)}) ${raw.slice(3,6)}-${raw.slice(6)}` : raw.length > 3 ? `(${raw.slice(0,3)}) ${raw.slice(3)}` : raw;
+                    setPhone(fmt);
                   }} />
                 <input style={S.input} placeholder="Email address" value={email} onChange={(e) => setEmail(e.target.value)} />
               </div>
@@ -980,33 +989,43 @@ export default function App() {
               <div style={S.buttonRow}>
                 <button style={S.secondary} onClick={back}>Back</button>
                 <div style={S.rightButtons}>
-                  <button style={{ ...S.primary, ...(step5Disabled ? S.disabled : {}) }} onClick={next} disabled={step5Disabled}>Review Booking</button>
+                  <button style={{ ...S.primary, ...(step6Disabled ? S.disabled : {}) }} onClick={next} disabled={step6Disabled}>Review Booking</button>
                 </div>
               </div>
             </>
           )}
 
-          {/* STEP 6 */}
-          {step === 6 && (
+          {/* ── STEP 7: Review ── */}
+          {step === 7 && (
             <>
               <h2 style={S.title}>Review Booking</h2>
               <p style={S.subtitle}>Review the request details before submitting.</p>
               <div style={S.summaryGrid}>
                 <div style={S.summaryCard}><div style={S.summaryHeading}>Customer</div><div style={S.summaryValue}>{name}<br />{phone}<br />{email}</div></div>
                 <div style={S.summaryCard}><div style={S.summaryHeading}>Appointment</div><div style={S.summaryValue}>{formatDateLabel(selectedDate)}<br />{selectedTime || "N/A"}</div></div>
-                <div style={S.summaryCard}><div style={S.summaryHeading}>Service</div><div style={S.summaryValue}>{selectedVehicle?.label || "N/A"}<br />{pkg === "basic" ? "Basic Detail" : pkg === "premium" ? "Premium Detail" : "N/A"}<br />{estimateText || "N/A"}</div></div>
+                <div style={S.summaryCard}>
+                  <div style={S.summaryHeading}>Service Plan</div>
+                  <div style={S.summaryValue}>
+                    {clientType === "oneTime" ? "⚡ One-Time Service" : clientType === "maintenance" ? "🔄 Maintenance Plan" : "N/A"}
+                    {clientType === "maintenance" && frequency && <><br />{frequency === "biweekly" ? "Bi-Weekly" : "Monthly"}</>}
+                  </div>
+                </div>
+                <div style={S.summaryCard}><div style={S.summaryHeading}>Detail Package</div><div style={S.summaryValue}>{selectedVehicle?.label || "N/A"}<br />{pkg === "basic" ? "Basic Detail" : pkg === "premium" ? "Premium Detail" : "N/A"}<br />{estimateText || "N/A"}</div></div>
                 <div style={S.summaryCard}><div style={S.summaryHeading}>Appointment Type</div><div style={S.summaryValue}>{serviceType === "mobile" ? "Mobile Service" : serviceType === "dropoff" ? "Drop-Off Service" : "N/A"}{serviceType === "mobile" && address && <><br />{address}</>}</div></div>
                 <div style={S.summaryCard}><div style={S.summaryHeading}>{vehicle === "boat" ? "Boat" : "Vehicle"}</div><div style={S.summaryValue}>{vehicleSummary}<br />{selectedVehicle?.label || "N/A"}</div></div>
                 <div style={S.summaryCard}><div style={S.summaryHeading}>Add-Ons</div><div style={S.summaryValue}>{addOns.length ? addOns.join(", ") : "No add-ons selected"}</div></div>
                 <div style={S.summaryCard}><div style={S.summaryHeading}>Estimated Add-Ons</div><div style={S.summaryValue}>{formatCurrency(addOnEstimate)}</div></div>
                 <div style={S.summaryCard}><div style={S.summaryHeading}>Avg Package Time</div><div style={S.summaryValue}>{packageHours}</div></div>
               </div>
+
+              {/* Notes */}
               <div style={{ marginTop: 24 }}>
                 <div style={S.sectionLabel}>Additional Notes</div>
                 <textarea style={{ ...S.input, marginTop: 10, minHeight: 100, resize: "vertical" as const, fontFamily: "inherit", lineHeight: 1.5 }}
                   placeholder="Any special requests, access instructions, or details about the vehicle condition…"
                   value={bookingNotes} onChange={(e) => setBookingNotes(e.target.value)} />
               </div>
+
               <div style={S.buttonRow}>
                 <button style={S.secondary} onClick={back}>Back</button>
                 <div style={S.rightButtons}>
@@ -1016,8 +1035,8 @@ export default function App() {
                         if (!address.trim()) { alert("Please enter your service address."); return; }
                         if (!addressSelected) { alert("Please select a valid address from the dropdown."); return; }
                       }
-                      const [yearPart, monthPart, dayPart] = selectedDate.split("-");
-                      const safeDate = `${monthPart}/${dayPart}/${yearPart}`;
+                      const [yp, mp, dp] = selectedDate.split("-");
+                      const safeDate = `${mp}/${dp}/${yp}`;
                       const res = await fetch(SCRIPT_URL, {
                         method: "POST",
                         body: JSON.stringify({
@@ -1032,6 +1051,8 @@ export default function App() {
                           serviceType, address, street, city,
                           state: stateRegion, zip, placeId, lat, lng,
                           avgTime: packageHours, notes: bookingNotes,
+                          clientType,
+                          recurringFrequency: frequency,
                         }),
                       });
                       const data = await res.json();
@@ -1044,13 +1065,16 @@ export default function App() {
             </>
           )}
 
-          {/* STEP 7 */}
-          {step === 7 && (
+          {/* ── STEP 8: Confirmation ── */}
+          {step === 8 && (
             <>
               <div style={S.successWrap}>
                 <div style={S.successBadge}>✅</div>
                 <h2 style={S.title}>Booking Request Submitted</h2>
-                <p style={S.successText}>Someone will be reaching out to you to confirm your service.</p>
+                <p style={S.successText}>
+                  Someone will be reaching out to you to confirm your service.
+                  {clientType === "maintenance" && ` As a maintenance client we'll follow up to schedule your recurring ${frequency === "biweekly" ? "bi-weekly" : "monthly"} appointments.`}
+                </p>
                 {googleUser && (
                   <button onClick={openMyBookings} style={{ ...S.secondary, marginTop: 8 }}>View My Bookings</button>
                 )}
@@ -1058,7 +1082,14 @@ export default function App() {
               <div style={S.summaryGrid}>
                 <div style={S.summaryCard}><div style={S.summaryHeading}>Customer</div><div style={S.summaryValue}>{name}<br />{phone}<br />{email}</div></div>
                 <div style={S.summaryCard}><div style={S.summaryHeading}>Appointment</div><div style={S.summaryValue}>{formatDateLabel(selectedDate)}<br />{selectedTime || "N/A"}</div></div>
-                <div style={S.summaryCard}><div style={S.summaryHeading}>Service</div><div style={S.summaryValue}>{selectedVehicle?.label || "N/A"}<br />{pkg === "basic" ? "Basic Detail" : pkg === "premium" ? "Premium Detail" : "N/A"}<br />{estimateText || "N/A"}</div></div>
+                <div style={S.summaryCard}>
+                  <div style={S.summaryHeading}>Service Plan</div>
+                  <div style={S.summaryValue}>
+                    {clientType === "oneTime" ? "⚡ One-Time Service" : "🔄 Maintenance Plan"}
+                    {clientType === "maintenance" && frequency && <><br />{frequency === "biweekly" ? "Bi-Weekly" : "Monthly"}</>}
+                  </div>
+                </div>
+                <div style={S.summaryCard}><div style={S.summaryHeading}>Detail Package</div><div style={S.summaryValue}>{selectedVehicle?.label || "N/A"}<br />{pkg === "basic" ? "Basic Detail" : pkg === "premium" ? "Premium Detail" : "N/A"}<br />{estimateText || "N/A"}</div></div>
                 <div style={S.summaryCard}><div style={S.summaryHeading}>Appointment Type</div><div style={S.summaryValue}>{serviceType === "mobile" ? "Mobile Service" : serviceType === "dropoff" ? "Drop-Off Service" : "N/A"}<br />{address || "No address provided"}</div></div>
                 <div style={S.summaryCard}><div style={S.summaryHeading}>{vehicle === "boat" ? "Boat" : "Vehicle"}</div><div style={S.summaryValue}>{vehicleSummary}<br />{selectedVehicle?.label || "N/A"}</div></div>
                 <div style={S.summaryCard}><div style={S.summaryHeading}>Add-Ons</div><div style={S.summaryValue}>{addOns.length ? addOns.join(", ") : "No add-ons selected"}</div></div>
