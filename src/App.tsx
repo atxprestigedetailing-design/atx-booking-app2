@@ -7,8 +7,6 @@ declare global {
   }
 }
 
-// ─── Constants ───────────────────────────────────────────────────────────────
-
 const GOOGLE_CLIENT_ID =
   "447699234633-ivo2e1c2q843scj32k5323o2rkq6h7dp.apps.googleusercontent.com";
 
@@ -16,8 +14,6 @@ const SCRIPT_URL =
   "https://script.google.com/macros/s/AKfycbzXgEiKY68xVN-qtwRofMTNdKxr-6HOR835vsJafxcE22HfFIh1UhLTeu_I0rYhe2klIQ/exec";
 
 const TOTAL_STEPS = 9;
-
-// ─── Types ───────────────────────────────────────────────────────────────────
 
 type AvailabilitySlot = {
   date: string;
@@ -71,8 +67,6 @@ type Booking = {
   status: string;
 };
 
-// ─── Static Data ─────────────────────────────────────────────────────────────
-
 const vehicleOptions = [
   { id: "truckSuv" as VehicleType, label: "Truck / SUV", basicRate: 80, premiumRate: 100 },
   { id: "sedan"    as VehicleType, label: "Sedan",        basicRate: 70, premiumRate: 90  },
@@ -96,8 +90,6 @@ const marineAddOnOptions: { label: AddOn; priceText: string; fixedPrice?: number
   { label: "Interior Deep Extraction",     priceText: "$120", fixedPrice: 120 },
   { label: "Sealant & Protection Upgrade", priceText: "$80",  fixedPrice: 80  },
 ];
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function formatDateLabel(dateStr: string) {
   if (!dateStr) return "N/A";
@@ -136,8 +128,6 @@ async function fetchBookingsForEmail(email: string): Promise<Booking[]> {
   return data.bookings || [];
 }
 
-// ─── BookingCard ─────────────────────────────────────────────────────────────
-
 function BookingCard({ booking, upcoming, onRequestChange }: {
   booking: Booking; upcoming: boolean; onRequestChange: (b: Booking) => void;
 }) {
@@ -154,14 +144,16 @@ function BookingCard({ booking, upcoming, onRequestChange }: {
         </span>
       )}
       <div style={{ fontSize: "1rem", fontWeight: 700, color: "#111827", marginBottom: 4 }}>
-        {formatDateLabel(booking.date)}{booking.time ? ` @ ${booking.time}` : ""}
+        {formatDateLabel(booking.date)}{booking.time ? ` at ${booking.time}` : ""}
       </div>
       <div style={{ fontSize: "0.92rem", color: "#6b7280", lineHeight: 1.6 }}>
-        {vehicleLabel && <div>🚗 {vehicleLabel}</div>}
-        <div>📦 {booking.packageType === "basic" ? "Basic Detail" : booking.packageType === "premium" ? "Premium Detail" : booking.packageType}</div>
-        {booking.serviceType && <div>📍 {booking.serviceType === "mobile" ? `Mobile${booking.address ? ` — ${booking.address}` : ""}` : "Drop-Off"}</div>}
-        {booking.addOns && <div>✨ {booking.addOns}</div>}
-        {booking.notes && <div>📝 {booking.notes}</div>}
+        {vehicleLabel && <div>{vehicleLabel}</div>}
+        <div>{booking.packageType === "basic" ? "Basic Detail" : booking.packageType === "premium" ? "Premium Detail" : booking.packageType}</div>
+        {booking.serviceType && (
+          <div>{booking.serviceType === "mobile" ? `Mobile Service${booking.address ? ` - ${booking.address}` : ""}` : "Drop-Off Service"}</div>
+        )}
+        {booking.addOns && <div>Add-Ons: {booking.addOns}</div>}
+        {booking.notes && <div>Notes: {booking.notes}</div>}
       </div>
       {upcoming && (
         <button onClick={() => onRequestChange(booking)} style={{ marginTop: 14, background: "#111827", color: "#fff", border: "none", borderRadius: 10, padding: "9px 16px", fontSize: "0.9rem", fontWeight: 600, cursor: "pointer" }}>
@@ -171,8 +163,6 @@ function BookingCard({ booking, upcoming, onRequestChange }: {
     </div>
   );
 }
-
-// ─── MaintenanceCard ──────────────────────────────────────────────────────────
 
 function MaintenanceCard({ booking, onRequestChange }: {
   booking: Booking; onRequestChange: (b: Booking) => void;
@@ -195,14 +185,16 @@ function MaintenanceCard({ booking, onRequestChange }: {
         {freqLabel.toUpperCase()}
       </span>
       <div style={{ fontSize: "1rem", fontWeight: 700, color: "#111827", marginBottom: 4 }}>
-        {formatDateLabel(booking.date)}{booking.time ? ` @ ${booking.time}` : ""}
+        {formatDateLabel(booking.date)}{booking.time ? ` at ${booking.time}` : ""}
       </div>
       <div style={{ fontSize: "0.92rem", color: "#6b7280", lineHeight: 1.6 }}>
-        {vehicleLabel && <div>🚗 {vehicleLabel}</div>}
-        <div>📦 {booking.packageType === "basic" ? "Basic Detail" : booking.packageType === "premium" ? "Premium Detail" : booking.packageType}</div>
-        {booking.serviceType && <div>📍 {booking.serviceType === "mobile" ? `Mobile${booking.address ? ` — ${booking.address}` : ""}` : "Drop-Off"}</div>}
-        {booking.addOns && <div>✨ {booking.addOns}</div>}
-        {booking.notes && <div>📝 {booking.notes}</div>}
+        {vehicleLabel && <div>{vehicleLabel}</div>}
+        <div>{booking.packageType === "basic" ? "Basic Detail" : booking.packageType === "premium" ? "Premium Detail" : booking.packageType}</div>
+        {booking.serviceType && (
+          <div>{booking.serviceType === "mobile" ? `Mobile Service${booking.address ? ` - ${booking.address}` : ""}` : "Drop-Off Service"}</div>
+        )}
+        {booking.addOns && <div>Add-Ons: {booking.addOns}</div>}
+        {booking.notes && <div>Notes: {booking.notes}</div>}
       </div>
       {upcoming && (
         <button onClick={() => onRequestChange(booking)} style={{ marginTop: 14, background: "#059669", color: "#fff", border: "none", borderRadius: 10, padding: "9px 16px", fontSize: "0.9rem", fontWeight: 600, cursor: "pointer" }}>
@@ -213,16 +205,11 @@ function MaintenanceCard({ booking, onRequestChange }: {
   );
 }
 
-// ─── Main App ─────────────────────────────────────────────────────────────────
-
 export default function App() {
   const addressInputRef = useRef(null);
 
-  // ── Auth ──
   const [googleUser, setGoogleUser]                     = useState<GoogleUser | null>(null);
   const [googleScriptLoaded, setGoogleScriptLoaded]     = useState(false);
-
-  // ── View ──
   const [view, setView]                                 = useState<"booking" | "myBookings" | "requestChange">("booking");
   const [bookingsTab, setBookingsTab]                   = useState<"appointments" | "maintenance">("appointments");
   const [userBookings, setUserBookings]                 = useState<Booking[]>([]);
@@ -231,12 +218,10 @@ export default function App() {
   const [changeNote, setChangeNote]                     = useState("");
   const [changeSubmitted, setChangeSubmitted]           = useState(false);
   const [changeSubmitting, setChangeSubmitting]         = useState(false);
-
-  // ── Booking flow ──
   const [step, setStep]                                 = useState(0);
   const [vehicle, setVehicle]                           = useState<VehicleType>("");
-  const [clientType, setClientType]                     = useState<ClientType>("");       // NEW
-  const [frequency, setFrequency]                       = useState<FrequencyType>("");    // NEW
+  const [clientType, setClientType]                     = useState<ClientType>("");
+  const [frequency, setFrequency]                       = useState<FrequencyType>("");
   const [pkg, setPkg]                                   = useState<PackageType>("");
   const [addOns, setAddOns]                             = useState<AddOn[]>([]);
   const [serviceType, setServiceType]                   = useState<ServiceType>("");
@@ -272,7 +257,6 @@ export default function App() {
   const currentYear = new Date().getFullYear();
   const yearOptions = Array.from({ length: currentYear - 1995 + 1 }, (_, i) => String(currentYear - i));
 
-  // ── Google Identity Services ──
   useEffect(() => {
     if (document.getElementById("google-gsi-script")) { setGoogleScriptLoaded(true); return; }
     const script = document.createElement("script");
@@ -304,7 +288,6 @@ export default function App() {
     setGoogleUser(null); setEmail(""); setView("booking"); setUserBookings([]);
   }
 
-  // ── Load bookings ──
   const loadMyBookings = useCallback(async () => {
     if (!googleUser) return;
     setBookingsLoading(true);
@@ -319,7 +302,6 @@ export default function App() {
     setView("myBookings"); setBookingsTab("appointments"); loadMyBookings();
   }
 
-  // ── Vehicle makes/models ──
   useEffect(() => {
     const load = async () => {
       try {
@@ -349,7 +331,6 @@ export default function App() {
     load();
   }, [year, make, vehicle]);
 
-  // ── Google Maps autocomplete ──
   useEffect(() => {
     if (step !== 5 || serviceType !== "mobile") return;
     if (!window.google?.maps?.places || !addressInputRef.current) return;
@@ -379,7 +360,6 @@ export default function App() {
     return () => { if (listener) window.google.maps.event.removeListener(listener); };
   }, [step, serviceType]);
 
-  // ── Availability ──
   useEffect(() => {
     fetchAllAvailability().then((slots) => {
       setAllAvailableSlots(slots);
@@ -392,7 +372,6 @@ export default function App() {
     setAvailableSlots(allAvailableSlots.filter((s) => s.date === selectedDate));
   }, [selectedDate, allAvailableSlots]);
 
-  // ── Derived values ──
   const selectedVehicle = vehicleOptions.find((v) => v.id === vehicle);
 
   const hourlyRate = useMemo(() => {
@@ -402,9 +381,9 @@ export default function App() {
 
   const packageHours = useMemo(() => {
     if (!vehicle || !pkg) return "Select vehicle first";
-    if (vehicle === "boat") return pkg === "premium" ? "5–8 hours avg" : "3–6 hours avg";
-    if (vehicle === "truckSuv") return "3–5 hours avg";
-    return pkg === "premium" ? "3–5 hours avg" : "3–4 hours avg";
+    if (vehicle === "boat") return pkg === "premium" ? "5-8 hours avg" : "3-6 hours avg";
+    if (vehicle === "truckSuv") return "3-5 hours avg";
+    return pkg === "premium" ? "3-5 hours avg" : "3-4 hours avg";
   }, [vehicle, pkg]);
 
   const addOnEstimate = useMemo(() => {
@@ -426,21 +405,10 @@ export default function App() {
       ? [boatSize, boatMake, boatModel].filter(Boolean).join(" ") || "N/A"
       : [year, make, model].filter(Boolean).join(" ") || "N/A";
 
-  // Step 2 next: if maintenance, go to step 3 (frequency). if oneTime, skip to step 3 anyway but frequency stays blank.
-  // Steps: 0=landing, 1=vehicle, 2=clientType, 3=frequency(maintenance only)/package(oneTime), ...
-  // To keep it simple we use a linear step count and just skip the frequency card visually for oneTime.
-  // Actual steps:
-  // 0 landing | 1 vehicle | 2 service plan | 3 frequency (maintenance) | 4 package | 5 mobile/dropoff | 6 customer info | 7 review | 8 confirm
-
-  const step2NextDisabled = !clientType;
- 
-
-  // For step 6 customer info
   const step6Disabled =
     !name || !phone || !email || !selectedDate || !selectedTime ||
     (vehicle === "boat" ? !boatSize || !boatMake || !boatModel : !year || !make || !model);
 
-  // ── Bookings split ──
   const standardBookings    = userBookings.filter((b) => b.clientType !== "maintenance");
   const maintenanceBookings = userBookings.filter((b) => b.clientType === "maintenance");
   const isMaintenance       = maintenanceBookings.length > 0;
@@ -449,7 +417,6 @@ export default function App() {
   const upcomingMaintenance = maintenanceBookings.filter((b) => isUpcoming(b.date)).sort((a, b) => a.date.localeCompare(b.date));
   const pastMaintenance     = maintenanceBookings.filter((b) => !isUpcoming(b.date)).sort((a, b) => b.date.localeCompare(a.date));
 
-  // ── Change request ──
   async function submitChangeRequest() {
     if (!changeTarget || !changeNote.trim()) return;
     setChangeSubmitting(true);
@@ -474,8 +441,6 @@ export default function App() {
     } catch (e) { console.error("Change request failed", e); }
     finally { setChangeSubmitting(false); }
   }
-
-  // ─── Styles ───────────────────────────────────────────────────────────────
 
   const S = {
     page:           { minHeight: "100vh", background: "linear-gradient(180deg,#f7f7f8 0%,#efeff1 100%)", color: "#171717", padding: "32px 16px", fontFamily: 'Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif' } as const,
@@ -511,11 +476,8 @@ export default function App() {
     summaryHeading: { fontSize: "0.92rem", color: "#6b7280", marginBottom: 8, textTransform: "uppercase" as const, letterSpacing: "0.04em" },
     summaryValue:   { fontSize: "1rem", fontWeight: 700, lineHeight: 1.5, color: "#111827", wordBreak: "break-word" as const },
     successWrap:    { textAlign: "center" as const, padding: "10px 0" },
-    successBadge:   { fontSize: "3rem", marginBottom: 6 },
     successText:    { fontSize: "1.05rem", color: "#4b5563", lineHeight: 1.6, maxWidth: 620, margin: "0 auto 24px" },
   };
-
-  // ─── Header ───────────────────────────────────────────────────────────────
 
   const Header = () => (
     <div style={{ display: "flex", justifyContent: "center", marginBottom: 32 }}>
@@ -545,12 +507,10 @@ export default function App() {
     </div>
   );
 
-  // ─── Progress Bar ─────────────────────────────────────────────────────────
-
   const ProgressBar = () => (
     <div style={{ marginBottom: 28 }}>
       <div style={{ display: "flex", justifyContent: "space-between", color: "#6b7280", fontSize: "0.9rem", marginBottom: 8 }}>
-        <span>Booking Flow</span>
+        <span>Booking</span>
         <span>Step {step} of {TOTAL_STEPS - 1}</span>
       </div>
       <div style={{ height: 8, background: "#e5e7eb", borderRadius: 999, overflow: "hidden", border: "1px solid #d1d5db" }}>
@@ -559,8 +519,7 @@ export default function App() {
     </div>
   );
 
-  // ─── MY BOOKINGS VIEW ─────────────────────────────────────────────────────
-
+  // MY BOOKINGS VIEW
   if (view === "myBookings") {
     return (
       <div style={S.page}>
@@ -568,28 +527,26 @@ export default function App() {
           <Header />
           <div style={S.card}>
             <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 24, flexWrap: "wrap" as const }}>
-              <button onClick={() => setView("booking")} style={{ ...S.secondary, padding: "9px 14px", fontSize: "0.9rem" }}>← Back</button>
+              <button onClick={() => setView("booking")} style={{ ...S.secondary, padding: "9px 14px", fontSize: "0.9rem" }}>Back</button>
               <h2 style={{ ...S.title, margin: 0, fontSize: "1.8rem" }}>My Bookings</h2>
-              <button onClick={() => { setView("booking"); setStep(1); }} style={{ ...S.primary, marginLeft: "auto", padding: "10px 16px", fontSize: "0.9rem" }}>+ Book New Service</button>
+              <button onClick={() => { setView("booking"); setStep(1); }} style={{ ...S.primary, marginLeft: "auto", padding: "10px 16px", fontSize: "0.9rem" }}>Book New Service</button>
             </div>
 
-            {/* Tabs */}
             <div style={{ display: "flex", gap: 4, marginBottom: 24, borderBottom: "2px solid #e5e7eb" }}>
               <button onClick={() => setBookingsTab("appointments")} style={{ background: "none", border: "none", cursor: "pointer", padding: "10px 18px", fontSize: "0.95rem", fontWeight: 700, color: bookingsTab === "appointments" ? "#111827" : "#9ca3af", borderBottom: bookingsTab === "appointments" ? "3px solid #111827" : "3px solid transparent", marginBottom: -2 }}>
                 My Appointments
               </button>
               {isMaintenance && (
                 <button onClick={() => setBookingsTab("maintenance")} style={{ background: "none", border: "none", cursor: "pointer", padding: "10px 18px", fontSize: "0.95rem", fontWeight: 700, color: bookingsTab === "maintenance" ? "#059669" : "#9ca3af", borderBottom: bookingsTab === "maintenance" ? "3px solid #059669" : "3px solid transparent", marginBottom: -2 }}>
-                  🔄 Maintenance Plan
+                  Maintenance Plan
                 </button>
               )}
             </div>
 
             {bookingsLoading ? (
-              <div style={{ textAlign: "center", padding: 40, color: "#6b7280" }}>Loading your bookings…</div>
+              <div style={{ textAlign: "center", padding: 40, color: "#6b7280" }}>Loading your bookings...</div>
             ) : (
               <>
-                {/* Appointments tab */}
                 {bookingsTab === "appointments" && (
                   <>
                     {upcomingStandard.length === 0 && pastStandard.length === 0 && (
@@ -619,18 +576,17 @@ export default function App() {
                   </>
                 )}
 
-                {/* Maintenance tab */}
                 {bookingsTab === "maintenance" && isMaintenance && (
                   <>
                     <div style={{ background: "#ecfdf5", border: "1px solid #6ee7b7", borderRadius: 14, padding: "14px 18px", marginBottom: 24 }}>
-                      <div style={{ fontWeight: 700, color: "#065f46", marginBottom: 4 }}>🔄 You're a Maintenance Client</div>
+                      <div style={{ fontWeight: 700, color: "#065f46", marginBottom: 4 }}>Maintenance Client</div>
                       <div style={{ color: "#047857", fontSize: "0.92rem", lineHeight: 1.6 }}>
-                        Your maintenance schedule is managed by ATX Prestige Detailing. Use "Request a Change" on any upcoming service to reschedule or adjust. You can also book additional one-time services for family or extra vehicles using the normal booking flow.
+                        Your maintenance schedule is managed by ATX Prestige Detailing. Use "Request a Change" on any upcoming service to reschedule or adjust. You can also book additional one-time services for family or extra vehicles through the normal booking flow.
                       </div>
                     </div>
                     {upcomingMaintenance.length > 0 && (
                       <>
-                        <div style={{ fontWeight: 700, color: "#374151", fontSize: "0.95rem", marginBottom: 12, textTransform: "uppercase" as const, letterSpacing: "0.04em" }}>Upcoming Maintenance Services</div>
+                        <div style={{ fontWeight: 700, color: "#374151", fontSize: "0.95rem", marginBottom: 12, textTransform: "uppercase" as const, letterSpacing: "0.04em" }}>Upcoming</div>
                         <div style={{ display: "grid", gap: 14, marginBottom: 28 }}>
                           {upcomingMaintenance.map((b, i) => (
                             <MaintenanceCard key={i} booking={b} onRequestChange={(b) => { setChangeTarget(b); setChangeNote(""); setChangeSubmitted(false); setView("requestChange"); }} />
@@ -640,7 +596,7 @@ export default function App() {
                     )}
                     {pastMaintenance.length > 0 && (
                       <>
-                        <div style={{ fontWeight: 700, color: "#9ca3af", fontSize: "0.95rem", marginBottom: 12, textTransform: "uppercase" as const, letterSpacing: "0.04em" }}>Past Maintenance Services</div>
+                        <div style={{ fontWeight: 700, color: "#9ca3af", fontSize: "0.95rem", marginBottom: 12, textTransform: "uppercase" as const, letterSpacing: "0.04em" }}>Past Services</div>
                         <div style={{ display: "grid", gap: 14 }}>
                           {pastMaintenance.map((b, i) => <MaintenanceCard key={i} booking={b} onRequestChange={() => {}} />)}
                         </div>
@@ -656,8 +612,7 @@ export default function App() {
     );
   }
 
-  // ─── REQUEST A CHANGE VIEW ────────────────────────────────────────────────
-
+  // REQUEST A CHANGE VIEW
   if (view === "requestChange" && changeTarget) {
     const vl = changeTarget.vehicle === "boat"
       ? [changeTarget.boatSize, changeTarget.make, changeTarget.model].filter(Boolean).join(" ")
@@ -668,37 +623,38 @@ export default function App() {
         <div style={S.container}>
           <Header />
           <div style={S.card}>
-            <button onClick={() => setView("myBookings")} style={{ ...S.secondary, padding: "9px 14px", fontSize: "0.9rem", marginBottom: 20 }}>← Back to My Bookings</button>
+            <button onClick={() => setView("myBookings")} style={{ ...S.secondary, padding: "9px 14px", fontSize: "0.9rem", marginBottom: 20 }}>Back to My Bookings</button>
             {changeSubmitted ? (
               <div style={S.successWrap}>
-                <div style={S.successBadge}>✅</div>
-                <h2 style={S.title}>Change Request Sent</h2>
-                <p style={S.successText}>Your request has been sent to ATX Prestige Detailing. Someone will reach out to confirm the changes.</p>
+                <h2 style={S.title}>Request Sent</h2>
+                <p style={S.successText}>Your request has been sent. Someone will reach out to confirm the changes.</p>
                 <button onClick={() => { setView("myBookings"); loadMyBookings(); }} style={S.primary}>Back to My Bookings</button>
               </div>
             ) : (
               <>
                 <h2 style={S.title}>Request a Change</h2>
-                <p style={S.subtitle}>Describe what you'd like to change about this appointment.</p>
+                <p style={S.subtitle}>Let us know what you'd like to change about this appointment.</p>
                 <div style={{ ...S.summaryCard, marginBottom: 24, background: "#f9fafb" }}>
                   <div style={S.summaryHeading}>Appointment</div>
                   <div style={S.summaryValue}>
-                    {formatDateLabel(changeTarget.date)}{changeTarget.time ? ` @ ${changeTarget.time}` : ""}<br />
+                    {formatDateLabel(changeTarget.date)}{changeTarget.time ? ` at ${changeTarget.time}` : ""}<br />
                     {vl}<br />
                     {changeTarget.packageType === "basic" ? "Basic Detail" : changeTarget.packageType === "premium" ? "Premium Detail" : changeTarget.packageType}
                   </div>
                 </div>
                 <div style={{ maxWidth: 560, margin: "0 auto" }}>
                   <div style={S.sectionLabel}>What would you like to change?</div>
-                  <textarea style={{ ...S.input, marginTop: 10, minHeight: 130, resize: "vertical" as const, fontFamily: "inherit", lineHeight: 1.5 }}
-                    placeholder="e.g. Can we move this to Saturday instead? Or change the time to 10am?"
-                    value={changeNote} onChange={(e) => setChangeNote(e.target.value)} />
+                  <textarea
+                    style={{ ...S.input, marginTop: 10, minHeight: 130, resize: "vertical" as const, fontFamily: "inherit", lineHeight: 1.5 }}
+                    placeholder="Describe what you'd like to change, such as a different date, time, or service update."
+                    value={changeNote} onChange={(e) => setChangeNote(e.target.value)}
+                  />
                 </div>
                 <div style={{ ...S.buttonRow, maxWidth: 560, margin: "20px auto 0" }}>
                   <button style={S.secondary} onClick={() => setView("myBookings")}>Cancel</button>
                   <button style={{ ...S.primary, ...(!changeNote.trim() || changeSubmitting ? S.disabled : {}) }}
                     onClick={submitChangeRequest} disabled={!changeNote.trim() || changeSubmitting}>
-                    {changeSubmitting ? "Sending…" : "Send Request"}
+                    {changeSubmitting ? "Sending..." : "Send Request"}
                   </button>
                 </div>
               </>
@@ -709,8 +665,7 @@ export default function App() {
     );
   }
 
-  // ─── BOOKING FLOW ─────────────────────────────────────────────────────────
-
+  // BOOKING FLOW
   return (
     <div style={S.page}>
       <div style={S.container}>
@@ -718,30 +673,30 @@ export default function App() {
         {step > 0 && step < TOTAL_STEPS - 1 && <ProgressBar />}
         <div style={S.card}>
 
-          {/* ── STEP 0: Landing ── */}
+          {/* STEP 0 */}
           {step === 0 && (
             <>
               <h2 style={S.title}>Book a Detail Service</h2>
-              <p style={S.subtitle}>Premium auto and marine detailing in Austin, TX.</p>
+              <p style={S.subtitle}>Auto and marine detailing in Austin, TX.</p>
               <div style={{ display: "flex", justifyContent: "center", gap: 12, padding: "10px 0 2px", flexWrap: "wrap" as const }}>
-                <button style={S.primary} onClick={() => setStep(1)}>Book Detail Service</button>
+                <button style={S.primary} onClick={() => setStep(1)}>Book a Service</button>
                 {googleUser && (
-                  <button style={{ ...S.secondary, display: "flex", alignItems: "center", gap: 8 }} onClick={openMyBookings}>📋 My Bookings</button>
+                  <button style={S.secondary} onClick={openMyBookings}>My Bookings</button>
                 )}
               </div>
               {!googleUser && (
                 <p style={{ textAlign: "center", color: "#9ca3af", fontSize: "0.88rem", marginTop: 18 }}>
-                  Sign in with Google above to view your past and upcoming services.
+                  Sign in with Google to view your past and upcoming appointments.
                 </p>
               )}
             </>
           )}
 
-          {/* ── STEP 1: Vehicle Type ── */}
+          {/* STEP 1 */}
           {step === 1 && (
             <>
-              <h2 style={S.title}>Choose a Vehicle Type</h2>
-              <p style={S.subtitle}>Select the vehicle class to continue.</p>
+              <h2 style={S.title}>Vehicle Type</h2>
+              <p style={S.subtitle}>Select the vehicle you're booking for.</p>
               <div style={S.optionGrid}>
                 {vehicleOptions.map((option) => (
                   <button key={option.id}
@@ -762,33 +717,28 @@ export default function App() {
             </>
           )}
 
-          {/* ── STEP 2: Service Plan (One-Time vs Maintenance) ── */}
+          {/* STEP 2 */}
           {step === 2 && (
             <>
-              <h2 style={S.title}>Choose Your Service Plan</h2>
-              <p style={S.subtitle}>Is this a one-time detail or are you setting up a maintenance plan?</p>
+              <h2 style={S.title}>Service Plan</h2>
+              <p style={S.subtitle}>Is this a one-time detail or a recurring maintenance plan?</p>
               <div style={S.optionGrid}>
                 <button
                   style={{ ...S.optionCard, ...(clientType === "oneTime" ? S.selectedCard : {}) }}
                   onClick={() => { setClientType("oneTime"); setFrequency(""); }}
                 >
-                  <div style={S.optionTitle}>⚡ One-Time Service</div>
-                  <div style={S.optionMeta}>
-                    A single detail appointment. Great for a deep clean, special occasion, or trying us out for the first time.
-                  </div>
+                  <div style={S.optionTitle}>One-Time Service</div>
+                  <div style={S.optionMeta}>A single detail appointment. Great for a deep clean, special occasion, or a first visit.</div>
                 </button>
                 <button
                   style={{ ...S.optionCard, ...(clientType === "maintenance" ? S.selectedGreen : {}) }}
                   onClick={() => setClientType("maintenance")}
                 >
-                  <div style={{ ...S.optionTitle, color: clientType === "maintenance" ? "#065f46" : "#111827" }}>🔄 Maintenance Plan</div>
-                  <div style={S.optionMeta}>
-                    Regular recurring details to keep your vehicle in pristine condition year-round. Choose bi-weekly or monthly.
-                  </div>
+                  <div style={{ ...S.optionTitle, color: clientType === "maintenance" ? "#065f46" : "#111827" }}>Maintenance Plan</div>
+                  <div style={S.optionMeta}>Recurring details to keep your vehicle in top condition. Choose bi-weekly or monthly.</div>
                 </button>
               </div>
 
-              {/* Frequency picker — only shows when maintenance is selected */}
               {clientType === "maintenance" && (
                 <div style={{ marginTop: 4, marginBottom: 8 }}>
                   <div style={{ fontWeight: 700, color: "#374151", fontSize: "0.95rem", marginBottom: 12, textAlign: "center" as const }}>
@@ -799,17 +749,15 @@ export default function App() {
                       style={{ ...S.optionCard, ...(frequency === "biweekly" ? S.selectedGreen : {}), textAlign: "center" as const }}
                       onClick={() => setFrequency("biweekly")}
                     >
-                      <div style={{ fontSize: "1.8rem", marginBottom: 6 }}>📅</div>
                       <div style={{ ...S.optionTitle, textAlign: "center" as const, color: frequency === "biweekly" ? "#065f46" : "#111827" }}>Bi-Weekly</div>
-                      <div style={S.optionMeta}>Every two weeks — ideal for high-use vehicles or boats.</div>
+                      <div style={S.optionMeta}>Every two weeks. Good for high-use vehicles or boats.</div>
                     </button>
                     <button
                       style={{ ...S.optionCard, ...(frequency === "monthly" ? S.selectedGreen : {}), textAlign: "center" as const }}
                       onClick={() => setFrequency("monthly")}
                     >
-                      <div style={{ fontSize: "1.8rem", marginBottom: 6 }}>🗓️</div>
                       <div style={{ ...S.optionTitle, textAlign: "center" as const, color: frequency === "monthly" ? "#065f46" : "#111827" }}>Monthly</div>
-                      <div style={S.optionMeta}>Once a month — a great balance of care and convenience.</div>
+                      <div style={S.optionMeta}>Once a month. A good balance of upkeep and convenience.</div>
                     </button>
                   </div>
                 </div>
@@ -819,30 +767,30 @@ export default function App() {
                 <button style={S.secondary} onClick={back}>Back</button>
                 <div style={S.rightButtons}>
                   <button
-                    style={{ ...S.primary, ...(step2NextDisabled || (clientType === "maintenance" && !frequency) ? S.disabled : {}) }}
+                    style={{ ...S.primary, ...(!clientType || (clientType === "maintenance" && !frequency) ? S.disabled : {}) }}
                     onClick={next}
-                    disabled={step2NextDisabled || (clientType === "maintenance" && !frequency)}
+                    disabled={!clientType || (clientType === "maintenance" && !frequency)}
                   >Next</button>
                 </div>
               </div>
             </>
           )}
 
-          {/* ── STEP 3: Package ── */}
+          {/* STEP 3 */}
           {step === 3 && (
             <>
-              <h2 style={S.title}>Choose a Detail Package</h2>
-              <p style={S.subtitle}>Pick the service level that fits the vehicle.</p>
+              <h2 style={S.title}>Detail Package</h2>
+              <p style={S.subtitle}>Choose the level of service for this appointment.</p>
               <div style={S.optionGrid}>
                 {(["basic", "premium"] as PackageType[]).map((packageType) => {
                   const label = packageType === "basic" ? "Basic Detail" : "Premium Detail";
                   const rateText = selectedVehicle
                     ? `${formatCurrency(packageType === "basic" ? selectedVehicle.basicRate : selectedVehicle.premiumRate)}/hr`
                     : "Select vehicle first";
-                  const timeText = !vehicle ? "Average time shown after vehicle selection"
-                    : vehicle === "boat" ? (packageType === "premium" ? "5–8 hours avg" : "3–6 hours avg")
-                    : packageType === "premium" ? "3–5 hours avg"
-                    : vehicle === "truckSuv" ? "3–5 hours avg" : "3–4 hours avg";
+                  const timeText = !vehicle ? "Time shown after vehicle selection"
+                    : vehicle === "boat" ? (packageType === "premium" ? "5-8 hours avg" : "3-6 hours avg")
+                    : packageType === "premium" ? "3-5 hours avg"
+                    : vehicle === "truckSuv" ? "3-5 hours avg" : "3-4 hours avg";
                   return (
                     <button key={packageType} style={{ ...S.optionCard, ...(pkg === packageType ? S.selectedCard : {}) }} onClick={() => setPkg(packageType)}>
                       <div style={S.optionTitle}>{label}</div>
@@ -851,13 +799,13 @@ export default function App() {
                   );
                 })}
               </div>
-              <div style={{ marginTop: 8, fontSize: "0.9rem", color: "#6b7280", fontStyle: "italic" }}>
-                Estimated time is based on the condition of the vehicle and may vary at the time of service.
+              <div style={{ marginTop: 8, fontSize: "0.9rem", color: "#6b7280" }}>
+                Time estimates are based on average conditions and may vary at the time of service.
               </div>
               <div style={S.estimateBox}><div style={S.estimateLabel}>Estimate</div><div style={S.estimateValue}>{estimateText || "$ per hour"}</div></div>
               <div style={S.noteBox}>
-                If wanting to see what's included in basic/premium packages go to{" "}
-                <a href="https://ATXPrestigeDetailing.com" target="_blank" rel="noopener noreferrer" style={{ color: "#111827", textDecoration: "none", fontWeight: 600, fontStyle: "italic", borderBottom: "1px solid #d1d5db" }}>ATXPrestigeDetailing.com</a>
+                To see what's included in each package, visit{" "}
+                <a href="https://ATXPrestigeDetailing.com" target="_blank" rel="noopener noreferrer" style={{ color: "#111827", textDecoration: "none", fontWeight: 600, borderBottom: "1px solid #d1d5db" }}>ATXPrestigeDetailing.com</a>
               </div>
               <div style={S.buttonRow}>
                 <button style={S.secondary} onClick={back}>Back</button>
@@ -866,11 +814,11 @@ export default function App() {
             </>
           )}
 
-          {/* ── STEP 4: Add-Ons ── */}
+          {/* STEP 4 */}
           {step === 4 && (
             <>
-              <h2 style={S.title}>Choose Add-Ons</h2>
-              <p style={S.subtitle}>{vehicle === "boat" ? "Optional marine upgrades for the appointment." : "Optional upgrades for the appointment."}</p>
+              <h2 style={S.title}>Add-On Services</h2>
+              <p style={S.subtitle}>{vehicle === "boat" ? "Optional marine services for this appointment." : "Optional services to add to your appointment."}</p>
               <div style={S.addOnGrid}>
                 {(vehicle === "boat" ? marineAddOnOptions : addOnOptions).map((option) => (
                   <label key={option.label} style={S.addOnRow}>
@@ -893,27 +841,27 @@ export default function App() {
             </>
           )}
 
-          {/* ── STEP 5: Mobile or Drop-Off ── */}
+          {/* STEP 5 */}
           {step === 5 && (
             <>
-              <h2 style={S.title}>Mobile or Drop-Off Service</h2>
-              <p style={S.subtitle}>Choose where the service will happen.</p>
+              <h2 style={S.title}>Service Location</h2>
+              <p style={S.subtitle}>Choose how you'd like the service to be done.</p>
               <div style={S.optionGrid}>
                 <button style={{ ...S.optionCard, ...(serviceType === "mobile" ? S.selectedCard : {}) }} onClick={() => { setServiceType("mobile"); setAddressSelected(false); }}>
                   <div style={S.optionTitle}>Mobile Service</div>
-                  <div style={S.optionMeta}>Customer enters a service address for on-site detail service.</div>
+                  <div style={S.optionMeta}>We come to you. Enter your location below after selecting this option.</div>
                 </button>
                 <button style={{ ...S.optionCard, ...(serviceType === "dropoff" ? S.selectedCard : {}) }}
                   onClick={() => { setServiceType("dropoff"); setAddress(""); setStreet(""); setCity(""); setStateRegion(""); setZip(""); setPlaceId(""); setLat(""); setLng(""); setAddressSelected(false); }}>
                   <div style={S.optionTitle}>Drop-Off Service</div>
-                  <div style={S.optionMeta}>Someone will contact the client with drop-off details.</div>
+                  <div style={S.optionMeta}>Drop off your vehicle with us. We'll follow up with location details.</div>
                 </button>
               </div>
               {serviceType === "mobile" && (
                 <div style={{ marginTop: 18 }}>
                   <input ref={addressInputRef} type="text" value={address}
                     onChange={(e) => { setAddress(e.target.value); setAddressSelected(false); }}
-                    placeholder="Start typing your service address" style={S.input} />
+                    placeholder="Start typing your address" style={S.input} />
                 </div>
               )}
               <div style={S.buttonRow}>
@@ -926,14 +874,14 @@ export default function App() {
             </>
           )}
 
-          {/* ── STEP 6: Customer Information ── */}
+          {/* STEP 6 */}
           {step === 6 && (
             <>
-              <h2 style={S.title}>Customer Information</h2>
-              <p style={S.subtitle}>Provide contact and vehicle details for appointment confirmation.</p>
+              <h2 style={S.title}>Your Information</h2>
+              <p style={S.subtitle}>We'll use this to confirm your appointment.</p>
               <div style={S.inputGrid}>
                 <div style={{ marginTop: 20 }}>
-                  <div style={S.sectionLabel}>Select Appointment Date</div>
+                  <div style={S.sectionLabel}>Appointment Date</div>
                   <select style={{ ...S.input, backgroundColor: "#fff", color: "#111827", cursor: "pointer" }} value={selectedDate}
                     onChange={(e) => { setSelectedDate(e.target.value); setSelectedTime(""); }}>
                     <option value="">Select a date</option>
@@ -941,13 +889,13 @@ export default function App() {
                   </select>
                 </div>
                 <div style={{ marginTop: 20 }}>
-                  <div style={S.sectionLabel}>Available Time</div>
+                  <div style={S.sectionLabel}>Appointment Time</div>
                   <select style={{ ...S.input, backgroundColor: "#fff", color: "#111827", cursor: "pointer" }} value={selectedTime} onChange={(e) => setSelectedTime(e.target.value)}>
                     <option value="">Select a time</option>
                     {availableSlots.map((slot, i) => <option key={i} value={slot.time}>{slot.time}</option>)}
                   </select>
                   {selectedDate && availableSlots.length === 0 && (
-                    <div style={{ marginTop: 8, color: "#b91c1c", fontSize: "0.95rem" }}>No available times found for this date.</div>
+                    <div style={{ marginTop: 8, color: "#b91c1c", fontSize: "0.95rem" }}>No available times for this date.</div>
                   )}
                 </div>
                 <input style={S.input} placeholder="Full name" value={name} onChange={(e) => setName(e.target.value)} />
@@ -961,7 +909,7 @@ export default function App() {
               </div>
 
               <div style={{ marginTop: 24 }}>
-                <div style={S.sectionLabel}>{vehicle === "boat" ? "Boat Information" : "Vehicle Information"}</div>
+                <div style={S.sectionLabel}>{vehicle === "boat" ? "Boat Details" : "Vehicle Details"}</div>
                 {vehicle === "boat" ? (
                   <div style={{ display: "flex", gap: 12, marginTop: 10, flexWrap: "wrap" as const }}>
                     <input style={{ ...S.input, flex: 1, minWidth: 120 }} placeholder="Size (e.g. 24 ft)" value={boatSize} onChange={(e) => setBoatSize(e.target.value)} />
@@ -975,11 +923,11 @@ export default function App() {
                       {yearOptions.map((yr) => <option key={yr} value={yr}>{yr}</option>)}
                     </select>
                     <select style={{ ...S.input, flex: 2, minWidth: 180, backgroundColor: "#fff", color: "#111827" }} value={make} onChange={(e) => { setMake(e.target.value); setModel(""); setModelOptions([]); }} disabled={loadingMakes}>
-                      <option value="">{loadingMakes ? "Loading makes..." : "Make"}</option>
+                      <option value="">{loadingMakes ? "Loading..." : "Make"}</option>
                       {makeOptions.map((mk) => <option key={mk} value={mk}>{mk}</option>)}
                     </select>
                     <select style={{ ...S.input, flex: 2, minWidth: 180, backgroundColor: "#fff", color: "#111827" }} value={model} onChange={(e) => setModel(e.target.value)} disabled={!year || !make || loadingModels}>
-                      <option value="">{!year || !make ? "Select year and make first" : loadingModels ? "Loading models..." : "Model"}</option>
+                      <option value="">{!year || !make ? "Select year and make first" : loadingModels ? "Loading..." : "Model"}</option>
                       {modelOptions.map((mdl) => <option key={mdl} value={mdl}>{mdl}</option>)}
                     </select>
                   </div>
@@ -995,34 +943,33 @@ export default function App() {
             </>
           )}
 
-          {/* ── STEP 7: Review ── */}
+          {/* STEP 7 */}
           {step === 7 && (
             <>
-              <h2 style={S.title}>Review Booking</h2>
-              <p style={S.subtitle}>Review the request details before submitting.</p>
+              <h2 style={S.title}>Review Your Booking</h2>
+              <p style={S.subtitle}>Check everything over before submitting.</p>
               <div style={S.summaryGrid}>
                 <div style={S.summaryCard}><div style={S.summaryHeading}>Customer</div><div style={S.summaryValue}>{name}<br />{phone}<br />{email}</div></div>
                 <div style={S.summaryCard}><div style={S.summaryHeading}>Appointment</div><div style={S.summaryValue}>{formatDateLabel(selectedDate)}<br />{selectedTime || "N/A"}</div></div>
                 <div style={S.summaryCard}>
                   <div style={S.summaryHeading}>Service Plan</div>
                   <div style={S.summaryValue}>
-                    {clientType === "oneTime" ? "⚡ One-Time Service" : clientType === "maintenance" ? "🔄 Maintenance Plan" : "N/A"}
+                    {clientType === "oneTime" ? "One-Time Service" : clientType === "maintenance" ? "Maintenance Plan" : "N/A"}
                     {clientType === "maintenance" && frequency && <><br />{frequency === "biweekly" ? "Bi-Weekly" : "Monthly"}</>}
                   </div>
                 </div>
-                <div style={S.summaryCard}><div style={S.summaryHeading}>Detail Package</div><div style={S.summaryValue}>{selectedVehicle?.label || "N/A"}<br />{pkg === "basic" ? "Basic Detail" : pkg === "premium" ? "Premium Detail" : "N/A"}<br />{estimateText || "N/A"}</div></div>
-                <div style={S.summaryCard}><div style={S.summaryHeading}>Appointment Type</div><div style={S.summaryValue}>{serviceType === "mobile" ? "Mobile Service" : serviceType === "dropoff" ? "Drop-Off Service" : "N/A"}{serviceType === "mobile" && address && <><br />{address}</>}</div></div>
+                <div style={S.summaryCard}><div style={S.summaryHeading}>Package</div><div style={S.summaryValue}>{selectedVehicle?.label || "N/A"}<br />{pkg === "basic" ? "Basic Detail" : pkg === "premium" ? "Premium Detail" : "N/A"}<br />{estimateText || "N/A"}</div></div>
+                <div style={S.summaryCard}><div style={S.summaryHeading}>Location</div><div style={S.summaryValue}>{serviceType === "mobile" ? "Mobile Service" : serviceType === "dropoff" ? "Drop-Off Service" : "N/A"}{serviceType === "mobile" && address && <><br />{address}</>}</div></div>
                 <div style={S.summaryCard}><div style={S.summaryHeading}>{vehicle === "boat" ? "Boat" : "Vehicle"}</div><div style={S.summaryValue}>{vehicleSummary}<br />{selectedVehicle?.label || "N/A"}</div></div>
-                <div style={S.summaryCard}><div style={S.summaryHeading}>Add-Ons</div><div style={S.summaryValue}>{addOns.length ? addOns.join(", ") : "No add-ons selected"}</div></div>
-                <div style={S.summaryCard}><div style={S.summaryHeading}>Estimated Add-Ons</div><div style={S.summaryValue}>{formatCurrency(addOnEstimate)}</div></div>
-                <div style={S.summaryCard}><div style={S.summaryHeading}>Avg Package Time</div><div style={S.summaryValue}>{packageHours}</div></div>
+                <div style={S.summaryCard}><div style={S.summaryHeading}>Add-Ons</div><div style={S.summaryValue}>{addOns.length ? addOns.join(", ") : "None"}</div></div>
+                <div style={S.summaryCard}><div style={S.summaryHeading}>Add-On Estimate</div><div style={S.summaryValue}>{formatCurrency(addOnEstimate)}</div></div>
+                <div style={S.summaryCard}><div style={S.summaryHeading}>Avg Time</div><div style={S.summaryValue}>{packageHours}</div></div>
               </div>
 
-              {/* Notes */}
               <div style={{ marginTop: 24 }}>
                 <div style={S.sectionLabel}>Additional Notes</div>
                 <textarea style={{ ...S.input, marginTop: 10, minHeight: 100, resize: "vertical" as const, fontFamily: "inherit", lineHeight: 1.5 }}
-                  placeholder="Any special requests, access instructions, or details about the vehicle condition…"
+                  placeholder="Any access instructions, special requests, or notes about the vehicle condition."
                   value={bookingNotes} onChange={(e) => setBookingNotes(e.target.value)} />
               </div>
 
@@ -1057,23 +1004,22 @@ export default function App() {
                       });
                       const data = await res.json();
                       if (data.success) { next(); }
-                      else { alert("Something went wrong."); console.error(data); }
-                    } catch (err) { alert("Something went wrong."); console.error(err); }
+                      else { alert("Something went wrong. Please try again."); console.error(data); }
+                    } catch (err) { alert("Something went wrong. Please try again."); console.error(err); }
                   }}>Submit Booking</button>
                 </div>
               </div>
             </>
           )}
 
-          {/* ── STEP 8: Confirmation ── */}
+          {/* STEP 8 */}
           {step === 8 && (
             <>
               <div style={S.successWrap}>
-                <div style={S.successBadge}>✅</div>
-                <h2 style={S.title}>Booking Request Submitted</h2>
+                <h2 style={S.title}>Booking Submitted</h2>
                 <p style={S.successText}>
-                  Someone will be reaching out to you to confirm your service.
-                  {clientType === "maintenance" && ` As a maintenance client we'll follow up to schedule your recurring ${frequency === "biweekly" ? "bi-weekly" : "monthly"} appointments.`}
+                  Your booking request has been received. Someone will be in touch shortly to confirm your appointment.
+                  {clientType === "maintenance" && ` We'll also follow up to get your ${frequency === "biweekly" ? "bi-weekly" : "monthly"} schedule set up.`}
                 </p>
                 {googleUser && (
                   <button onClick={openMyBookings} style={{ ...S.secondary, marginTop: 8 }}>View My Bookings</button>
@@ -1085,16 +1031,16 @@ export default function App() {
                 <div style={S.summaryCard}>
                   <div style={S.summaryHeading}>Service Plan</div>
                   <div style={S.summaryValue}>
-                    {clientType === "oneTime" ? "⚡ One-Time Service" : "🔄 Maintenance Plan"}
+                    {clientType === "oneTime" ? "One-Time Service" : "Maintenance Plan"}
                     {clientType === "maintenance" && frequency && <><br />{frequency === "biweekly" ? "Bi-Weekly" : "Monthly"}</>}
                   </div>
                 </div>
-                <div style={S.summaryCard}><div style={S.summaryHeading}>Detail Package</div><div style={S.summaryValue}>{selectedVehicle?.label || "N/A"}<br />{pkg === "basic" ? "Basic Detail" : pkg === "premium" ? "Premium Detail" : "N/A"}<br />{estimateText || "N/A"}</div></div>
-                <div style={S.summaryCard}><div style={S.summaryHeading}>Appointment Type</div><div style={S.summaryValue}>{serviceType === "mobile" ? "Mobile Service" : serviceType === "dropoff" ? "Drop-Off Service" : "N/A"}<br />{address || "No address provided"}</div></div>
+                <div style={S.summaryCard}><div style={S.summaryHeading}>Package</div><div style={S.summaryValue}>{selectedVehicle?.label || "N/A"}<br />{pkg === "basic" ? "Basic Detail" : pkg === "premium" ? "Premium Detail" : "N/A"}<br />{estimateText || "N/A"}</div></div>
+                <div style={S.summaryCard}><div style={S.summaryHeading}>Location</div><div style={S.summaryValue}>{serviceType === "mobile" ? "Mobile Service" : serviceType === "dropoff" ? "Drop-Off Service" : "N/A"}<br />{address || "No address provided"}</div></div>
                 <div style={S.summaryCard}><div style={S.summaryHeading}>{vehicle === "boat" ? "Boat" : "Vehicle"}</div><div style={S.summaryValue}>{vehicleSummary}<br />{selectedVehicle?.label || "N/A"}</div></div>
-                <div style={S.summaryCard}><div style={S.summaryHeading}>Add-Ons</div><div style={S.summaryValue}>{addOns.length ? addOns.join(", ") : "No add-ons selected"}</div></div>
-                <div style={S.summaryCard}><div style={S.summaryHeading}>Estimated Add-Ons</div><div style={S.summaryValue}>{formatCurrency(addOnEstimate)}</div></div>
-                <div style={S.summaryCard}><div style={S.summaryHeading}>Avg Package Time</div><div style={S.summaryValue}>{packageHours}</div></div>
+                <div style={S.summaryCard}><div style={S.summaryHeading}>Add-Ons</div><div style={S.summaryValue}>{addOns.length ? addOns.join(", ") : "None"}</div></div>
+                <div style={S.summaryCard}><div style={S.summaryHeading}>Add-On Estimate</div><div style={S.summaryValue}>{formatCurrency(addOnEstimate)}</div></div>
+                <div style={S.summaryCard}><div style={S.summaryHeading}>Avg Time</div><div style={S.summaryValue}>{packageHours}</div></div>
                 {bookingNotes.trim() && (
                   <div style={{ ...S.summaryCard, gridColumn: "1 / -1" }}>
                     <div style={S.summaryHeading}>Notes</div>
