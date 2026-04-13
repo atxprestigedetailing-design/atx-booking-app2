@@ -11,7 +11,7 @@ const GOOGLE_CLIENT_ID =
   "447699234633-ivo2e1c2q843scj32k5323o2rkq6h7dp.apps.googleusercontent.com";
 
 const SCRIPT_URL =
-  "https://script.google.com/macros/s/AKfycbzXgEiKY68xVN-qtwRofMTNdKxr-6HOR835vsJafxcE22HfFIh1UhLTeu_I0rYhe2klIQ/exec";
+  "https://script.google.com/macros/s/AKfycbzrgmu-vuVccD-UhbHn8tacqlFFW_RCYZHG0SLPIxsVedNu5Fi0Z_HDQ_ErmqAIo9--uQ/exec";
 
 const TOTAL_STEPS = 9;
 
@@ -957,18 +957,43 @@ export default function App() {
                   </div>
                 ) : (
                   <div style={{ display: "flex", gap: 12, marginTop: 10, flexWrap: "wrap" as const }}>
-                    <select style={{ ...S.input, flex: 1, minWidth: 120, backgroundColor: "#fff", color: "#111827" }} value={year} onChange={(e) => { setYear(e.target.value); setModel(""); setModelOptions([]); }}>
-                      <option value="">Year</option>
-                      {yearOptions.map((yr) => <option key={yr} value={yr}>{yr}</option>)}
-                    </select>
-                    <select style={{ ...S.input, flex: 2, minWidth: 180, backgroundColor: "#fff", color: "#111827" }} value={make} onChange={(e) => { setMake(e.target.value); setModel(""); setModelOptions([]); }} disabled={loadingMakes}>
-                      <option value="">{loadingMakes ? "Loading..." : "Make"}</option>
-                      {makeOptions.map((mk) => <option key={mk} value={mk}>{mk}</option>)}
-                    </select>
-                    <select style={{ ...S.input, flex: 2, minWidth: 180, backgroundColor: "#fff", color: "#111827" }} value={model} onChange={(e) => setModel(e.target.value)} disabled={!year || !make || loadingModels}>
-                      <option value="">{!year || !make ? "Select year and make first" : loadingModels ? "Loading..." : "Model"}</option>
-                      {modelOptions.map((mdl) => <option key={mdl} value={mdl}>{mdl}</option>)}
-                    </select>
+                    {/* Year — free text with suggestions */}
+                    <input
+                      style={{ ...S.input, flex: 1, minWidth: 120 }}
+                      placeholder="Year"
+                      value={year}
+                      onChange={(e) => { setYear(e.target.value); setModel(""); setModelOptions([]); }}
+                      list="year-options"
+                    />
+                    <datalist id="year-options">
+                      {yearOptions.map((yr) => <option key={yr} value={yr} />)}
+                    </datalist>
+
+                    {/* Make — free text with API suggestions */}
+                    <input
+                      style={{ ...S.input, flex: 2, minWidth: 180 }}
+                      placeholder={loadingMakes ? "Loading..." : "Make"}
+                      value={make}
+                      onChange={(e) => { setMake(e.target.value); setModel(""); setModelOptions([]); }}
+                      list="make-options"
+                      autoComplete="off"
+                    />
+                    <datalist id="make-options">
+                      {makeOptions.map((mk) => <option key={mk} value={mk} />)}
+                    </datalist>
+
+                    {/* Model — free text with API suggestions */}
+                    <input
+                      style={{ ...S.input, flex: 2, minWidth: 180 }}
+                      placeholder={!year || !make ? "Enter year and make first" : loadingModels ? "Loading..." : "Model"}
+                      value={model}
+                      onChange={(e) => setModel(e.target.value)}
+                      list="model-options"
+                      autoComplete="off"
+                    />
+                    <datalist id="model-options">
+                      {modelOptions.map((mdl) => <option key={mdl} value={mdl} />)}
+                    </datalist>
                   </div>
                 )}
               </div>
