@@ -270,12 +270,33 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (!googleScriptLoaded || googleUser) return;
-    if (!window.google?.accounts?.id) return;
-    window.google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: handleGoogleCredential });
+  if (!googleScriptLoaded || googleUser) return;
+  if (!window.google?.accounts?.id) return;
+
+  window.google.accounts.id.initialize({
+    client_id: GOOGLE_CLIENT_ID,
+    callback: handleGoogleCredential,
+  });
+
+  // Retry rendering the button until the div is in the DOM
+  let attempts = 0;
+  const tryRender = () => {
     const btnEl = document.getElementById("google-signin-btn");
-    if (btnEl) window.google.accounts.id.renderButton(btnEl, { theme: "outline", size: "large", shape: "rectangular", text: "signin_with", logo_alignment: "left" });
-  }, [googleScriptLoaded, googleUser, view, step]);
+    if (btnEl) {
+      window.google.accounts.id.renderButton(btnEl, {
+        theme: "outline",
+        size: "large",
+        shape: "rectangular",
+        text: "signin_with",
+        logo_alignment: "left",
+      });
+    } else if (attempts < 10) {
+      attempts++;
+      setTimeout(tryRender, 100);
+    }
+  };
+  tryRender();
+}, [googleScriptLoaded, googleUser, view, step]);
 
   function handleGoogleCredential(response: any) {
     try {
