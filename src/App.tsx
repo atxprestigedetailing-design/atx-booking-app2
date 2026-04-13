@@ -7,7 +7,7 @@ declare global {
 }
 
 const SCRIPT_URL =
-  "https://script.google.com/macros/s/AKfycbwzc5YR9p1-FfoU5fGent2NJwnlUO24uqivy4SRbYCahfNzdjfFu1Sg-Ry0ltuCIoH8bw/exec";
+  "https://script.google.com/macros/s/AKfycbzoWUVCXC3Cj7bKRVwpPZ0g1wGzjej5cOJC4U2gkYhV1csdsyXM2w9S4vj8dg3T4qCoJA/exec";
 
 type AvailabilitySlot = {
   date: string;
@@ -125,6 +125,7 @@ export default function App() {
   const [boatMake, setBoatMake] = useState("");
   const [boatModel, setBoatModel] = useState("");
   const [boatSize, setBoatSize] = useState("");
+  const [bookingNotes, setBookingNotes] = useState("");
   const [selectedDate, setSelectedDate] = useState("");
   const [availableSlots, setAvailableSlots] = useState<AvailabilitySlot[]>([]);
   const [allAvailableSlots, setAllAvailableSlots] = useState<AvailabilitySlot[]>([]);
@@ -1311,6 +1312,24 @@ export default function App() {
                 </div>
               </div>
 
+              {/* ── Notes ── */}
+              <div style={{ marginTop: 24 }}>
+                <div style={styles.sectionLabel}>Additional Notes</div>
+                <textarea
+                  style={{
+                    ...styles.input,
+                    marginTop: 10,
+                    minHeight: 100,
+                    resize: "vertical" as const,
+                    fontFamily: "inherit",
+                    lineHeight: 1.5,
+                  }}
+                  placeholder="Any special requests, access instructions, or details about the vehicle condition…"
+                  value={bookingNotes}
+                  onChange={(e) => setBookingNotes(e.target.value)}
+                />
+              </div>
+
               <div style={styles.buttonRow}>
                 <button style={styles.secondaryButton} onClick={back}>
                   Back
@@ -1362,6 +1381,7 @@ export default function App() {
                             lat,
                             lng,
                             avgTime: packageHours,
+                            notes: bookingNotes,
                           }),
                         });
                         const data = await res.json();
@@ -1392,7 +1412,8 @@ export default function App() {
                 <div style={styles.successBadge}>✅</div>
                 <h2 style={styles.title}>Booking Request Submitted</h2>
                 <p style={styles.successText}>
-                  Someone will be reaching out to you to confirm your service. 
+                  Someone will be reaching out to you to confirm your service. This private build is
+                  also showing a booking summary for testing.
                 </p>
               </div>
 
@@ -1468,6 +1489,15 @@ export default function App() {
                   <div style={styles.summaryHeading}>Avg Package Time</div>
                   <div style={styles.summaryValue}>{packageHours}</div>
                 </div>
+
+                {bookingNotes.trim() && (
+                  <div style={{ ...styles.summaryCard, gridColumn: "1 / -1" }}>
+                    <div style={styles.summaryHeading}>Notes</div>
+                    <div style={{ ...styles.summaryValue, fontWeight: 400, color: "#374151", whiteSpace: "pre-wrap" as const }}>
+                      {bookingNotes}
+                    </div>
+                  </div>
+                )}
               </div>
             </>
           )}
