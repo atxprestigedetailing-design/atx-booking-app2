@@ -1,13 +1,21 @@
 import logo from "./assets/logo.png";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
+
 declare global {
   interface Window {
     google: any;
   }
 }
 
+// ─── Constants ───────────────────────────────────────────────────────────────
+
+const GOOGLE_CLIENT_ID =
+  "447699234633-ivo2e1c2q843scj32k5323o2rkq6h7dp.apps.googleusercontent.com";
+
 const SCRIPT_URL =
-  "https://script.google.com/macros/s/AKfycbzoWUVCXC3Cj7bKRVwpPZ0g1wGzjej5cOJC4U2gkYhV1csdsyXM2w9S4vj8dg3T4qCoJA/exec";
+  "https://script.google.com/macros/s/AKfycbxspP9xrPYBcLfPDoEt94WNJ8R9SMEiONrDXxzpSmO9lgar3HW1I5LB6czPs7sbelVNJg/exec";
+
+// ─── Types ───────────────────────────────────────────────────────────────────
 
 type AvailabilitySlot = {
   date: string;
@@ -15,12 +23,6 @@ type AvailabilitySlot = {
   available?: boolean;
   notes?: string;
 };
-
-async function fetchAllAvailability(): Promise<AvailabilitySlot[]> {
-  const res = await fetch(`${SCRIPT_URL}?action=getAllAvailability`);
-  const data: { slots: AvailabilitySlot[] } = await res.json();
-  return data.slots || [];
-}
 
 type VehicleType = "truckSuv" | "sedan" | "coupe" | "boat" | "";
 type PackageType = "basic" | "premium" | "";
@@ -38,203 +40,373 @@ type AddOn =
   | "Interior Deep Extraction"
   | "Sealant & Protection Upgrade";
 
+type GoogleUser = {
+  name: string;
+  email: string;
+  picture: string;
+};
+
+type Booking = {
+  date: string;
+  time: string;
+  year: string;
+  make: string;
+  model: string;
+  boatSize: string;
+  vehicle: string;
+  packageType: string;
+  hourlyRate: string;
+  addOns: string;
+  serviceType: string;
+  address: string;
+  avgTime: string;
+  notes: string;
+  clientType: string;
+  recurringFrequency: string;
+  status: string;
+};
+
+// ─── Static Data ─────────────────────────────────────────────────────────────
+
 const vehicleOptions = [
-  {
-    id: "truckSuv" as VehicleType,
-    label: "Truck / SUV",
-    basicRate: 80,
-    premiumRate: 100,
-  },
-  {
-    id: "sedan" as VehicleType,
-    label: "Sedan",
-    basicRate: 70,
-    premiumRate: 90,
-  },
-  {
-    id: "coupe" as VehicleType,
-    label: "Coupe",
-    basicRate: 65,
-    premiumRate: 85,
-  },
-  {
-    id: "boat" as VehicleType,
-    label: "Boat",
-    basicRate: 90,
-    premiumRate: 110,
-  },
+  { id: "truckSuv" as VehicleType, label: "Truck / SUV", basicRate: 80, premiumRate: 100 },
+  { id: "sedan"    as VehicleType, label: "Sedan",        basicRate: 70, premiumRate: 90  },
+  { id: "coupe"    as VehicleType, label: "Coupe",        basicRate: 65, premiumRate: 85  },
+  { id: "boat"     as VehicleType, label: "Boat",         basicRate: 90, premiumRate: 110 },
 ];
 
+const addOnOptions: { label: AddOn; priceText: string; fixedPrice?: number }[] = [
+  { label: "Headlight Restoration", priceText: "$150", fixedPrice: 150 },
+  { label: "Stain Removal",         priceText: "Need consultation" },
+  { label: "Paint Correction",      priceText: "Need consultation" },
+  { label: "Pet Hair Removal",      priceText: "$60",  fixedPrice: 60  },
+  { label: "Steam Cleaning",        priceText: "$60",  fixedPrice: 60  },
+  { label: "Ceramic Coating",       priceText: "Need consultation" },
+];
+
+const marineAddOnOptions: { label: AddOn; priceText: string; fixedPrice?: number }[] = [
+  { label: "Oxidation Removal",            priceText: "Need consultation" },
+  { label: "Gelcoat Polishing",            priceText: "Need consultation" },
+  { label: "Wet Sanding",                  priceText: "Need consultation" },
+  { label: "Interior Deep Extraction",     priceText: "$120", fixedPrice: 120 },
+  { label: "Sealant & Protection Upgrade", priceText: "$80",  fixedPrice: 80  },
+];
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
 function formatDateLabel(dateStr: string) {
-  const [year, month, day] = dateStr.split("-").map(Number);
-  const date = new Date(year, month - 1, day);
+  if (!dateStr) return "N/A";
+  const parts = dateStr.includes("-") ? dateStr.split("-").map(Number) : null;
+  if (!parts) return dateStr;
+  const [y, m, d] = parts;
+  const date = new Date(y, m - 1, d);
   return date.toLocaleDateString("en-US", {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-    year: "numeric",
+    weekday: "short", month: "short", day: "numeric", year: "numeric",
   });
 }
 
-const addOnOptions: {
-  label: AddOn;
-  priceText: string;
-  fixedPrice?: number;
-}[] = [
-  { label: "Headlight Restoration", priceText: "$150", fixedPrice: 150 },
-  { label: "Stain Removal", priceText: "Need consultation" },
-  { label: "Paint Correction", priceText: "Need consultation" },
-  { label: "Pet Hair Removal", priceText: "$60", fixedPrice: 60 },
-  { label: "Steam Cleaning", priceText: "$60", fixedPrice: 60 },
-  { label: "Ceramic Coating", priceText: "Need consultation" },
-];
-
-const marineAddOnOptions: {
-  label: AddOn;
-  priceText: string;
-  fixedPrice?: number;
-}[] = [
-  { label: "Oxidation Removal", priceText: "Need consultation" },
-  { label: "Gelcoat Polishing", priceText: "Need consultation" },
-  { label: "Wet Sanding", priceText: "Need consultation" },
-  { label: "Interior Deep Extraction", priceText: "$120", fixedPrice: 120 },
-  { label: "Sealant & Protection Upgrade", priceText: "$80", fixedPrice: 80 },
-];
-
 function formatCurrency(value: number) {
   return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 0,
+    style: "currency", currency: "USD", maximumFractionDigits: 0,
   }).format(value);
 }
 
+function isUpcoming(dateStr: string) {
+  if (!dateStr) return false;
+  const parts = dateStr.includes("-") ? dateStr.split("-").map(Number) : null;
+  if (!parts) return false;
+  const [y, m, d] = parts;
+  const apptDate = new Date(y, m - 1, d);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return apptDate >= today;
+}
+
+async function fetchAllAvailability(): Promise<AvailabilitySlot[]> {
+  const res = await fetch(`${SCRIPT_URL}?action=getAllAvailability`);
+  const data: { slots: AvailabilitySlot[] } = await res.json();
+  return data.slots || [];
+}
+
+async function fetchBookingsForEmail(email: string): Promise<Booking[]> {
+  const res = await fetch(
+    `${SCRIPT_URL}?action=getBookingsByEmail&email=${encodeURIComponent(email)}`
+  );
+  const data: { bookings: Booking[] } = await res.json();
+  return data.bookings || [];
+}
+
+// ─── BookingCard ─────────────────────────────────────────────────────────────
+
+function BookingCard({
+  booking, upcoming, onRequestChange,
+}: {
+  booking: Booking; upcoming: boolean; onRequestChange: (b: Booking) => void;
+}) {
+  const vehicleLabel =
+    booking.vehicle === "boat"
+      ? [booking.boatSize, booking.make, booking.model].filter(Boolean).join(" ")
+      : [booking.year, booking.make, booking.model].filter(Boolean).join(" ");
+
+  return (
+    <div style={{
+      background: "#ffffff",
+      border: upcoming ? "1.5px solid #2563eb" : "1px solid #e5e7eb",
+      borderRadius: 16, padding: 18, position: "relative" as const,
+    }}>
+      {upcoming && (
+        <span style={{
+          position: "absolute" as const, top: 14, right: 14,
+          background: "#eff6ff", color: "#2563eb",
+          fontSize: "0.75rem", fontWeight: 700, borderRadius: 999, padding: "3px 10px",
+        }}>UPCOMING</span>
+      )}
+      <div style={{ fontSize: "1rem", fontWeight: 700, color: "#111827", marginBottom: 4 }}>
+        {formatDateLabel(booking.date)}{booking.time ? ` @ ${booking.time}` : ""}
+      </div>
+      <div style={{ fontSize: "0.92rem", color: "#6b7280", lineHeight: 1.6 }}>
+        {vehicleLabel && <div>🚗 {vehicleLabel}</div>}
+        <div>📦 {booking.packageType === "basic" ? "Basic Detail" : booking.packageType === "premium" ? "Premium Detail" : booking.packageType}</div>
+        {booking.serviceType && (
+          <div>📍 {booking.serviceType === "mobile" ? `Mobile${booking.address ? ` — ${booking.address}` : ""}` : "Drop-Off"}</div>
+        )}
+        {booking.addOns && <div>✨ {booking.addOns}</div>}
+        {booking.notes && <div>📝 {booking.notes}</div>}
+      </div>
+      {upcoming && (
+        <button onClick={() => onRequestChange(booking)} style={{
+          marginTop: 14, background: "#111827", color: "#fff", border: "none",
+          borderRadius: 10, padding: "9px 16px", fontSize: "0.9rem", fontWeight: 600, cursor: "pointer",
+        }}>Request a Change</button>
+      )}
+    </div>
+  );
+}
+
+// ─── MaintenanceCard ──────────────────────────────────────────────────────────
+
+function MaintenanceCard({
+  booking, onRequestChange,
+}: {
+  booking: Booking; onRequestChange: (b: Booking) => void;
+}) {
+  const vehicleLabel =
+    booking.vehicle === "boat"
+      ? [booking.boatSize, booking.make, booking.model].filter(Boolean).join(" ")
+      : [booking.year, booking.make, booking.model].filter(Boolean).join(" ");
+
+  const freqLabel =
+    booking.recurringFrequency === "biweekly" ? "Bi-Weekly"
+    : booking.recurringFrequency === "monthly" ? "Monthly"
+    : booking.recurringFrequency || "Recurring";
+
+  const upcoming = isUpcoming(booking.date);
+
+  return (
+    <div style={{
+      background: "#ffffff", border: "1.5px solid #059669",
+      borderRadius: 16, padding: 18, position: "relative" as const,
+    }}>
+      <span style={{
+        position: "absolute" as const, top: 14, right: 14,
+        background: "#ecfdf5", color: "#059669",
+        fontSize: "0.75rem", fontWeight: 700, borderRadius: 999, padding: "3px 10px",
+      }}>{freqLabel.toUpperCase()}</span>
+      <div style={{ fontSize: "1rem", fontWeight: 700, color: "#111827", marginBottom: 4 }}>
+        {formatDateLabel(booking.date)}{booking.time ? ` @ ${booking.time}` : ""}
+      </div>
+      <div style={{ fontSize: "0.92rem", color: "#6b7280", lineHeight: 1.6 }}>
+        {vehicleLabel && <div>🚗 {vehicleLabel}</div>}
+        <div>📦 {booking.packageType === "basic" ? "Basic Detail" : booking.packageType === "premium" ? "Premium Detail" : booking.packageType}</div>
+        {booking.serviceType && (
+          <div>📍 {booking.serviceType === "mobile" ? `Mobile${booking.address ? ` — ${booking.address}` : ""}` : "Drop-Off"}</div>
+        )}
+        {booking.addOns && <div>✨ {booking.addOns}</div>}
+        {booking.notes && <div>📝 {booking.notes}</div>}
+      </div>
+      {upcoming && (
+        <button onClick={() => onRequestChange(booking)} style={{
+          marginTop: 14, background: "#059669", color: "#fff", border: "none",
+          borderRadius: 10, padding: "9px 16px", fontSize: "0.9rem", fontWeight: 600, cursor: "pointer",
+        }}>Request a Change</button>
+      )}
+    </div>
+  );
+}
+
+// ─── Main App ─────────────────────────────────────────────────────────────────
+
 export default function App() {
   const addressInputRef = useRef(null);
-  const [step, setStep] = useState(0);
-  const [vehicle, setVehicle] = useState<VehicleType>("");
-  const [pkg, setPkg] = useState<PackageType>("");
-  const [addOns, setAddOns] = useState<AddOn[]>([]);
-  const [serviceType, setServiceType] = useState<ServiceType>("");
-  const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [email, setEmail] = useState("");
-  const [year, setYear] = useState("");
-  const [make, setMake] = useState("");
-  const [model, setModel] = useState("");
-  const [boatMake, setBoatMake] = useState("");
-  const [boatModel, setBoatModel] = useState("");
-  const [boatSize, setBoatSize] = useState("");
-  const [bookingNotes, setBookingNotes] = useState("");
-  const [selectedDate, setSelectedDate] = useState("");
-  const [availableSlots, setAvailableSlots] = useState<AvailabilitySlot[]>([]);
+
+  // ── Auth ──
+  const [googleUser, setGoogleUser]           = useState<GoogleUser | null>(null);
+  const [googleScriptLoaded, setGoogleScriptLoaded] = useState(false);
+
+  // ── View ──
+  const [view, setView]                       = useState<"booking" | "myBookings" | "requestChange">("booking");
+  const [bookingsTab, setBookingsTab]         = useState<"appointments" | "maintenance">("appointments");
+  const [userBookings, setUserBookings]       = useState<Booking[]>([]);
+  const [bookingsLoading, setBookingsLoading] = useState(false);
+  const [changeTarget, setChangeTarget]       = useState<Booking | null>(null);
+  const [changeNote, setChangeNote]           = useState("");
+  const [changeSubmitted, setChangeSubmitted] = useState(false);
+  const [changeSubmitting, setChangeSubmitting] = useState(false);
+
+  // ── Booking flow ──
+  const [step, setStep]                       = useState(0);
+  const [vehicle, setVehicle]                 = useState<VehicleType>("");
+  const [pkg, setPkg]                         = useState<PackageType>("");
+  const [addOns, setAddOns]                   = useState<AddOn[]>([]);
+  const [serviceType, setServiceType]         = useState<ServiceType>("");
+  const [name, setName]                       = useState("");
+  const [phone, setPhone]                     = useState("");
+  const [email, setEmail]                     = useState("");
+  const [year, setYear]                       = useState("");
+  const [make, setMake]                       = useState("");
+  const [model, setModel]                     = useState("");
+  const [boatMake, setBoatMake]               = useState("");
+  const [boatModel, setBoatModel]             = useState("");
+  const [boatSize, setBoatSize]               = useState("");
+  const [bookingNotes, setBookingNotes]       = useState("");
+  const [selectedDate, setSelectedDate]       = useState("");
+  const [availableSlots, setAvailableSlots]   = useState<AvailabilitySlot[]>([]);
   const [allAvailableSlots, setAllAvailableSlots] = useState<AvailabilitySlot[]>([]);
-  const [availableDates, setAvailableDates] = useState<string[]>([]);
-  const [selectedTime, setSelectedTime] = useState("");
-  const [address, setAddress] = useState("");
-  const [street, setStreet] = useState("");
-  const [city, setCity] = useState("");
-  const [stateRegion, setStateRegion] = useState("");
-  const [zip, setZip] = useState("");
-  const [placeId, setPlaceId] = useState("");
-  const [lat, setLat] = useState("");
-  const [lng, setLng] = useState("");
+  const [availableDates, setAvailableDates]   = useState<string[]>([]);
+  const [selectedTime, setSelectedTime]       = useState("");
+  const [address, setAddress]                 = useState("");
+  const [street, setStreet]                   = useState("");
+  const [city, setCity]                       = useState("");
+  const [stateRegion, setStateRegion]         = useState("");
+  const [zip, setZip]                         = useState("");
+  const [placeId, setPlaceId]                 = useState("");
+  const [lat, setLat]                         = useState("");
+  const [lng, setLng]                         = useState("");
   const [addressSelected, setAddressSelected] = useState(false);
+  const [makeOptions, setMakeOptions]         = useState<string[]>([]);
+  const [modelOptions, setModelOptions]       = useState<string[]>([]);
+  const [loadingMakes, setLoadingMakes]       = useState(false);
+  const [loadingModels, setLoadingModels]     = useState(false);
+
   const currentYear = new Date().getFullYear();
-  const yearOptions = Array.from(
-    { length: currentYear - 1995 + 1 },
-    (_, i) => String(currentYear - i)
-  );
+  const yearOptions = Array.from({ length: currentYear - 1995 + 1 }, (_, i) => String(currentYear - i));
 
-  const [makeOptions, setMakeOptions] = useState<string[]>([]);
-  const [modelOptions, setModelOptions] = useState<string[]>([]);
-  const [loadingMakes, setLoadingMakes] = useState(false);
-  const [loadingModels, setLoadingModels] = useState(false);
+  // ── Load Google Identity Services ──
+  useEffect(() => {
+    if (document.getElementById("google-gsi-script")) { setGoogleScriptLoaded(true); return; }
+    const script = document.createElement("script");
+    script.id = "google-gsi-script";
+    script.src = "https://accounts.google.com/gsi/client";
+    script.async = true;
+    script.defer = true;
+    script.onload = () => setGoogleScriptLoaded(true);
+    document.body.appendChild(script);
+  }, []);
 
+  // ── Render Google Sign-In button ──
+  useEffect(() => {
+    if (!googleScriptLoaded || googleUser) return;
+    if (!window.google?.accounts?.id) return;
+    window.google.accounts.id.initialize({
+      client_id: GOOGLE_CLIENT_ID,
+      callback: handleGoogleCredential,
+    });
+    const btnEl = document.getElementById("google-signin-btn");
+    if (btnEl) {
+      window.google.accounts.id.renderButton(btnEl, {
+        theme: "outline", size: "large", shape: "rectangular",
+        text: "signin_with", logo_alignment: "left",
+      });
+    }
+  }, [googleScriptLoaded, googleUser, view, step]);
+
+  function handleGoogleCredential(response: any) {
+    try {
+      const payload = JSON.parse(atob(response.credential.split(".")[1]));
+      const user: GoogleUser = {
+        name: payload.name || "",
+        email: payload.email || "",
+        picture: payload.picture || "",
+      };
+      setGoogleUser(user);
+      setEmail(user.email);
+    } catch (e) {
+      console.error("Google sign-in error", e);
+    }
+  }
+
+  function handleSignOut() {
+    if (window.google?.accounts?.id) window.google.accounts.id.disableAutoSelect();
+    setGoogleUser(null);
+    setEmail("");
+    setView("booking");
+    setUserBookings([]);
+  }
+
+  // ── Fetch user bookings ──
+  const loadMyBookings = useCallback(async () => {
+    if (!googleUser) return;
+    setBookingsLoading(true);
+    try {
+      const bookings = await fetchBookingsForEmail(googleUser.email);
+      setUserBookings(bookings);
+    } catch (e) {
+      console.error("Failed to load bookings", e);
+    } finally {
+      setBookingsLoading(false);
+    }
+  }, [googleUser]);
+
+  function openMyBookings() {
+    setView("myBookings");
+    setBookingsTab("appointments");
+    loadMyBookings();
+  }
+
+  // ── Vehicle makes/models ──
   useEffect(() => {
     const loadMakes = async () => {
       try {
         setLoadingMakes(true);
         const vehicleTypeForApi = vehicle === "truckSuv" ? "truck" : "car";
-        const res = await fetch(
-          `https://vpic.nhtsa.dot.gov/api/vehicles/GetMakesForVehicleType/${vehicleTypeForApi}?format=json`
-        );
+        const res = await fetch(`https://vpic.nhtsa.dot.gov/api/vehicles/GetMakesForVehicleType/${vehicleTypeForApi}?format=json`);
         const data = await res.json();
-        const makes =
-          data.Results?.map((item: any) => item.MakeName || item.Make_Name)
-            .filter(Boolean)
-            .sort((a: string, b: string) => a.localeCompare(b)) || [];
+        const makes = data.Results?.map((item: any) => item.MakeName || item.Make_Name).filter(Boolean).sort((a: string, b: string) => a.localeCompare(b)) || [];
         setMakeOptions(makes);
-      } catch (err) {
-        console.error("Error loading makes", err);
-        setMakeOptions([]);
-      } finally {
-        setLoadingMakes(false);
-      }
+      } catch (err) { setMakeOptions([]); }
+      finally { setLoadingMakes(false); }
     };
-
-    if (vehicle && vehicle !== "boat") {
-      loadMakes();
-    } else {
-      setMakeOptions([]);
-    }
+    if (vehicle && vehicle !== "boat") { loadMakes(); } else { setMakeOptions([]); }
   }, [vehicle]);
 
   useEffect(() => {
     const loadModels = async () => {
-      if (!year || !make || !vehicle || vehicle === "boat") {
-        setModelOptions([]);
-        return;
-      }
+      if (!year || !make || !vehicle || vehicle === "boat") { setModelOptions([]); return; }
       try {
         setLoadingModels(true);
         const vehicleTypeForApi = vehicle === "truckSuv" ? "truck" : "car";
-        const res = await fetch(
-          `https://vpic.nhtsa.dot.gov/api/vehicles/GetModelsForMakeYear/make/${encodeURIComponent(
-            make
-          )}/modelyear/${year}/vehicletype/${vehicleTypeForApi}?format=json`
-        );
+        const res = await fetch(`https://vpic.nhtsa.dot.gov/api/vehicles/GetModelsForMakeYear/make/${encodeURIComponent(make)}/modelyear/${year}/vehicletype/${vehicleTypeForApi}?format=json`);
         const data = await res.json();
-        const models =
-          data.Results?.map((item: any) => item.Model_Name)
-            .filter(Boolean)
-            .sort((a: string, b: string) => a.localeCompare(b)) || [];
+        const models = data.Results?.map((item: any) => item.Model_Name).filter(Boolean).sort((a: string, b: string) => a.localeCompare(b)) || [];
         setModelOptions(models);
-      } catch (err) {
-        console.error("Error loading models", err);
-        setModelOptions([]);
-      } finally {
-        setLoadingModels(false);
-      }
+      } catch (err) { setModelOptions([]); }
+      finally { setLoadingModels(false); }
     };
-
     loadModels();
   }, [year, make, vehicle]);
 
+  // ── Google Maps autocomplete ──
   useEffect(() => {
     if (step !== 4 || serviceType !== "mobile") return;
-    if (!window.google?.maps?.places) return;
-    if (!addressInputRef.current) return;
-
-    const autocomplete = new window.google.maps.places.Autocomplete(
-      addressInputRef.current,
-      {
-        types: ["address"],
-        componentRestrictions: { country: "us" },
-        fields: ["address_components", "formatted_address", "geometry", "place_id"],
-      }
-    );
-
+    if (!window.google?.maps?.places || !addressInputRef.current) return;
+    const autocomplete = new window.google.maps.places.Autocomplete(addressInputRef.current, {
+      types: ["address"], componentRestrictions: { country: "us" },
+      fields: ["address_components", "formatted_address", "geometry", "place_id"],
+    });
     const listener = autocomplete.addListener("place_changed", () => {
       const place = autocomplete.getPlace();
       if (!place?.address_components) return;
-
-      let streetNumber = "";
-      let route = "";
-      let locality = "";
-      let adminArea = "";
-      let postalCode = "";
-
+      let streetNumber = "", route = "", locality = "", adminArea = "", postalCode = "";
       place.address_components.forEach((component: any) => {
         const types = component.types;
         if (types.includes("street_number")) streetNumber = component.long_name;
@@ -243,51 +415,31 @@ export default function App() {
         if (types.includes("administrative_area_level_1")) adminArea = component.short_name;
         if (types.includes("postal_code")) postalCode = component.long_name;
       });
-
-      const streetValue = [streetNumber, route].filter(Boolean).join(" ");
       setAddress(place.formatted_address || "");
-      setStreet(streetValue);
-      setCity(locality);
-      setStateRegion(adminArea);
-      setZip(postalCode);
+      setStreet([streetNumber, route].filter(Boolean).join(" "));
+      setCity(locality); setStateRegion(adminArea); setZip(postalCode);
       setPlaceId(place.place_id || "");
       setLat(place.geometry?.location?.lat?.() ?? "");
       setLng(place.geometry?.location?.lng?.() ?? "");
       setAddressSelected(true);
     });
-
-    return () => {
-      if (listener) {
-        window.google.maps.event.removeListener(listener);
-      }
-    };
+    return () => { if (listener) window.google.maps.event.removeListener(listener); };
   }, [step, serviceType]);
 
+  // ── Availability ──
   useEffect(() => {
-    const loadAllAvailability = async () => {
-      try {
-        const slots = await fetchAllAvailability();
-        setAllAvailableSlots(slots);
-        const uniqueDates = [...new Set(slots.map((slot) => slot.date))];
-        setAvailableDates(uniqueDates);
-      } catch (err) {
-        console.error("Error loading all availability", err);
-        setAllAvailableSlots([]);
-        setAvailableDates([]);
-      }
-    };
-    loadAllAvailability();
+    fetchAllAvailability().then((slots) => {
+      setAllAvailableSlots(slots);
+      setAvailableDates([...new Set(slots.map((s) => s.date))]);
+    }).catch(console.error);
   }, []);
 
   useEffect(() => {
-    if (!selectedDate) {
-      setAvailableSlots([]);
-      return;
-    }
-    const filtered = allAvailableSlots.filter((slot) => slot.date === selectedDate);
-    setAvailableSlots(filtered);
+    if (!selectedDate) { setAvailableSlots([]); return; }
+    setAvailableSlots(allAvailableSlots.filter((s) => s.date === selectedDate));
   }, [selectedDate, allAvailableSlots]);
 
+  // ── Derived values ──
   const selectedVehicle = vehicleOptions.find((v) => v.id === vehicle);
 
   const hourlyRate = useMemo(() => {
@@ -299,1208 +451,629 @@ export default function App() {
     if (!vehicle || !pkg) return "Select vehicle first";
     if (vehicle === "boat") return pkg === "premium" ? "5–8 hours avg" : "3–6 hours avg";
     if (vehicle === "truckSuv") return "3–5 hours avg";
-    if (vehicle === "sedan") return pkg === "premium" ? "3–5 hours avg" : "3–4 hours avg";
-    if (vehicle === "coupe") return pkg === "premium" ? "3–5 hours avg" : "3–4 hours avg";
-    return "3–5 hours avg";
+    return pkg === "premium" ? "3–5 hours avg" : "3–4 hours avg";
   }, [vehicle, pkg]);
 
   const addOnEstimate = useMemo(() => {
-    return addOns.reduce((sum, selected) => {
-      const allOptions = [...addOnOptions, ...marineAddOnOptions];
-      const found = allOptions.find((option) => option.label === selected);
-      return sum + (found?.fixedPrice ?? 0);
-    }, 0);
+    const all = [...addOnOptions, ...marineAddOnOptions];
+    return addOns.reduce((sum, a) => sum + (all.find((o) => o.label === a)?.fixedPrice ?? 0), 0);
   }, [addOns]);
 
-  const estimateText = useMemo(() => {
-    if (!hourlyRate) return "";
-    return `${formatCurrency(hourlyRate)}/hr`;
-  }, [hourlyRate]);
-
-  const addOnSummaryText = useMemo(() => {
-    if (!addOns.length) return "";
-    return addOns.join(", ");
-  }, [addOns]);
+  const estimateText  = useMemo(() => hourlyRate ? `${formatCurrency(hourlyRate)}/hr` : "", [hourlyRate]);
+  const addOnSummaryText = useMemo(() => addOns.join(", "), [addOns]);
 
   function toggleAddOn(addOn: AddOn) {
-    setAddOns((prev) =>
-      prev.includes(addOn) ? prev.filter((item) => item !== addOn) : [...prev, addOn]
-    );
+    setAddOns((prev) => prev.includes(addOn) ? prev.filter((i) => i !== addOn) : [...prev, addOn]);
   }
+  function next() { setStep((s) => s + 1); }
+  function back() { setStep((s) => s - 1); }
 
-  function next() {
-    setStep((s) => s + 1);
-  }
-
-  function back() {
-    setStep((s) => s - 1);
-  }
-
-  const styles = {
-    page: {
-      minHeight: "100vh",
-      background: "linear-gradient(180deg, #f7f7f8 0%, #efeff1 100%)",
-      color: "#171717",
-      padding: "32px 16px",
-      fontFamily:
-        'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-    } as const,
-    container: {
-      maxWidth: 920,
-      margin: "0 auto",
-    } as const,
-    brand: {
-      display: "flex",
-      justifyContent: "center",
-      marginBottom: 32,
-    } as const,
-    brandRow: {
-      display: "grid",
-      gridTemplateColumns: "110px auto",
-      alignItems: "center",
-      gap: 20,
-      maxWidth: 760,
-      width: "100%",
-    } as const,
-    logo: {
-      width: 110,
-      height: 110,
-      objectFit: "contain" as const,
-      opacity: 1,
-    },
-    brandTitle: {
-      fontSize: "2.8rem",
-      fontWeight: 800,
-      letterSpacing: "-1px",
-      color: "#111827",
-      margin: 0,
-      lineHeight: 1.05,
-    },
-    brandSub: {
-      color: "#6b7280",
-      fontSize: "1.05rem",
-      marginTop: 10,
-      marginBottom: 0,
-      lineHeight: 1.45,
-      fontStyle: "italic",
-    },
-    progressWrap: {
-      marginBottom: 28,
-    },
-    progressText: {
-      display: "flex",
-      justifyContent: "space-between",
-      color: "#6b7280",
-      fontSize: "0.9rem",
-      marginBottom: 8,
-    },
-    progressBar: {
-      height: 8,
-      background: "#e5e7eb",
-      borderRadius: 999,
-      overflow: "hidden",
-      border: "1px solid #d1d5db",
-    } as const,
-    progressFill: {
-      height: "100%",
-      width: `${((step + 1) / 8) * 100}%`,
-      background: "linear-gradient(90deg, #6b7280 0%, #9ca3af 100%)",
-      borderRadius: 999,
-      transition: "width 0.25s ease",
-    },
-    card: {
-      background: "rgba(255, 255, 255, 0.96)",
-      border: "1px solid #e5e7eb",
-      borderRadius: 24,
-      boxShadow: "0 18px 45px rgba(17, 24, 39, 0.08)",
-      padding: 28,
-    } as const,
-    title: {
-      fontSize: "3rem",
-      fontWeight: 800,
-      letterSpacing: "-1px",
-      color: "#111827",
-      margin: "0 0 14px",
-      textAlign: "center" as const,
-    },
-    subtitle: {
-      fontSize: "1rem",
-      color: "#6b7280",
-      margin: "0 0 28px",
-      textAlign: "center" as const,
-    },
-    primaryButton: {
-      background: "#111827",
-      color: "#ffffff",
-      border: "none",
-      borderRadius: 14,
-      padding: "14px 20px",
-      fontSize: "1rem",
-      fontWeight: 700,
-      cursor: "pointer",
-      boxShadow: "0 10px 24px rgba(17, 24, 39, 0.16)",
-    } as const,
-    secondaryButton: {
-      background: "#ffffff",
-      color: "#111827",
-      border: "1px solid #d1d5db",
-      borderRadius: 14,
-      padding: "13px 18px",
-      fontSize: "1rem",
-      fontWeight: 600,
-      cursor: "pointer",
-    } as const,
-    disabledButton: {
-      opacity: 0.45,
-      cursor: "not-allowed",
-    } as const,
-    heroButtonWrap: {
-      display: "flex",
-      justifyContent: "center",
-      padding: "10px 0 2px",
-    },
-    optionGrid: {
-      display: "grid",
-      gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-      gap: 14,
-      marginBottom: 20,
-    } as const,
-    optionCard: {
-      background: "#ffffff",
-      border: "1px solid #e5e7eb",
-      borderRadius: 18,
-      padding: 18,
-      cursor: "pointer",
-      textAlign: "left" as const,
-      transition: "all 0.2s ease",
-    },
-    selectedCard: {
-      border: "2px solid #2563eb",
-      background: "#eff6ff",
-      boxShadow: "0 0 0 2px rgba(37, 99, 235, 0.1)",
-    },
-    optionTitle: {
-      fontWeight: 700,
-      fontSize: "1.05rem",
-      marginBottom: 8,
-      color: "#111827",
-    },
-    optionMeta: {
-      color: "#6b7280",
-      fontSize: "0.95rem",
-      lineHeight: 1.45,
-    },
-    estimateBox: {
-      background: "#f9fafb",
-      border: "1px solid #e5e7eb",
-      borderRadius: 16,
-      padding: 16,
-      textAlign: "center" as const,
-      marginTop: 6,
-    } as const,
-    estimateLabel: {
-      color: "#6b7280",
-      fontSize: "0.95rem",
-      marginBottom: 6,
-    },
-    estimateValue: {
-      fontSize: "1.05rem",
-      fontWeight: 800,
-      color: "#111827",
-      lineHeight: 1.5,
-    },
-    noteBox: {
-      marginTop: 14,
-      background: "#f3f4f6",
-      border: "1px solid #e5e7eb",
-      borderRadius: 16,
-      padding: 14,
-      color: "#374151",
-      textAlign: "center" as const,
-      lineHeight: 1.45,
-    } as const,
-    addOnGrid: {
-      display: "grid",
-      gap: 12,
-      marginBottom: 18,
-    } as const,
-    addOnRow: {
-      display: "flex",
-      alignItems: "center",
-      gap: 14,
-      padding: 16,
-      borderRadius: 16,
-      border: "1px solid #e5e7eb",
-      background: "#ffffff",
-      cursor: "pointer",
-      justifyContent: "space-between",
-      flexWrap: "wrap" as const,
-    },
-    checkWrap: {
-      display: "flex",
-      alignItems: "center",
-      gap: 12,
-      flex: 1,
-      minWidth: 220,
-    },
-    checkbox: {
-      width: 18,
-      height: 18,
-      accentColor: "#111827",
-    },
-    addOnPrice: {
-      color: "#374151",
-      fontWeight: 700,
-    },
-    inputGrid: {
-      display: "grid",
-      gap: 14,
-      maxWidth: 560,
-      margin: "0 auto",
-    } as const,
-    input: {
-      width: "100%",
-      boxSizing: "border-box" as const,
-      background: "#ffffff",
-      color: "#111827",
-      border: "1px solid #d1d5db",
-      borderRadius: 14,
-      padding: "14px 16px",
-      fontSize: "1rem",
-      outline: "none",
-    },
-    buttonRow: {
-      display: "flex",
-      justifyContent: "space-between",
-      gap: 12,
-      flexWrap: "wrap" as const,
-      marginTop: 24,
-    },
-    rightButtons: {
-      display: "flex",
-      gap: 12,
-      marginLeft: "auto",
-    } as const,
-    summaryGrid: {
-      display: "grid",
-      gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-      gap: 14,
-      marginTop: 22,
-    } as const,
-    summaryCard: {
-      background: "#ffffff",
-      border: "1px solid #e5e7eb",
-      borderRadius: 16,
-      padding: 16,
-    },
-    sectionLabel: {
-      fontSize: "0.95rem",
-      fontWeight: 700,
-      color: "#374151",
-      marginTop: 6,
-      marginBottom: -4,
-      textAlign: "left" as const,
-    },
-    vehicleRow: {
-      display: "flex",
-      gap: 10,
-      alignItems: "center",
-    } as const,
-    summaryHeading: {
-      fontSize: "0.92rem",
-      color: "#6b7280",
-      marginBottom: 8,
-      textTransform: "uppercase" as const,
-      letterSpacing: "0.04em",
-    },
-    summaryValue: {
-      fontSize: "1rem",
-      fontWeight: 700,
-      lineHeight: 1.5,
-      color: "#111827",
-      wordBreak: "break-word" as const,
-    },
-    submittedWrap: {
-      textAlign: "center" as const,
-      padding: "10px 0",
-    },
-    successBadge: {
-      fontSize: "3rem",
-      marginBottom: 6,
-    },
-    successText: {
-      fontSize: "1.05rem",
-      color: "#4b5563",
-      lineHeight: 1.6,
-      maxWidth: 620,
-      margin: "0 auto 24px",
-    },
-  };
-
-  // Determine vehicle display string for summaries
   const vehicleSummary =
     vehicle === "boat"
       ? [boatSize, boatMake, boatModel].filter(Boolean).join(" ") || "N/A"
       : [year, make, model].filter(Boolean).join(" ") || "N/A";
 
-  // Step 5 Next button disabled logic
   const step5Disabled =
-    !name ||
-    !phone ||
-    !email ||
-    !selectedDate ||
-    !selectedTime ||
-    (vehicle === "boat"
-      ? !boatSize || !boatMake || !boatModel
-      : !year || !make || !model);
+    !name || !phone || !email || !selectedDate || !selectedTime ||
+    (vehicle === "boat" ? !boatSize || !boatMake || !boatModel : !year || !make || !model);
+
+  // ── Bookings split ──
+  const standardBookings    = userBookings.filter((b) => b.clientType !== "maintenance");
+  const maintenanceBookings = userBookings.filter((b) => b.clientType === "maintenance");
+  const isMaintenance       = maintenanceBookings.length > 0;
+  const upcomingStandard    = standardBookings.filter((b) => isUpcoming(b.date)).sort((a, b) => a.date.localeCompare(b.date));
+  const pastStandard        = standardBookings.filter((b) => !isUpcoming(b.date)).sort((a, b) => b.date.localeCompare(a.date));
+  const upcomingMaintenance = maintenanceBookings.filter((b) => isUpcoming(b.date)).sort((a, b) => a.date.localeCompare(b.date));
+  const pastMaintenance     = maintenanceBookings.filter((b) => !isUpcoming(b.date)).sort((a, b) => b.date.localeCompare(a.date));
+
+  // ── Change request submit ──
+  async function submitChangeRequest() {
+    if (!changeTarget || !changeNote.trim()) return;
+    setChangeSubmitting(true);
+    try {
+      const vehicleLabel =
+        changeTarget.vehicle === "boat"
+          ? [changeTarget.boatSize, changeTarget.make, changeTarget.model].filter(Boolean).join(" ")
+          : [changeTarget.year, changeTarget.make, changeTarget.model].filter(Boolean).join(" ");
+      await fetch(SCRIPT_URL, {
+        method: "POST",
+        body: JSON.stringify({
+          action: "requestChange",
+          customerEmail: googleUser?.email || "",
+          customerName: googleUser?.name || "",
+          bookingDate: changeTarget.date,
+          bookingTime: changeTarget.time,
+          vehicle: vehicleLabel,
+          packageType: changeTarget.packageType,
+          changeNote,
+        }),
+      });
+      setChangeSubmitted(true);
+    } catch (e) {
+      console.error("Change request failed", e);
+    } finally {
+      setChangeSubmitting(false);
+    }
+  }
+
+  // ─── Styles ───────────────────────────────────────────────────────────────
+
+  const S = {
+    page:           { minHeight: "100vh", background: "linear-gradient(180deg, #f7f7f8 0%, #efeff1 100%)", color: "#171717", padding: "32px 16px", fontFamily: 'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' } as const,
+    container:      { maxWidth: 920, margin: "0 auto" } as const,
+    card:           { background: "rgba(255,255,255,0.96)", border: "1px solid #e5e7eb", borderRadius: 24, boxShadow: "0 18px 45px rgba(17,24,39,0.08)", padding: 28 } as const,
+    title:          { fontSize: "2.4rem", fontWeight: 800, letterSpacing: "-1px", color: "#111827", margin: "0 0 14px", textAlign: "center" as const },
+    subtitle:       { fontSize: "1rem", color: "#6b7280", margin: "0 0 28px", textAlign: "center" as const },
+    primary:        { background: "#111827", color: "#fff", border: "none", borderRadius: 14, padding: "14px 20px", fontSize: "1rem", fontWeight: 700, cursor: "pointer", boxShadow: "0 10px 24px rgba(17,24,39,0.16)" } as const,
+    secondary:      { background: "#fff", color: "#111827", border: "1px solid #d1d5db", borderRadius: 14, padding: "13px 18px", fontSize: "1rem", fontWeight: 600, cursor: "pointer" } as const,
+    disabled:       { opacity: 0.45, cursor: "not-allowed" } as const,
+    optionGrid:     { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 14, marginBottom: 20 } as const,
+    optionCard:     { background: "#fff", border: "1px solid #e5e7eb", borderRadius: 18, padding: 18, cursor: "pointer", textAlign: "left" as const, transition: "all 0.2s ease" },
+    selectedCard:   { border: "2px solid #2563eb", background: "#eff6ff", boxShadow: "0 0 0 2px rgba(37,99,235,0.1)" },
+    optionTitle:    { fontWeight: 700, fontSize: "1.05rem", marginBottom: 8, color: "#111827" },
+    optionMeta:     { color: "#6b7280", fontSize: "0.95rem", lineHeight: 1.45 },
+    estimateBox:    { background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: 16, padding: 16, textAlign: "center" as const, marginTop: 6 } as const,
+    estimateLabel:  { color: "#6b7280", fontSize: "0.95rem", marginBottom: 6 },
+    estimateValue:  { fontSize: "1.05rem", fontWeight: 800, color: "#111827", lineHeight: 1.5 },
+    noteBox:        { marginTop: 14, background: "#f3f4f6", border: "1px solid #e5e7eb", borderRadius: 16, padding: 14, color: "#374151", textAlign: "center" as const, lineHeight: 1.45 } as const,
+    addOnGrid:      { display: "grid", gap: 12, marginBottom: 18 } as const,
+    addOnRow:       { display: "flex", alignItems: "center", gap: 14, padding: 16, borderRadius: 16, border: "1px solid #e5e7eb", background: "#fff", cursor: "pointer", justifyContent: "space-between", flexWrap: "wrap" as const },
+    checkWrap:      { display: "flex", alignItems: "center", gap: 12, flex: 1, minWidth: 220 },
+    checkbox:       { width: 18, height: 18, accentColor: "#111827" },
+    addOnPrice:     { color: "#374151", fontWeight: 700 },
+    inputGrid:      { display: "grid", gap: 14, maxWidth: 560, margin: "0 auto" } as const,
+    input:          { width: "100%", boxSizing: "border-box" as const, background: "#fff", color: "#111827", border: "1px solid #d1d5db", borderRadius: 14, padding: "14px 16px", fontSize: "1rem", outline: "none" },
+    buttonRow:      { display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" as const, marginTop: 24 },
+    rightButtons:   { display: "flex", gap: 12, marginLeft: "auto" } as const,
+    summaryGrid:    { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14, marginTop: 22 } as const,
+    summaryCard:    { background: "#fff", border: "1px solid #e5e7eb", borderRadius: 16, padding: 16 },
+    sectionLabel:   { fontSize: "0.95rem", fontWeight: 700, color: "#374151", marginTop: 6, marginBottom: -4, textAlign: "left" as const },
+    summaryHeading: { fontSize: "0.92rem", color: "#6b7280", marginBottom: 8, textTransform: "uppercase" as const, letterSpacing: "0.04em" },
+    summaryValue:   { fontSize: "1rem", fontWeight: 700, lineHeight: 1.5, color: "#111827", wordBreak: "break-word" as const },
+    successWrap:    { textAlign: "center" as const, padding: "10px 0" },
+    successBadge:   { fontSize: "3rem", marginBottom: 6 },
+    successText:    { fontSize: "1.05rem", color: "#4b5563", lineHeight: 1.6, maxWidth: 620, margin: "0 auto 24px" },
+    progressWrap:   { marginBottom: 28 },
+    progressText:   { display: "flex", justifyContent: "space-between", color: "#6b7280", fontSize: "0.9rem", marginBottom: 8 },
+    progressBar:    { height: 8, background: "#e5e7eb", borderRadius: 999, overflow: "hidden", border: "1px solid #d1d5db" } as const,
+    progressFill:   { height: "100%", width: `${((step + 1) / 8) * 100}%`, background: "linear-gradient(90deg,#6b7280,#9ca3af)", borderRadius: 999, transition: "width 0.25s ease" },
+  };
+
+  // ─── Shared Header ────────────────────────────────────────────────────────
+
+  const Header = () => (
+    <div style={{ display: "flex", justifyContent: "center", marginBottom: 32 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "110px 1fr auto", alignItems: "center", gap: 20, maxWidth: 760, width: "100%" }}>
+        <img src={logo} alt="ATX Prestige Detailing logo" style={{ width: 110, height: 110, objectFit: "contain" as const }} />
+        <div>
+          <h1 style={{ fontSize: "2.8rem", fontWeight: 800, letterSpacing: "-1px", color: "#111827", margin: 0, lineHeight: 1.05 }}>ATX Prestige Detailing</h1>
+          <p style={{ color: "#6b7280", fontSize: "1.05rem", marginTop: 10, marginBottom: 0, lineHeight: 1.45, fontStyle: "italic" }}>Defined by Detail, Driven by Standards, Trusted for Prestige</p>
+        </div>
+        {/* Auth */}
+        <div style={{ display: "flex", flexDirection: "column" as const, alignItems: "flex-end", gap: 8, minWidth: 180 }}>
+          {googleUser ? (
+            <>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <img src={googleUser.picture} alt={googleUser.name} style={{ width: 36, height: 36, borderRadius: "50%", border: "2px solid #e5e7eb" }} />
+                <div style={{ textAlign: "right" as const }}>
+                  <div style={{ fontSize: "0.9rem", fontWeight: 700, color: "#111827" }}>{googleUser.name}</div>
+                  <div style={{ fontSize: "0.75rem", color: "#6b7280" }}>{googleUser.email}</div>
+                </div>
+              </div>
+              <button onClick={handleSignOut} style={{ fontSize: "0.8rem", color: "#6b7280", background: "none", border: "none", cursor: "pointer", textDecoration: "underline" }}>
+                Sign out
+              </button>
+            </>
+          ) : (
+            <div id="google-signin-btn" />
+          )}
+        </div>
+      </div>
+    </div>
+  );
+
+  // ─── MY BOOKINGS VIEW ─────────────────────────────────────────────────────
+
+  if (view === "myBookings") {
+    return (
+      <div style={S.page}>
+        <div style={S.container}>
+          <Header />
+          <div style={S.card}>
+            <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 24, flexWrap: "wrap" as const }}>
+              <button onClick={() => setView("booking")} style={{ ...S.secondary, padding: "9px 14px", fontSize: "0.9rem" }}>← Back</button>
+              <h2 style={{ ...S.title, margin: 0, fontSize: "1.8rem" }}>My Bookings</h2>
+              <button onClick={() => { setView("booking"); setStep(1); }} style={{ ...S.primary, marginLeft: "auto", padding: "10px 16px", fontSize: "0.9rem" }}>
+                + Book New Service
+              </button>
+            </div>
+
+            {/* Tabs */}
+            <div style={{ display: "flex", gap: 4, marginBottom: 24, borderBottom: "2px solid #e5e7eb" }}>
+              <button onClick={() => setBookingsTab("appointments")} style={{
+                background: "none", border: "none", cursor: "pointer", padding: "10px 18px", fontSize: "0.95rem", fontWeight: 700,
+                color: bookingsTab === "appointments" ? "#111827" : "#9ca3af",
+                borderBottom: bookingsTab === "appointments" ? "3px solid #111827" : "3px solid transparent", marginBottom: -2,
+              }}>My Appointments</button>
+              {isMaintenance && (
+                <button onClick={() => setBookingsTab("maintenance")} style={{
+                  background: "none", border: "none", cursor: "pointer", padding: "10px 18px", fontSize: "0.95rem", fontWeight: 700,
+                  color: bookingsTab === "maintenance" ? "#059669" : "#9ca3af",
+                  borderBottom: bookingsTab === "maintenance" ? "3px solid #059669" : "3px solid transparent", marginBottom: -2,
+                }}>🔄 Maintenance Plan</button>
+              )}
+            </div>
+
+            {bookingsLoading ? (
+              <div style={{ textAlign: "center", padding: 40, color: "#6b7280" }}>Loading your bookings…</div>
+            ) : (
+              <>
+                {/* Appointments tab */}
+                {bookingsTab === "appointments" && (
+                  <>
+                    {upcomingStandard.length === 0 && pastStandard.length === 0 && (
+                      <div style={{ textAlign: "center", padding: 40, color: "#6b7280" }}>
+                        No bookings found for {googleUser?.email}.
+                        <br />
+                        <button onClick={() => { setView("booking"); setStep(1); }} style={{ ...S.primary, marginTop: 16, display: "inline-block" }}>
+                          Book Your First Service
+                        </button>
+                      </div>
+                    )}
+                    {upcomingStandard.length > 0 && (
+                      <>
+                        <div style={{ fontWeight: 700, color: "#374151", fontSize: "0.95rem", marginBottom: 12, textTransform: "uppercase" as const, letterSpacing: "0.04em" }}>Upcoming</div>
+                        <div style={{ display: "grid", gap: 14, marginBottom: 28 }}>
+                          {upcomingStandard.map((b, i) => (
+                            <BookingCard key={i} booking={b} upcoming onRequestChange={(b) => { setChangeTarget(b); setChangeNote(""); setChangeSubmitted(false); setView("requestChange"); }} />
+                          ))}
+                        </div>
+                      </>
+                    )}
+                    {pastStandard.length > 0 && (
+                      <>
+                        <div style={{ fontWeight: 700, color: "#9ca3af", fontSize: "0.95rem", marginBottom: 12, textTransform: "uppercase" as const, letterSpacing: "0.04em" }}>Past Services</div>
+                        <div style={{ display: "grid", gap: 14 }}>
+                          {pastStandard.map((b, i) => (
+                            <BookingCard key={i} booking={b} upcoming={false} onRequestChange={() => {}} />
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </>
+                )}
+
+                {/* Maintenance tab */}
+                {bookingsTab === "maintenance" && isMaintenance && (
+                  <>
+                    <div style={{ background: "#ecfdf5", border: "1px solid #6ee7b7", borderRadius: 14, padding: "14px 18px", marginBottom: 24 }}>
+                      <div style={{ fontWeight: 700, color: "#065f46", marginBottom: 4 }}>🔄 You're a Maintenance Client</div>
+                      <div style={{ color: "#047857", fontSize: "0.92rem", lineHeight: 1.6 }}>
+                        Your maintenance schedule is managed by ATX Prestige Detailing. Use "Request a Change" on any upcoming service to reschedule or adjust. You can also book additional one-time services for family or extra vehicles using the normal booking flow.
+                      </div>
+                    </div>
+                    {upcomingMaintenance.length > 0 && (
+                      <>
+                        <div style={{ fontWeight: 700, color: "#374151", fontSize: "0.95rem", marginBottom: 12, textTransform: "uppercase" as const, letterSpacing: "0.04em" }}>Upcoming Maintenance Services</div>
+                        <div style={{ display: "grid", gap: 14, marginBottom: 28 }}>
+                          {upcomingMaintenance.map((b, i) => (
+                            <MaintenanceCard key={i} booking={b} onRequestChange={(b) => { setChangeTarget(b); setChangeNote(""); setChangeSubmitted(false); setView("requestChange"); }} />
+                          ))}
+                        </div>
+                      </>
+                    )}
+                    {pastMaintenance.length > 0 && (
+                      <>
+                        <div style={{ fontWeight: 700, color: "#9ca3af", fontSize: "0.95rem", marginBottom: 12, textTransform: "uppercase" as const, letterSpacing: "0.04em" }}>Past Maintenance Services</div>
+                        <div style={{ display: "grid", gap: 14 }}>
+                          {pastMaintenance.map((b, i) => (
+                            <MaintenanceCard key={i} booking={b} onRequestChange={() => {}} />
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ─── REQUEST A CHANGE VIEW ────────────────────────────────────────────────
+
+  if (view === "requestChange" && changeTarget) {
+    const vehicleLabel =
+      changeTarget.vehicle === "boat"
+        ? [changeTarget.boatSize, changeTarget.make, changeTarget.model].filter(Boolean).join(" ")
+        : [changeTarget.year, changeTarget.make, changeTarget.model].filter(Boolean).join(" ");
+
+    return (
+      <div style={S.page}>
+        <div style={S.container}>
+          <Header />
+          <div style={S.card}>
+            <button onClick={() => setView("myBookings")} style={{ ...S.secondary, padding: "9px 14px", fontSize: "0.9rem", marginBottom: 20 }}>
+              ← Back to My Bookings
+            </button>
+
+            {changeSubmitted ? (
+              <div style={S.successWrap}>
+                <div style={S.successBadge}>✅</div>
+                <h2 style={S.title}>Change Request Sent</h2>
+                <p style={S.successText}>Your request has been sent to ATX Prestige Detailing. Someone will reach out to confirm the changes.</p>
+                <button onClick={() => { setView("myBookings"); loadMyBookings(); }} style={S.primary}>Back to My Bookings</button>
+              </div>
+            ) : (
+              <>
+                <h2 style={S.title}>Request a Change</h2>
+                <p style={S.subtitle}>Describe what you'd like to change about this appointment.</p>
+                <div style={{ ...S.summaryCard, marginBottom: 24, background: "#f9fafb" }}>
+                  <div style={S.summaryHeading}>Appointment</div>
+                  <div style={S.summaryValue}>
+                    {formatDateLabel(changeTarget.date)}{changeTarget.time ? ` @ ${changeTarget.time}` : ""}<br />
+                    {vehicleLabel}<br />
+                    {changeTarget.packageType === "basic" ? "Basic Detail" : changeTarget.packageType === "premium" ? "Premium Detail" : changeTarget.packageType}
+                  </div>
+                </div>
+                <div style={{ maxWidth: 560, margin: "0 auto" }}>
+                  <div style={S.sectionLabel}>What would you like to change?</div>
+                  <textarea
+                    style={{ ...S.input, marginTop: 10, minHeight: 130, resize: "vertical" as const, fontFamily: "inherit", lineHeight: 1.5 }}
+                    placeholder="e.g. Can we move this to Saturday instead? Or change the time to 10am?"
+                    value={changeNote} onChange={(e) => setChangeNote(e.target.value)}
+                  />
+                </div>
+                <div style={{ ...S.buttonRow, maxWidth: 560, margin: "20px auto 0" }}>
+                  <button style={S.secondary} onClick={() => setView("myBookings")}>Cancel</button>
+                  <button
+                    style={{ ...S.primary, ...(!changeNote.trim() || changeSubmitting ? S.disabled : {}) }}
+                    onClick={submitChangeRequest} disabled={!changeNote.trim() || changeSubmitting}
+                  >{changeSubmitting ? "Sending…" : "Send Request"}</button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ─── BOOKING FLOW ─────────────────────────────────────────────────────────
 
   return (
-    <div style={styles.page}>
-      <div style={styles.container}>
-        <div style={styles.brand}>
-          <div style={styles.brandRow}>
-            <img
-              src={logo}
-              alt="ATX Prestige Detailing logo"
-              style={styles.logo}
-            />
-            <div>
-              <h1 style={styles.brandTitle}>ATX Prestige Detailing</h1>
-              <p style={styles.brandSub}>
-                Defined by Detail, Driven by Standards, Trusted for Prestige
-              </p>
-            </div>
-          </div>
-        </div>
+    <div style={S.page}>
+      <div style={S.container}>
+        <Header />
 
-        <div style={styles.progressWrap}>
-          <div style={styles.progressText}>
-            <span>Booking Flow</span>
-            <span>Step {step + 1} of 8</span>
+        {step > 0 && step < 7 && (
+          <div style={S.progressWrap}>
+            <div style={S.progressText}><span>Booking Flow</span><span>Step {step + 1} of 8</span></div>
+            <div style={S.progressBar}><div style={S.progressFill} /></div>
           </div>
-          <div style={styles.progressBar}>
-            <div style={styles.progressFill} />
-          </div>
-        </div>
+        )}
 
-        <div style={styles.card}>
-          {/* ── STEP 0: Landing ── */}
+        <div style={S.card}>
+
+          {/* STEP 0 */}
           {step === 0 && (
             <>
-              <h2 style={styles.title}>Book a Detail Service</h2>
-              <div style={styles.heroButtonWrap}>
-                <button style={styles.primaryButton} onClick={next}>
-                  Book Detail Service
-                </button>
+              <h2 style={S.title}>Book a Detail Service</h2>
+              <p style={S.subtitle}>Premium auto and marine detailing in Austin, TX.</p>
+              <div style={{ display: "flex", justifyContent: "center", gap: 12, padding: "10px 0 2px", flexWrap: "wrap" as const }}>
+                <button style={S.primary} onClick={() => setStep(1)}>Book Detail Service</button>
+                {googleUser && (
+                  <button style={{ ...S.secondary, display: "flex", alignItems: "center", gap: 8 }} onClick={openMyBookings}>
+                    📋 My Bookings
+                  </button>
+                )}
               </div>
+              {!googleUser && (
+                <p style={{ textAlign: "center", color: "#9ca3af", fontSize: "0.88rem", marginTop: 18 }}>
+                  Sign in with Google above to view your past and upcoming services.
+                </p>
+              )}
             </>
           )}
 
-          {/* ── STEP 1: Vehicle Type ── */}
+          {/* STEP 1 */}
           {step === 1 && (
             <>
-              <h2 style={styles.title}>Choose a Vehicle Type</h2>
-              <p style={styles.subtitle}>Select the vehicle class to continue.</p>
-
-              <div style={styles.optionGrid}>
-                {vehicleOptions.map((option) => {
-                  const isSelected = vehicle === option.id;
-                  return (
-                    <button
-                      key={option.id}
-                      style={{
-                        ...styles.optionCard,
-                        ...(isSelected ? styles.selectedCard : {}),
-                      }}
-                      onClick={() => {
-                        setVehicle(option.id);
-                        setPkg("");
-                        setMake("");
-                        setModel("");
-                        setMakeOptions([]);
-                        setModelOptions([]);
-                        setBoatMake("");
-                        setBoatModel("");
-                        setBoatSize("");
-                        setAddOns([]);
-                      }}
-                    >
-                      <div style={styles.optionTitle}>{option.label}</div>
-                      <div style={styles.optionMeta}>
-                        Basic {formatCurrency(option.basicRate)}/hr
-                        <br />
-                        Premium {formatCurrency(option.premiumRate)}/hr
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-
-              <div style={styles.buttonRow}>
-                <div />
-                <div style={styles.rightButtons}>
-                  <button
-                    style={{
-                      ...styles.primaryButton,
-                      ...(!vehicle ? styles.disabledButton : {}),
-                    }}
-                    onClick={next}
-                    disabled={!vehicle}
+              <h2 style={S.title}>Choose a Vehicle Type</h2>
+              <p style={S.subtitle}>Select the vehicle class to continue.</p>
+              <div style={S.optionGrid}>
+                {vehicleOptions.map((option) => (
+                  <button key={option.id}
+                    style={{ ...S.optionCard, ...(vehicle === option.id ? S.selectedCard : {}) }}
+                    onClick={() => { setVehicle(option.id); setPkg(""); setMake(""); setModel(""); setMakeOptions([]); setModelOptions([]); setBoatMake(""); setBoatModel(""); setBoatSize(""); setAddOns([]); }}
                   >
-                    Next
+                    <div style={S.optionTitle}>{option.label}</div>
+                    <div style={S.optionMeta}>Basic {formatCurrency(option.basicRate)}/hr<br />Premium {formatCurrency(option.premiumRate)}/hr</div>
                   </button>
+                ))}
+              </div>
+              <div style={S.buttonRow}>
+                <button style={S.secondary} onClick={() => setStep(0)}>Back</button>
+                <div style={S.rightButtons}>
+                  <button style={{ ...S.primary, ...(!vehicle ? S.disabled : {}) }} onClick={next} disabled={!vehicle}>Next</button>
                 </div>
               </div>
             </>
           )}
 
-          {/* ── STEP 2: Package ── */}
+          {/* STEP 2 */}
           {step === 2 && (
             <>
-              <h2 style={styles.title}>Choose a Detail Package</h2>
-              <p style={styles.subtitle}>Pick the service level that fits the vehicle.</p>
-
-              <div style={styles.optionGrid}>
+              <h2 style={S.title}>Choose a Detail Package</h2>
+              <p style={S.subtitle}>Pick the service level that fits the vehicle.</p>
+              <div style={S.optionGrid}>
                 {(["basic", "premium"] as PackageType[]).map((packageType) => {
-                  const isSelected = pkg === packageType;
                   const label = packageType === "basic" ? "Basic Detail" : "Premium Detail";
-                  const rateText = selectedVehicle
-                    ? `${formatCurrency(
-                        packageType === "basic"
-                          ? selectedVehicle.basicRate
-                          : selectedVehicle.premiumRate
-                      )}/hr`
-                    : "Select vehicle first";
-
-                  let timeText = "";
-                  if (!vehicle) {
-                    timeText = "Average time shown after vehicle selection";
-                  } else if (vehicle === "boat") {
-                    timeText = packageType === "premium" ? "5–8 hours avg" : "3–6 hours avg";
-                  } else if (packageType === "premium") {
-                    timeText = "3–5 hours avg";
-                  } else if (vehicle === "truckSuv") {
-                    timeText = "3–5 hours avg";
-                  } else {
-                    timeText = "3–4 hours avg";
-                  }
-
+                  const rateText = selectedVehicle ? `${formatCurrency(packageType === "basic" ? selectedVehicle.basicRate : selectedVehicle.premiumRate)}/hr` : "Select vehicle first";
+                  const timeText = !vehicle ? "Average time shown after vehicle selection"
+                    : vehicle === "boat" ? (packageType === "premium" ? "5–8 hours avg" : "3–6 hours avg")
+                    : packageType === "premium" ? "3–5 hours avg"
+                    : vehicle === "truckSuv" ? "3–5 hours avg" : "3–4 hours avg";
                   return (
-                    <button
-                      key={packageType}
-                      style={{
-                        ...styles.optionCard,
-                        ...(isSelected ? styles.selectedCard : {}),
-                      }}
-                      onClick={() => setPkg(packageType)}
-                    >
-                      <div style={styles.optionTitle}>{label}</div>
-                      <div style={styles.optionMeta}>
-                        {rateText}
-                        <br />
-                        {timeText}
-                      </div>
+                    <button key={packageType} style={{ ...S.optionCard, ...(pkg === packageType ? S.selectedCard : {}) }} onClick={() => setPkg(packageType)}>
+                      <div style={S.optionTitle}>{label}</div>
+                      <div style={S.optionMeta}>{rateText}<br />{timeText}</div>
                     </button>
                   );
                 })}
               </div>
-
-              <div
-                style={{
-                  marginTop: 8,
-                  fontSize: "0.9rem",
-                  color: "#6b7280",
-                  fontStyle: "italic",
-                }}
-              >
-                Estimated time is based on the condition of the vehicle and may vary at the time of
-                service.
+              <div style={{ marginTop: 8, fontSize: "0.9rem", color: "#6b7280", fontStyle: "italic" }}>Estimated time is based on the condition of the vehicle and may vary at the time of service.</div>
+              <div style={S.estimateBox}><div style={S.estimateLabel}>Estimate</div><div style={S.estimateValue}>{estimateText || "$ per hour"}</div></div>
+              <div style={S.noteBox}>
+                If wanting to see what's included in basic/premium packages go to{" "}
+                <a href="https://ATXPrestigeDetailing.com" target="_blank" rel="noopener noreferrer" style={{ color: "#111827", textDecoration: "none", fontWeight: 600, fontStyle: "italic", borderBottom: "1px solid #d1d5db" }}>ATXPrestigeDetailing.com</a>
               </div>
-
-              <div style={styles.estimateBox}>
-                <div style={styles.estimateLabel}>Estimate</div>
-                <div style={styles.estimateValue}>{estimateText || "$ per hour"}</div>
-              </div>
-
-              <div style={styles.noteBox}>
-                If wanting to see what's included in basic/premium packages go to
-                <br />
-                <a
-                  href="https://ATXPrestigeDetailing.com"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{
-                    color: "#111827",
-                    textDecoration: "none",
-                    fontWeight: 600,
-                    fontStyle: "italic",
-                    borderBottom: "1px solid #d1d5db",
-                  }}
-                >
-                  ATXPrestigeDetailing.com
-                </a>
-              </div>
-
-              <div style={styles.buttonRow}>
-                <button style={styles.secondaryButton} onClick={back}>
-                  Back
-                </button>
-                <div style={styles.rightButtons}>
-                  <button
-                    style={{
-                      ...styles.primaryButton,
-                      ...(!pkg ? styles.disabledButton : {}),
-                    }}
-                    onClick={next}
-                    disabled={!pkg}
-                  >
-                    Next
-                  </button>
-                </div>
+              <div style={S.buttonRow}>
+                <button style={S.secondary} onClick={back}>Back</button>
+                <div style={S.rightButtons}><button style={{ ...S.primary, ...(!pkg ? S.disabled : {}) }} onClick={next} disabled={!pkg}>Next</button></div>
               </div>
             </>
           )}
 
-          {/* ── STEP 3: Add-Ons (auto or marine) ── */}
+          {/* STEP 3 */}
           {step === 3 && (
             <>
-              <h2 style={styles.title}>Choose Add-Ons</h2>
-              <p style={styles.subtitle}>
-                {vehicle === "boat"
-                  ? "Optional marine upgrades for the appointment."
-                  : "Optional upgrades for the appointment."}
-              </p>
-
-              <div style={styles.addOnGrid}>
+              <h2 style={S.title}>Choose Add-Ons</h2>
+              <p style={S.subtitle}>{vehicle === "boat" ? "Optional marine upgrades for the appointment." : "Optional upgrades for the appointment."}</p>
+              <div style={S.addOnGrid}>
                 {(vehicle === "boat" ? marineAddOnOptions : addOnOptions).map((option) => (
-                  <label key={option.label} style={styles.addOnRow}>
-                    <div style={styles.checkWrap}>
-                      <input
-                        style={styles.checkbox}
-                        type="checkbox"
-                        checked={addOns.includes(option.label)}
-                        onChange={() => toggleAddOn(option.label)}
-                      />
+                  <label key={option.label} style={S.addOnRow}>
+                    <div style={S.checkWrap}>
+                      <input style={S.checkbox} type="checkbox" checked={addOns.includes(option.label)} onChange={() => toggleAddOn(option.label)} />
                       <span>{option.label}</span>
                     </div>
-                    <span style={styles.addOnPrice}>{option.priceText}</span>
+                    <span style={S.addOnPrice}>{option.priceText}</span>
                   </label>
                 ))}
               </div>
-
-              <div style={styles.estimateBox}>
-                <div style={styles.estimateLabel}>Estimate</div>
-                <div style={styles.estimateValue}>
-                  {estimateText || "$ per hour"}
-                  {addOnSummaryText ? ` + ${addOnSummaryText}` : ""}
-                </div>
+              <div style={S.estimateBox}>
+                <div style={S.estimateLabel}>Estimate</div>
+                <div style={S.estimateValue}>{estimateText || "$ per hour"}{addOnSummaryText ? ` + ${addOnSummaryText}` : ""}</div>
               </div>
-
-              <div style={styles.buttonRow}>
-                <button style={styles.secondaryButton} onClick={back}>
-                  Back
-                </button>
-                <div style={styles.rightButtons}>
-                  <button style={styles.primaryButton} onClick={next}>
-                    Next
-                  </button>
-                </div>
+              <div style={S.buttonRow}>
+                <button style={S.secondary} onClick={back}>Back</button>
+                <div style={S.rightButtons}><button style={S.primary} onClick={next}>Next</button></div>
               </div>
             </>
           )}
 
-          {/* ── STEP 4: Mobile or Drop-Off ── */}
+          {/* STEP 4 */}
           {step === 4 && (
             <>
-              <h2 style={styles.title}>Mobile or Drop-Off Service</h2>
-              <p style={styles.subtitle}>Choose where the service will happen.</p>
-
-              <div style={styles.optionGrid}>
-                <button
-                  style={{
-                    ...styles.optionCard,
-                    ...(serviceType === "mobile" ? styles.selectedCard : {}),
-                  }}
-                  onClick={() => {
-                    setServiceType("mobile");
-                    setAddressSelected(false);
-                  }}
-                >
-                  <div style={styles.optionTitle}>Mobile Service</div>
-                  <div style={styles.optionMeta}>
-                    Customer enters a service address for on-site detail service.
-                  </div>
+              <h2 style={S.title}>Mobile or Drop-Off Service</h2>
+              <p style={S.subtitle}>Choose where the service will happen.</p>
+              <div style={S.optionGrid}>
+                <button style={{ ...S.optionCard, ...(serviceType === "mobile" ? S.selectedCard : {}) }} onClick={() => { setServiceType("mobile"); setAddressSelected(false); }}>
+                  <div style={S.optionTitle}>Mobile Service</div>
+                  <div style={S.optionMeta}>Customer enters a service address for on-site detail service.</div>
                 </button>
-
-                <button
-                  style={{
-                    ...styles.optionCard,
-                    ...(serviceType === "dropoff" ? styles.selectedCard : {}),
-                  }}
-                  onClick={() => {
-                    setServiceType("dropoff");
-                    setAddress("");
-                    setStreet("");
-                    setCity("");
-                    setStateRegion("");
-                    setZip("");
-                    setPlaceId("");
-                    setLat("");
-                    setLng("");
-                    setAddressSelected(false);
-                  }}
-                >
-                  <div style={styles.optionTitle}>Drop-Off Service</div>
-                  <div style={styles.optionMeta}>
-                    Someone will contact the client with drop-off details.
-                  </div>
+                <button style={{ ...S.optionCard, ...(serviceType === "dropoff" ? S.selectedCard : {}) }}
+                  onClick={() => { setServiceType("dropoff"); setAddress(""); setStreet(""); setCity(""); setStateRegion(""); setZip(""); setPlaceId(""); setLat(""); setLng(""); setAddressSelected(false); }}>
+                  <div style={S.optionTitle}>Drop-Off Service</div>
+                  <div style={S.optionMeta}>Someone will contact the client with drop-off details.</div>
                 </button>
               </div>
-
               {serviceType === "mobile" && (
                 <div style={{ marginTop: 18 }}>
-                  <input
-                    ref={addressInputRef}
-                    type="text"
-                    value={address}
-                    onChange={(e) => {
-                      setAddress(e.target.value);
-                      setAddressSelected(false);
-                    }}
-                    placeholder="Start typing your service address"
-                    style={styles.input}
-                  />
+                  <input ref={addressInputRef} type="text" value={address}
+                    onChange={(e) => { setAddress(e.target.value); setAddressSelected(false); }}
+                    placeholder="Start typing your service address" style={S.input} />
                 </div>
               )}
-
-              <div style={styles.buttonRow}>
-                <button style={styles.secondaryButton} onClick={back}>
-                  Back
-                </button>
-                <div style={styles.rightButtons}>
-                  <button
-                    style={{
-                      ...styles.primaryButton,
-                      ...(!serviceType || (serviceType === "mobile" && !address.trim())
-                        ? styles.disabledButton
-                        : {}),
-                    }}
-                    onClick={next}
-                    disabled={
-                      !serviceType || (serviceType === "mobile" && !address.trim())
-                    }
-                  >
-                    Next
-                  </button>
+              <div style={S.buttonRow}>
+                <button style={S.secondary} onClick={back}>Back</button>
+                <div style={S.rightButtons}>
+                  <button style={{ ...S.primary, ...(!serviceType || (serviceType === "mobile" && !address.trim()) ? S.disabled : {}) }}
+                    onClick={next} disabled={!serviceType || (serviceType === "mobile" && !address.trim())}>Next</button>
                 </div>
               </div>
             </>
           )}
 
-          {/* ── STEP 5: Customer Information ── */}
+          {/* STEP 5 */}
           {step === 5 && (
             <>
-              <h2 style={styles.title}>Customer Information</h2>
-              <p style={styles.subtitle}>
-                Provide contact and vehicle details for appointment confirmation.
-              </p>
-
-              <div style={styles.inputGrid}>
+              <h2 style={S.title}>Customer Information</h2>
+              <p style={S.subtitle}>Provide contact and vehicle details for appointment confirmation.</p>
+              <div style={S.inputGrid}>
                 <div style={{ marginTop: 20 }}>
-                  <div style={styles.sectionLabel}>Select Appointment Date</div>
-                  <select
-                    style={{
-                      ...styles.input,
-                      backgroundColor: "#ffffff",
-                      color: "#111827",
-                      cursor: "pointer",
-                    }}
-                    value={selectedDate}
-                    onChange={(e) => {
-                      setSelectedDate(e.target.value);
-                      setSelectedTime("");
-                    }}
-                  >
+                  <div style={S.sectionLabel}>Select Appointment Date</div>
+                  <select style={{ ...S.input, backgroundColor: "#fff", color: "#111827", cursor: "pointer" }} value={selectedDate}
+                    onChange={(e) => { setSelectedDate(e.target.value); setSelectedTime(""); }}>
                     <option value="">Select a date</option>
-                    {availableDates.map((date, index) => (
-                      <option key={index} value={date}>
-                        {formatDateLabel(date)}
-                      </option>
-                    ))}
+                    {availableDates.map((date, i) => <option key={i} value={date}>{formatDateLabel(date)}</option>)}
                   </select>
                 </div>
-
                 <div style={{ marginTop: 20 }}>
-                  <div style={styles.sectionLabel}>Available Time</div>
-                  <select
-                    style={{
-                      ...styles.input,
-                      backgroundColor: "#ffffff",
-                      color: "#111827",
-                      cursor: "pointer",
-                    }}
-                    value={selectedTime}
-                    onChange={(e) => setSelectedTime(e.target.value)}
-                  >
+                  <div style={S.sectionLabel}>Available Time</div>
+                  <select style={{ ...S.input, backgroundColor: "#fff", color: "#111827", cursor: "pointer" }} value={selectedTime} onChange={(e) => setSelectedTime(e.target.value)}>
                     <option value="">Select a time</option>
-                    {availableSlots.map((slot, index) => (
-                      <option key={index} value={slot.time}>
-                        {slot.time}
-                      </option>
-                    ))}
+                    {availableSlots.map((slot, i) => <option key={i} value={slot.time}>{slot.time}</option>)}
                   </select>
                   {selectedDate && availableSlots.length === 0 && (
-                    <div style={{ marginTop: 8, color: "#b91c1c", fontSize: "0.95rem" }}>
-                      No available times found for this date.
-                    </div>
+                    <div style={{ marginTop: 8, color: "#b91c1c", fontSize: "0.95rem" }}>No available times found for this date.</div>
                   )}
                 </div>
-
-                <input
-                  style={styles.input}
-                  placeholder="Full name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                />
-                <input
-                  style={styles.input}
-                  placeholder="Phone number"
-                  value={phone}
-                  type="tel"
-                  inputMode="numeric"
+                <input style={S.input} placeholder="Full name" value={name} onChange={(e) => setName(e.target.value)} />
+                <input style={S.input} placeholder="Phone number" value={phone} type="tel" inputMode="numeric"
                   onChange={(e) => {
                     const raw = e.target.value.replace(/\D/g, "").slice(0, 10);
-                    const formatted =
-                      raw.length > 6
-                        ? `(${raw.slice(0, 3)}) ${raw.slice(3, 6)}-${raw.slice(6)}`
-                        : raw.length > 3
-                        ? `(${raw.slice(0, 3)}) ${raw.slice(3)}`
-                        : raw;
+                    const formatted = raw.length > 6 ? `(${raw.slice(0,3)}) ${raw.slice(3,6)}-${raw.slice(6)}` : raw.length > 3 ? `(${raw.slice(0,3)}) ${raw.slice(3)}` : raw;
                     setPhone(formatted);
-                  }}
-                />
-                <input
-                  style={styles.input}
-                  placeholder="Email address"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                />
+                  }} />
+                <input style={S.input} placeholder="Email address" value={email} onChange={(e) => setEmail(e.target.value)} />
               </div>
 
-              {/* ── Vehicle / Boat Information ── */}
               <div style={{ marginTop: 24 }}>
-                <div style={styles.sectionLabel}>
-                  {vehicle === "boat" ? "Boat Information" : "Vehicle Information"}
-                </div>
-
+                <div style={S.sectionLabel}>{vehicle === "boat" ? "Boat Information" : "Vehicle Information"}</div>
                 {vehicle === "boat" ? (
-                  <div
-                    style={{
-                      display: "flex",
-                      gap: 12,
-                      marginTop: 10,
-                      flexWrap: "wrap" as const,
-                    }}
-                  >
-                    <input
-                      style={{ ...styles.input, flex: 1, minWidth: 120 }}
-                      placeholder="Size (e.g. 24 ft)"
-                      value={boatSize}
-                      onChange={(e) => setBoatSize(e.target.value)}
-                    />
-                    <input
-                      style={{ ...styles.input, flex: 2, minWidth: 180 }}
-                      placeholder="Make (e.g. Sea Ray)"
-                      value={boatMake}
-                      onChange={(e) => setBoatMake(e.target.value)}
-                    />
-                    <input
-                      style={{ ...styles.input, flex: 2, minWidth: 180 }}
-                      placeholder="Model (e.g. Sundancer 320)"
-                      value={boatModel}
-                      onChange={(e) => setBoatModel(e.target.value)}
-                    />
+                  <div style={{ display: "flex", gap: 12, marginTop: 10, flexWrap: "wrap" as const }}>
+                    <input style={{ ...S.input, flex: 1, minWidth: 120 }} placeholder="Size (e.g. 24 ft)" value={boatSize} onChange={(e) => setBoatSize(e.target.value)} />
+                    <input style={{ ...S.input, flex: 2, minWidth: 180 }} placeholder="Make (e.g. Sea Ray)" value={boatMake} onChange={(e) => setBoatMake(e.target.value)} />
+                    <input style={{ ...S.input, flex: 2, minWidth: 180 }} placeholder="Model (e.g. Sundancer 320)" value={boatModel} onChange={(e) => setBoatModel(e.target.value)} />
                   </div>
                 ) : (
-                  <div
-                    style={{
-                      display: "flex",
-                      gap: 12,
-                      marginTop: 10,
-                      flexWrap: "wrap" as const,
-                    }}
-                  >
-                    <select
-                      style={{
-                        ...styles.input,
-                        flex: 1,
-                        minWidth: 120,
-                        backgroundColor: "#fff",
-                        color: "#111827",
-                      }}
-                      value={year}
-                      onChange={(e) => {
-                        setYear(e.target.value);
-                        setModel("");
-                        setModelOptions([]);
-                      }}
-                    >
+                  <div style={{ display: "flex", gap: 12, marginTop: 10, flexWrap: "wrap" as const }}>
+                    <select style={{ ...S.input, flex: 1, minWidth: 120, backgroundColor: "#fff", color: "#111827" }} value={year} onChange={(e) => { setYear(e.target.value); setModel(""); setModelOptions([]); }}>
                       <option value="">Year</option>
-                      {yearOptions.map((yr) => (
-                        <option key={yr} value={yr}>
-                          {yr}
-                        </option>
-                      ))}
+                      {yearOptions.map((yr) => <option key={yr} value={yr}>{yr}</option>)}
                     </select>
-
-                    <select
-                      style={{
-                        ...styles.input,
-                        flex: 2,
-                        minWidth: 180,
-                        backgroundColor: "#fff",
-                        color: "#111827",
-                      }}
-                      value={make}
-                      onChange={(e) => {
-                        setMake(e.target.value);
-                        setModel("");
-                        setModelOptions([]);
-                      }}
-                      disabled={loadingMakes}
-                    >
-                      <option value="">
-                        {loadingMakes ? "Loading makes..." : "Make"}
-                      </option>
-                      {makeOptions.map((mk) => (
-                        <option key={mk} value={mk}>
-                          {mk}
-                        </option>
-                      ))}
+                    <select style={{ ...S.input, flex: 2, minWidth: 180, backgroundColor: "#fff", color: "#111827" }} value={make} onChange={(e) => { setMake(e.target.value); setModel(""); setModelOptions([]); }} disabled={loadingMakes}>
+                      <option value="">{loadingMakes ? "Loading makes..." : "Make"}</option>
+                      {makeOptions.map((mk) => <option key={mk} value={mk}>{mk}</option>)}
                     </select>
-
-                    <select
-                      style={{
-                        ...styles.input,
-                        flex: 2,
-                        minWidth: 180,
-                        backgroundColor: "#fff",
-                        color: "#111827",
-                      }}
-                      value={model}
-                      onChange={(e) => setModel(e.target.value)}
-                      disabled={!year || !make || loadingModels}
-                    >
-                      <option value="">
-                        {!year || !make
-                          ? "Select year and make first"
-                          : loadingModels
-                          ? "Loading models..."
-                          : "Model"}
-                      </option>
-                      {modelOptions.map((mdl) => (
-                        <option key={mdl} value={mdl}>
-                          {mdl}
-                        </option>
-                      ))}
+                    <select style={{ ...S.input, flex: 2, minWidth: 180, backgroundColor: "#fff", color: "#111827" }} value={model} onChange={(e) => setModel(e.target.value)} disabled={!year || !make || loadingModels}>
+                      <option value="">{!year || !make ? "Select year and make first" : loadingModels ? "Loading models..." : "Model"}</option>
+                      {modelOptions.map((mdl) => <option key={mdl} value={mdl}>{mdl}</option>)}
                     </select>
                   </div>
                 )}
               </div>
 
-              <div style={styles.buttonRow}>
-                <button style={styles.secondaryButton} onClick={back}>
-                  Back
-                </button>
-                <div style={styles.rightButtons}>
-                  <button
-                    style={{
-                      ...styles.primaryButton,
-                      ...(step5Disabled ? styles.disabledButton : {}),
-                    }}
-                    onClick={next}
-                    disabled={step5Disabled}
-                  >
-                    Review Booking
-                  </button>
+              <div style={S.buttonRow}>
+                <button style={S.secondary} onClick={back}>Back</button>
+                <div style={S.rightButtons}>
+                  <button style={{ ...S.primary, ...(step5Disabled ? S.disabled : {}) }} onClick={next} disabled={step5Disabled}>Review Booking</button>
                 </div>
               </div>
             </>
           )}
 
-          {/* ── STEP 6: Review ── */}
+          {/* STEP 6 */}
           {step === 6 && (
             <>
-              <h2 style={styles.title}>Review Booking</h2>
-              <p style={styles.subtitle}>Review the request details before submitting.</p>
-
-              <div style={styles.summaryGrid}>
-                <div style={styles.summaryCard}>
-                  <div style={styles.summaryHeading}>Customer</div>
-                  <div style={styles.summaryValue}>
-                    {name}
-                    <br />
-                    {phone}
-                    <br />
-                    {email}
-                  </div>
-                </div>
-
-                <div style={styles.summaryCard}>
-                  <div style={styles.summaryHeading}>Appointment</div>
-                  <div style={styles.summaryValue}>
-                    {selectedDate ? formatDateLabel(selectedDate) : "N/A"}
-                    <br />
-                    {selectedTime || "N/A"}
-                  </div>
-                </div>
-
-                <div style={styles.summaryCard}>
-                  <div style={styles.summaryHeading}>Service</div>
-                  <div style={styles.summaryValue}>
-                    {selectedVehicle?.label || "N/A"}
-                    <br />
-                    {pkg === "basic" ? "Basic Detail" : pkg === "premium" ? "Premium Detail" : "N/A"}
-                    <br />
-                    {estimateText || "N/A"}
-                  </div>
-                </div>
-
-                <div style={styles.summaryCard}>
-                  <div style={styles.summaryHeading}>Appointment Type</div>
-                  <div style={styles.summaryValue}>
-                    {serviceType === "mobile"
-                      ? "Mobile Service"
-                      : serviceType === "dropoff"
-                      ? "Drop-Off Service"
-                      : "N/A"}
-                    {serviceType === "mobile" && address && (
-                      <>
-                        <br />
-                        {address}
-                      </>
-                    )}
-                  </div>
-                </div>
-
-                <div style={styles.summaryCard}>
-                  <div style={styles.summaryHeading}>
-                    {vehicle === "boat" ? "Boat" : "Vehicle"}
-                  </div>
-                  <div style={styles.summaryValue}>
-                    {vehicleSummary}
-                    <br />
-                    {selectedVehicle?.label || "N/A"}
-                  </div>
-                </div>
-
-                <div style={styles.summaryCard}>
-                  <div style={styles.summaryHeading}>Add-Ons</div>
-                  <div style={styles.summaryValue}>
-                    {addOns.length ? addOns.join(", ") : "No add-ons selected"}
-                  </div>
-                </div>
-
-                <div style={styles.summaryCard}>
-                  <div style={styles.summaryHeading}>Estimated Add-Ons</div>
-                  <div style={styles.summaryValue}>{formatCurrency(addOnEstimate)}</div>
-                </div>
-
-                <div style={styles.summaryCard}>
-                  <div style={styles.summaryHeading}>Avg Package Time</div>
-                  <div style={styles.summaryValue}>{packageHours}</div>
-                </div>
+              <h2 style={S.title}>Review Booking</h2>
+              <p style={S.subtitle}>Review the request details before submitting.</p>
+              <div style={S.summaryGrid}>
+                <div style={S.summaryCard}><div style={S.summaryHeading}>Customer</div><div style={S.summaryValue}>{name}<br />{phone}<br />{email}</div></div>
+                <div style={S.summaryCard}><div style={S.summaryHeading}>Appointment</div><div style={S.summaryValue}>{formatDateLabel(selectedDate)}<br />{selectedTime || "N/A"}</div></div>
+                <div style={S.summaryCard}><div style={S.summaryHeading}>Service</div><div style={S.summaryValue}>{selectedVehicle?.label || "N/A"}<br />{pkg === "basic" ? "Basic Detail" : pkg === "premium" ? "Premium Detail" : "N/A"}<br />{estimateText || "N/A"}</div></div>
+                <div style={S.summaryCard}><div style={S.summaryHeading}>Appointment Type</div><div style={S.summaryValue}>{serviceType === "mobile" ? "Mobile Service" : serviceType === "dropoff" ? "Drop-Off Service" : "N/A"}{serviceType === "mobile" && address && <><br />{address}</>}</div></div>
+                <div style={S.summaryCard}><div style={S.summaryHeading}>{vehicle === "boat" ? "Boat" : "Vehicle"}</div><div style={S.summaryValue}>{vehicleSummary}<br />{selectedVehicle?.label || "N/A"}</div></div>
+                <div style={S.summaryCard}><div style={S.summaryHeading}>Add-Ons</div><div style={S.summaryValue}>{addOns.length ? addOns.join(", ") : "No add-ons selected"}</div></div>
+                <div style={S.summaryCard}><div style={S.summaryHeading}>Estimated Add-Ons</div><div style={S.summaryValue}>{formatCurrency(addOnEstimate)}</div></div>
+                <div style={S.summaryCard}><div style={S.summaryHeading}>Avg Package Time</div><div style={S.summaryValue}>{packageHours}</div></div>
               </div>
-
-              {/* ── Notes ── */}
               <div style={{ marginTop: 24 }}>
-                <div style={styles.sectionLabel}>Additional Notes</div>
-                <textarea
-                  style={{
-                    ...styles.input,
-                    marginTop: 10,
-                    minHeight: 100,
-                    resize: "vertical" as const,
-                    fontFamily: "inherit",
-                    lineHeight: 1.5,
-                  }}
+                <div style={S.sectionLabel}>Additional Notes</div>
+                <textarea style={{ ...S.input, marginTop: 10, minHeight: 100, resize: "vertical" as const, fontFamily: "inherit", lineHeight: 1.5 }}
                   placeholder="Any special requests, access instructions, or details about the vehicle condition…"
-                  value={bookingNotes}
-                  onChange={(e) => setBookingNotes(e.target.value)}
-                />
+                  value={bookingNotes} onChange={(e) => setBookingNotes(e.target.value)} />
               </div>
-
-              <div style={styles.buttonRow}>
-                <button style={styles.secondaryButton} onClick={back}>
-                  Back
-                </button>
-                <div style={styles.rightButtons}>
-                  <button
-                    style={styles.primaryButton}
-                    onClick={async () => {
-                      try {
-                        if (serviceType === "mobile") {
-                          if (!address.trim()) {
-                            alert("Please enter your service address.");
-                            return;
-                          }
-                          if (!addressSelected) {
-                            alert("Please select a valid address from the dropdown.");
-                            return;
-                          }
-                        }
-                        const [yearPart, monthPart, dayPart] = selectedDate.split("-");
-                        const safeDate = `${monthPart}/${dayPart}/${yearPart}`;
-                        const res = await fetch(SCRIPT_URL, {
-                          method: "POST",
-                          body: JSON.stringify({
-                            action: "bookAppointment",
-                            name,
-                            phone,
-                            email,
-                            date: selectedDate,
-                            displayDate: safeDate,
-                            time: selectedTime,
-                            // Vehicle fields
-                            year: vehicle === "boat" ? "" : year,
-                            make: vehicle === "boat" ? boatMake : make,
-                            model: vehicle === "boat" ? boatModel : model,
-                            boatSize: vehicle === "boat" ? boatSize : "",
-                            vehicle,
-                            packageType: pkg,
-                            hourlyRate,
-                            addOns: addOns.join(", "),
-                            addOnEstimate,
-                            serviceType,
-                            address,
-                            street,
-                            city,
-                            state: stateRegion,
-                            zip,
-                            placeId,
-                            lat,
-                            lng,
-                            avgTime: packageHours,
-                            notes: bookingNotes,
-                          }),
-                        });
-                        const data = await res.json();
-                        if (data.success) {
-                          alert("Booking submitted successfully!");
-                          next();
-                        } else {
-                          alert("Something went wrong.");
-                          console.error(data);
-                        }
-                      } catch (err) {
-                        alert("Something went wrong.");
-                        console.error(err);
+              <div style={S.buttonRow}>
+                <button style={S.secondary} onClick={back}>Back</button>
+                <div style={S.rightButtons}>
+                  <button style={S.primary} onClick={async () => {
+                    try {
+                      if (serviceType === "mobile") {
+                        if (!address.trim()) { alert("Please enter your service address."); return; }
+                        if (!addressSelected) { alert("Please select a valid address from the dropdown."); return; }
                       }
-                    }}
-                  >
-                    Submit Booking
-                  </button>
+                      const [yearPart, monthPart, dayPart] = selectedDate.split("-");
+                      const safeDate = `${monthPart}/${dayPart}/${yearPart}`;
+                      const res = await fetch(SCRIPT_URL, {
+                        method: "POST",
+                        body: JSON.stringify({
+                          action: "bookAppointment", name, phone, email,
+                          date: selectedDate, displayDate: safeDate, time: selectedTime,
+                          year: vehicle === "boat" ? "" : year,
+                          make: vehicle === "boat" ? boatMake : make,
+                          model: vehicle === "boat" ? boatModel : model,
+                          boatSize: vehicle === "boat" ? boatSize : "",
+                          vehicle, packageType: pkg, hourlyRate,
+                          addOns: addOns.join(", "), addOnEstimate,
+                          serviceType, address, street, city,
+                          state: stateRegion, zip, placeId, lat, lng,
+                          avgTime: packageHours, notes: bookingNotes,
+                        }),
+                      });
+                      const data = await res.json();
+                      if (data.success) { next(); }
+                      else { alert("Something went wrong."); console.error(data); }
+                    } catch (err) { alert("Something went wrong."); console.error(err); }
+                  }}>Submit Booking</button>
                 </div>
               </div>
             </>
           )}
 
-          {/* ── STEP 7: Confirmation ── */}
+          {/* STEP 7 */}
           {step === 7 && (
             <>
-              <div style={styles.submittedWrap}>
-                <div style={styles.successBadge}>✅</div>
-                <h2 style={styles.title}>Booking Request Submitted</h2>
-                <p style={styles.successText}>
-                  Someone will be reaching out to you to confirm your service. This private build is
-                  also showing a booking summary for testing.
-                </p>
+              <div style={S.successWrap}>
+                <div style={S.successBadge}>✅</div>
+                <h2 style={S.title}>Booking Request Submitted</h2>
+                <p style={S.successText}>Someone will be reaching out to you to confirm your service.</p>
+                {googleUser && (
+                  <button onClick={openMyBookings} style={{ ...S.secondary, marginTop: 8 }}>View My Bookings</button>
+                )}
               </div>
-
-              <div style={styles.summaryGrid}>
-                <div style={styles.summaryCard}>
-                  <div style={styles.summaryHeading}>Customer</div>
-                  <div style={styles.summaryValue}>
-                    {name}
-                    <br />
-                    {phone}
-                    <br />
-                    {email}
-                  </div>
-                </div>
-
-                <div style={styles.summaryCard}>
-                  <div style={styles.summaryHeading}>Appointment</div>
-                  <div style={styles.summaryValue}>
-                    {selectedDate ? formatDateLabel(selectedDate) : "N/A"}
-                    <br />
-                    {selectedTime || "N/A"}
-                  </div>
-                </div>
-
-                <div style={styles.summaryCard}>
-                  <div style={styles.summaryHeading}>Service</div>
-                  <div style={styles.summaryValue}>
-                    {selectedVehicle?.label || "N/A"}
-                    <br />
-                    {pkg === "basic" ? "Basic Detail" : pkg === "premium" ? "Premium Detail" : "N/A"}
-                    <br />
-                    {estimateText || "N/A"}
-                  </div>
-                </div>
-
-                <div style={styles.summaryCard}>
-                  <div style={styles.summaryHeading}>Appointment Type</div>
-                  <div style={styles.summaryValue}>
-                    {serviceType === "mobile"
-                      ? "Mobile Service"
-                      : serviceType === "dropoff"
-                      ? "Drop-Off Service"
-                      : "N/A"}
-                    <br />
-                    {address || "No address provided"}
-                  </div>
-                </div>
-
-                <div style={styles.summaryCard}>
-                  <div style={styles.summaryHeading}>
-                    {vehicle === "boat" ? "Boat" : "Vehicle"}
-                  </div>
-                  <div style={styles.summaryValue}>
-                    {vehicleSummary}
-                    <br />
-                    {selectedVehicle?.label || "N/A"}
-                  </div>
-                </div>
-
-                <div style={styles.summaryCard}>
-                  <div style={styles.summaryHeading}>Add-Ons</div>
-                  <div style={styles.summaryValue}>
-                    {addOns.length ? addOns.join(", ") : "No add-ons selected"}
-                  </div>
-                </div>
-
-                <div style={styles.summaryCard}>
-                  <div style={styles.summaryHeading}>Estimated Add-Ons</div>
-                  <div style={styles.summaryValue}>{formatCurrency(addOnEstimate)}</div>
-                </div>
-
-                <div style={styles.summaryCard}>
-                  <div style={styles.summaryHeading}>Avg Package Time</div>
-                  <div style={styles.summaryValue}>{packageHours}</div>
-                </div>
-
+              <div style={S.summaryGrid}>
+                <div style={S.summaryCard}><div style={S.summaryHeading}>Customer</div><div style={S.summaryValue}>{name}<br />{phone}<br />{email}</div></div>
+                <div style={S.summaryCard}><div style={S.summaryHeading}>Appointment</div><div style={S.summaryValue}>{formatDateLabel(selectedDate)}<br />{selectedTime || "N/A"}</div></div>
+                <div style={S.summaryCard}><div style={S.summaryHeading}>Service</div><div style={S.summaryValue}>{selectedVehicle?.label || "N/A"}<br />{pkg === "basic" ? "Basic Detail" : pkg === "premium" ? "Premium Detail" : "N/A"}<br />{estimateText || "N/A"}</div></div>
+                <div style={S.summaryCard}><div style={S.summaryHeading}>Appointment Type</div><div style={S.summaryValue}>{serviceType === "mobile" ? "Mobile Service" : serviceType === "dropoff" ? "Drop-Off Service" : "N/A"}<br />{address || "No address provided"}</div></div>
+                <div style={S.summaryCard}><div style={S.summaryHeading}>{vehicle === "boat" ? "Boat" : "Vehicle"}</div><div style={S.summaryValue}>{vehicleSummary}<br />{selectedVehicle?.label || "N/A"}</div></div>
+                <div style={S.summaryCard}><div style={S.summaryHeading}>Add-Ons</div><div style={S.summaryValue}>{addOns.length ? addOns.join(", ") : "No add-ons selected"}</div></div>
+                <div style={S.summaryCard}><div style={S.summaryHeading}>Estimated Add-Ons</div><div style={S.summaryValue}>{formatCurrency(addOnEstimate)}</div></div>
+                <div style={S.summaryCard}><div style={S.summaryHeading}>Avg Package Time</div><div style={S.summaryValue}>{packageHours}</div></div>
                 {bookingNotes.trim() && (
-                  <div style={{ ...styles.summaryCard, gridColumn: "1 / -1" }}>
-                    <div style={styles.summaryHeading}>Notes</div>
-                    <div style={{ ...styles.summaryValue, fontWeight: 400, color: "#374151", whiteSpace: "pre-wrap" as const }}>
-                      {bookingNotes}
-                    </div>
+                  <div style={{ ...S.summaryCard, gridColumn: "1 / -1" }}>
+                    <div style={S.summaryHeading}>Notes</div>
+                    <div style={{ ...S.summaryValue, fontWeight: 400, color: "#374151", whiteSpace: "pre-wrap" as const }}>{bookingNotes}</div>
                   </div>
                 )}
               </div>
             </>
           )}
+
         </div>
       </div>
     </div>
