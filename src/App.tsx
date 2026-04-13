@@ -433,7 +433,7 @@ export default function App() {
   // 0 landing | 1 vehicle | 2 service plan | 3 frequency (maintenance) | 4 package | 5 mobile/dropoff | 6 customer info | 7 review | 8 confirm
 
   const step2NextDisabled = !clientType;
-  const step3NextDisabled = clientType === "maintenance" ? !frequency : false;
+ 
 
   // For step 6 customer info
   const step6Disabled =
