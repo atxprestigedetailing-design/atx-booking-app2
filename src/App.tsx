@@ -180,12 +180,14 @@ function MaintenanceCard({ booking, onRequestChange }: {
   const upcoming = isUpcoming(booking.date);
 
   return (
-    <div style={{ background: "#fff", border: "1.5px solid #059669", borderRadius: 16, padding: 18, position: "relative" as const }}>
-      <span style={{ position: "absolute" as const, top: 14, right: 14, background: "#ecfdf5", color: "#059669", fontSize: "0.75rem", fontWeight: 700, borderRadius: 999, padding: "3px 10px" }}>
-        {freqLabel.toUpperCase()}
-      </span>
-      <div style={{ fontSize: "1rem", fontWeight: 700, color: "#111827", marginBottom: 4 }}>
-        {formatDateLabel(booking.date)}{booking.time ? ` at ${booking.time}` : ""}
+    <div style={{ background: "#fff", border: "1.5px solid #059669", borderRadius: 16, padding: 18 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8, marginBottom: 4 }}>
+        <div style={{ fontSize: "1rem", fontWeight: 700, color: "#111827", flex: 1, minWidth: 0 }}>
+          {formatDateLabel(booking.date)}{booking.time ? ` at ${booking.time}` : ""}
+        </div>
+        <span style={{ background: "#ecfdf5", color: "#059669", fontSize: "0.72rem", fontWeight: 700, borderRadius: 999, padding: "3px 9px", whiteSpace: "nowrap" as const, flexShrink: 0 }}>
+          {freqLabel.toUpperCase()}
+        </span>
       </div>
       <div style={{ fontSize: "0.92rem", color: "#6b7280", lineHeight: 1.6 }}>
         {vehicleLabel && <div>{vehicleLabel}</div>}
@@ -481,24 +483,24 @@ export default function App() {
 
   const Header = () => (
     <div style={{ display: "flex", justifyContent: "center", marginBottom: 32 }}>
-      <div style={{ display: "grid", gridTemplateColumns: "110px 1fr auto", alignItems: "center", gap: 20, maxWidth: 760, width: "100%" }}>
-        <img src={logo} alt="ATX Prestige Detailing logo" style={{ width: 110, height: 110, objectFit: "contain" as const }} />
-        <div>
-          <h1 style={{ fontSize: "2.8rem", fontWeight: 800, letterSpacing: "-1px", color: "#111827", margin: 0, lineHeight: 1.05 }}>ATX Prestige Detailing</h1>
-          <p style={{ color: "#6b7280", fontSize: "1.05rem", marginTop: 10, marginBottom: 0, lineHeight: 1.45, fontStyle: "italic" }}>Defined by Detail, Driven by Standards, Trusted for Prestige</p>
+      <div style={{ maxWidth: 760, width: "100%" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 12 }}>
+          <img src={logo} alt="ATX Prestige Detailing logo" style={{ width: 72, height: 72, objectFit: "contain" as const, flexShrink: 0 }} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <h1 style={{ fontSize: "clamp(1.5rem, 5vw, 2.8rem)", fontWeight: 800, letterSpacing: "-1px", color: "#111827", margin: 0, lineHeight: 1.05 }}>ATX Prestige Detailing</h1>
+            <p style={{ color: "#6b7280", fontSize: "clamp(0.8rem, 2.5vw, 1rem)", marginTop: 6, marginBottom: 0, lineHeight: 1.4, fontStyle: "italic" }}>Defined by Detail, Driven by Standards, Trusted for Prestige</p>
+          </div>
         </div>
-        <div style={{ display: "flex", flexDirection: "column" as const, alignItems: "flex-end", gap: 8, minWidth: 180 }}>
+        <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center" }}>
           {googleUser ? (
-            <>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <img src={googleUser.picture} alt={googleUser.name} style={{ width: 36, height: 36, borderRadius: "50%", border: "2px solid #e5e7eb" }} />
-                <div style={{ textAlign: "right" as const }}>
-                  <div style={{ fontSize: "0.9rem", fontWeight: 700, color: "#111827" }}>{googleUser.name}</div>
-                  <div style={{ fontSize: "0.75rem", color: "#6b7280" }}>{googleUser.email}</div>
-                </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <img src={googleUser.picture} alt={googleUser.name} style={{ width: 32, height: 32, borderRadius: "50%", border: "2px solid #e5e7eb", flexShrink: 0 }} />
+              <div>
+                <div style={{ fontSize: "0.85rem", fontWeight: 700, color: "#111827" }}>{googleUser.name}</div>
+                <div style={{ fontSize: "0.72rem", color: "#6b7280" }}>{googleUser.email}</div>
               </div>
-              <button onClick={handleSignOut} style={{ fontSize: "0.8rem", color: "#6b7280", background: "none", border: "none", cursor: "pointer", textDecoration: "underline" }}>Sign out</button>
-            </>
+              <button onClick={handleSignOut} style={{ fontSize: "0.8rem", color: "#6b7280", background: "none", border: "1px solid #d1d5db", borderRadius: 8, padding: "4px 10px", cursor: "pointer", marginLeft: 4 }}>Sign out</button>
+            </div>
           ) : (
             <div id="google-signin-btn" />
           )}
