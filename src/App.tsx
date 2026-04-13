@@ -11,7 +11,7 @@ const GOOGLE_CLIENT_ID =
   "447699234633-ivo2e1c2q843scj32k5323o2rkq6h7dp.apps.googleusercontent.com";
 
 const SCRIPT_URL =
-  "https://script.google.com/macros/s/AKfycbxVXpM_irUAnIkMUUSYGSvOl7OD8pPT_xH01sRHXBpoL7khBVssfVSeFDo-GWrcaO55jA/exec";
+  "https://script.google.com/macros/s/AKfycbyUAEOmRpO99rLB4M_ITUmjh7Z1Kl9iwhE8YwGRvZLyRoQ5G5ynCeN_R_jZglE6br18hQ/exec";
 
 const TOTAL_STEPS = 9;
 
@@ -116,6 +116,74 @@ function isUpcoming(dateStr: string) {
   return new Date(y, m - 1, d) >= today;
 }
 
+// Calculate recurring schedule dates from a start date
+function calcRecurringDates(startDateStr: string, freq: string, count: number = 6): string[] {
+  if (!startDateStr || !freq) return [];
+  const [y, m, d] = startDateStr.split("-").map(Number);
+  const start = new Date(y, m - 1, d);
+  const dates: string[] = [];
+
+  if (freq === "biweekly") {
+    let next = new Date(start);
+    next.setDate(next.getDate() + 14);
+    while (dates.length < count) {
+      dates.push(formatDateLabel(fmtDate(next)));
+      next.setDate(next.getDate() + 14);
+    }
+  } else if (freq === "monthly") {
+    // Same weekday + same week position each month
+    const dow = start.getDay();
+    const weekPos = Math.ceil(start.getDate() / 7);
+    const isLast = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 7).getMonth() !== start.getMonth();
+
+    let checkMonth = start.getMonth() + 1;
+    let checkYear = start.getFullYear();
+    if (checkMonth > 11) { checkMonth = 0; checkYear++; }
+
+    while (dates.length < count) {
+      const candidate = getNthWeekday(checkYear, checkMonth, dow, weekPos, isLast);
+      if (candidate) dates.push(formatDateLabel(fmtDate(candidate)));
+      checkMonth++;
+      if (checkMonth > 11) { checkMonth = 0; checkYear++; }
+      if (checkYear > start.getFullYear() + 3) break;
+    }
+  }
+  return dates;
+}
+
+function fmtDate(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function getNthWeekday(year: number, month: number, dow: number, n: number, isLast: boolean): Date | null {
+  if (isLast) {
+    const last = new Date(year, month + 1, 0);
+    while (last.getDay() !== dow) last.setDate(last.getDate() - 1);
+    return last;
+  }
+  const first = new Date(year, month, 1);
+  const diff = (dow - first.getDay() + 7) % 7;
+  const result = new Date(year, month, 1 + diff + (n - 1) * 7);
+  return result.getMonth() === month ? result : null;
+}
+
+function getCadenceLabel(startDateStr: string, freq: string): string {
+  if (!startDateStr || !freq) return "";
+  const [y, m, d] = startDateStr.split("-").map(Number);
+  const start = new Date(y, m - 1, d);
+  const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  const dayName = dayNames[start.getDay()];
+  if (freq === "biweekly") return `Every other ${dayName}`;
+  const weekPos = Math.ceil(start.getDate() / 7);
+  const isLast = new Date(y, m - 1, d + 7).getMonth() !== start.getMonth();
+  const ordinals = ["", "1st", "2nd", "3rd", "4th", "5th"];
+  const pos = isLast ? "last" : ordinals[weekPos];
+  return `Every ${pos} ${dayName} of the month`;
+}
+
 async function fetchAllAvailability(): Promise<AvailabilitySlot[]> {
   const res = await fetch(`${SCRIPT_URL}?action=getAllAvailability`);
   const data: { slots: AvailabilitySlot[] } = await res.json();
@@ -181,7 +249,7 @@ function MaintenanceCard({ booking, onRequestChange }: {
 
   return (
     <div style={{ background: "#fff", border: "1.5px solid #059669", borderRadius: 16, padding: 18 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8, marginBottom: 4 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8, marginBottom: 2 }}>
         <div style={{ fontSize: "1rem", fontWeight: 700, color: "#111827", flex: 1, minWidth: 0 }}>
           {formatDateLabel(booking.date)}{booking.time ? ` at ${booking.time}` : ""}
         </div>
@@ -189,6 +257,11 @@ function MaintenanceCard({ booking, onRequestChange }: {
           {freqLabel.toUpperCase()}
         </span>
       </div>
+      {booking.recurringFrequency && booking.date && (
+        <div style={{ fontSize: "0.82rem", color: "#059669", marginBottom: 6 }}>
+          {getCadenceLabel(booking.date, booking.recurringFrequency)}
+        </div>
+      )}
       <div style={{ fontSize: "0.92rem", color: "#6b7280", lineHeight: 1.6 }}>
         {vehicleLabel && <div>{vehicleLabel}</div>}
         <div>{booking.packageType === "basic" ? "Basic Detail" : booking.packageType === "premium" ? "Premium Detail" : booking.packageType}</div>
@@ -937,6 +1010,29 @@ export default function App() {
                     <div style={{ marginTop: 8, color: "#b91c1c", fontSize: "0.95rem" }}>No available times for this date.</div>
                   )}
                 </div>
+
+                {/* Recurring schedule preview — maintenance only */}
+                {clientType === "maintenance" && selectedDate && frequency && (
+                  <div style={{ background: "#ecfdf5", border: "1px solid #6ee7b7", borderRadius: 14, padding: "14px 16px", marginTop: 4 }}>
+                    <div style={{ fontWeight: 700, color: "#065f46", marginBottom: 8, fontSize: "0.95rem" }}>
+                      Your Recurring Schedule
+                    </div>
+                    <div style={{ fontSize: "0.88rem", color: "#047857", marginBottom: 8 }}>
+                      {getCadenceLabel(selectedDate, frequency)} starting {formatDateLabel(selectedDate)}
+                    </div>
+                    <div style={{ display: "grid", gap: 4 }}>
+                      {calcRecurringDates(selectedDate, frequency, 6).map((d, i) => (
+                        <div key={i} style={{ fontSize: "0.88rem", color: "#065f46" }}>
+                          {i + 2}. {d}
+                        </div>
+                      ))}
+                    </div>
+                    <div style={{ fontSize: "0.82rem", color: "#6b7280", marginTop: 8 }}>
+                      Showing your next 6 scheduled dates. These slots will be held for you.
+                    </div>
+                  </div>
+                )}
+
                 <input style={S.input} placeholder="Full name" value={name} onChange={(e) => setName(e.target.value)} />
                 <input style={S.input} placeholder="Phone number" value={phone} type="tel" inputMode="numeric"
                   onChange={(e) => {
@@ -1020,8 +1116,24 @@ export default function App() {
                   <div style={S.summaryValue}>
                     {clientType === "oneTime" ? "One-Time Service" : clientType === "maintenance" ? "Maintenance Plan" : "N/A"}
                     {clientType === "maintenance" && frequency && <><br />{frequency === "biweekly" ? "Bi-Weekly" : "Monthly"}</>}
+                    {clientType === "maintenance" && selectedDate && frequency && (
+                      <><br /><span style={{ fontSize: "0.88rem", fontWeight: 400, color: "#059669" }}>{getCadenceLabel(selectedDate, frequency)}</span></>
+                    )}
                   </div>
                 </div>
+                {clientType === "maintenance" && selectedDate && frequency && (
+                  <div style={{ ...S.summaryCard, gridColumn: "1 / -1", background: "#f0fdf4", border: "1px solid #6ee7b7" }}>
+                    <div style={S.summaryHeading}>Recurring Schedule</div>
+                    <div style={{ fontSize: "0.9rem", color: "#065f46", fontWeight: 600, marginBottom: 8 }}>
+                      {getCadenceLabel(selectedDate, frequency)} — first service {formatDateLabel(selectedDate)}
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 4 }}>
+                      {calcRecurringDates(selectedDate, frequency, 6).map((d, i) => (
+                        <div key={i} style={{ fontSize: "0.88rem", color: "#374151" }}>{i + 2}. {d}</div>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 <div style={S.summaryCard}><div style={S.summaryHeading}>Package</div><div style={S.summaryValue}>{selectedVehicle?.label || "N/A"}<br />{pkg === "basic" ? "Basic Detail" : pkg === "premium" ? "Premium Detail" : "N/A"}<br />{estimateText || "N/A"}</div></div>
                 <div style={S.summaryCard}><div style={S.summaryHeading}>Location</div><div style={S.summaryValue}>{serviceType === "mobile" ? "Mobile Service" : serviceType === "dropoff" ? "Drop-Off Service" : "N/A"}{serviceType === "mobile" && address && <><br />{address}</>}</div></div>
                 <div style={S.summaryCard}><div style={S.summaryHeading}>{vehicle === "boat" ? "Boat" : "Vehicle"}</div><div style={S.summaryValue}>{vehicleSummary}<br />{selectedVehicle?.label || "N/A"}</div></div>
@@ -1097,8 +1209,24 @@ export default function App() {
                   <div style={S.summaryValue}>
                     {clientType === "oneTime" ? "One-Time Service" : "Maintenance Plan"}
                     {clientType === "maintenance" && frequency && <><br />{frequency === "biweekly" ? "Bi-Weekly" : "Monthly"}</>}
+                    {clientType === "maintenance" && selectedDate && frequency && (
+                      <><br /><span style={{ fontSize: "0.88rem", fontWeight: 400, color: "#059669" }}>{getCadenceLabel(selectedDate, frequency)}</span></>
+                    )}
                   </div>
                 </div>
+                {clientType === "maintenance" && selectedDate && frequency && (
+                  <div style={{ ...S.summaryCard, gridColumn: "1 / -1", background: "#f0fdf4", border: "1px solid #6ee7b7" }}>
+                    <div style={S.summaryHeading}>Recurring Schedule</div>
+                    <div style={{ fontSize: "0.9rem", color: "#065f46", fontWeight: 600, marginBottom: 8 }}>
+                      {getCadenceLabel(selectedDate, frequency)} — first service {formatDateLabel(selectedDate)}
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 4 }}>
+                      {calcRecurringDates(selectedDate, frequency, 6).map((d, i) => (
+                        <div key={i} style={{ fontSize: "0.88rem", color: "#374151" }}>{i + 2}. {d}</div>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 <div style={S.summaryCard}><div style={S.summaryHeading}>Package</div><div style={S.summaryValue}>{selectedVehicle?.label || "N/A"}<br />{pkg === "basic" ? "Basic Detail" : pkg === "premium" ? "Premium Detail" : "N/A"}<br />{estimateText || "N/A"}</div></div>
                 <div style={S.summaryCard}><div style={S.summaryHeading}>Location</div><div style={S.summaryValue}>{serviceType === "mobile" ? "Mobile Service" : serviceType === "dropoff" ? "Drop-Off Service" : "N/A"}<br />{address || "No address provided"}</div></div>
                 <div style={S.summaryCard}><div style={S.summaryHeading}>{vehicle === "boat" ? "Boat" : "Vehicle"}</div><div style={S.summaryValue}>{vehicleSummary}<br />{selectedVehicle?.label || "N/A"}</div></div>
