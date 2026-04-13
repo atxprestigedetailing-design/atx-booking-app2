@@ -11,7 +11,7 @@ const GOOGLE_CLIENT_ID =
   "447699234633-ivo2e1c2q843scj32k5323o2rkq6h7dp.apps.googleusercontent.com";
 
 const SCRIPT_URL =
-  "https://script.google.com/macros/s/AKfycbzXgEiKY68xVN-qtwRofMTNdKxr-6HOR835vsJafxcE22HfFIh1UhLTeu_I0rYhe2klIQ/exec";
+  "https://script.google.com/macros/s/AKfycbwzc5YR9p1-FfoU5fGent2NJwnlUO24uqivy4SRbYCahfNzdjfFu1Sg-Ry0ltuCIoH8bw/exec";
 
 const TOTAL_STEPS = 9;
 
@@ -269,15 +269,13 @@ export default function App() {
     document.body.appendChild(script);
   }, []);
 
-useEffect(() => {
-  if (!googleScriptLoaded || googleUser) return;
-  if (!window.google?.accounts?.id) return;
-  window.google.accounts.id.initialize({
-    client_id: GOOGLE_CLIENT_ID,
-    callback: handleGoogleCredential,
-  });
-}, [googleScriptLoaded, googleUser]);
-
+  useEffect(() => {
+    if (!googleScriptLoaded || googleUser) return;
+    if (!window.google?.accounts?.id) return;
+    window.google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: handleGoogleCredential });
+    const btnEl = document.getElementById("google-signin-btn");
+    if (btnEl) window.google.accounts.id.renderButton(btnEl, { theme: "outline", size: "large", shape: "rectangular", text: "signin_with", logo_alignment: "left" });
+  }, [googleScriptLoaded, googleUser, view, step]);
 
   function handleGoogleCredential(response: any) {
     try {
@@ -386,9 +384,10 @@ useEffect(() => {
   const packageHours = useMemo(() => {
     if (!vehicle || !pkg) return "Select vehicle first";
     if (vehicle === "boat") return pkg === "premium" ? "5-8 hours avg" : "3-6 hours avg";
+    if (clientType === "maintenance") return "2 hours";
     if (vehicle === "truckSuv") return "3-5 hours avg";
     return pkg === "premium" ? "3-5 hours avg" : "3-4 hours avg";
-  }, [vehicle, pkg]);
+  }, [vehicle, pkg, clientType]);
 
   const addOnEstimate = useMemo(() => {
     const all = [...addOnOptions, ...marineAddOnOptions];
@@ -504,30 +503,7 @@ useEffect(() => {
               <button onClick={handleSignOut} style={{ fontSize: "0.8rem", color: "#6b7280", background: "none", border: "1px solid #d1d5db", borderRadius: 8, padding: "4px 10px", cursor: "pointer", marginLeft: 4 }}>Sign out</button>
             </div>
           ) : (
-            <button
-  onClick={() => window.google?.accounts?.id?.prompt()}
-  style={{
-    display: "flex",
-    alignItems: "center",
-    gap: 8,
-    background: "#fff",
-    border: "1px solid #d1d5db",
-    borderRadius: 8,
-    padding: "8px 14px",
-    fontSize: "0.9rem",
-    fontWeight: 600,
-    cursor: "pointer",
-    color: "#374151",
-    boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
-  }}
->
-  <img
-    src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg"
-    alt="Google"
-    style={{ width: 18, height: 18 }}
-  />
-  Sign in with Google
-</button>
+            <div id="google-signin-btn" />
           )}
         </div>
       </div>
@@ -757,17 +733,28 @@ useEffect(() => {
                   <div style={S.optionTitle}>One-Time Service</div>
                   <div style={S.optionMeta}>A single detail appointment. Great for a deep clean, special occasion, or a first visit.</div>
                 </button>
-                <button
-                  style={{ ...S.optionCard, ...(clientType === "maintenance" ? S.selectedGreen : {}) }}
-                  onClick={() => setClientType("maintenance")}
-                >
-                  <div style={{ ...S.optionTitle, color: clientType === "maintenance" ? "#065f46" : "#111827" }}>Maintenance Plan</div>
-                  <div style={S.optionMeta}>Recurring details to keep your vehicle in top condition. Choose bi-weekly or monthly.</div>
-                </button>
+                {vehicle !== "boat" && (
+                  <button
+                    style={{ ...S.optionCard, ...(clientType === "maintenance" ? S.selectedGreen : {}) }}
+                    onClick={() => setClientType("maintenance")}
+                  >
+                    <div style={{ ...S.optionTitle, color: clientType === "maintenance" ? "#065f46" : "#111827" }}>Maintenance Plan</div>
+                    <div style={S.optionMeta}>Recurring 2-hour details to keep your vehicle in top condition. Choose bi-weekly or monthly.</div>
+                  </button>
+                )}
               </div>
 
-              {clientType === "maintenance" && (
+              {vehicle === "boat" && (
+                <div style={{ background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: 14, padding: "12px 16px", marginBottom: 8, fontSize: "0.9rem", color: "#6b7280" }}>
+                  Maintenance plans are not available for boats. Please select One-Time Service.
+                </div>
+              )}
+
+              {clientType === "maintenance" && vehicle !== "boat" && (
                 <div style={{ marginTop: 4, marginBottom: 8 }}>
+                  <div style={{ background: "#fefce8", border: "1px solid #fde68a", borderRadius: 14, padding: "12px 16px", marginBottom: 16, fontSize: "0.9rem", color: "#92400e", lineHeight: 1.6 }}>
+                    To sign up for a maintenance plan, you must have had a detail with us within the last 30 days. If you have not booked yet, select One-Time Service first.
+                  </div>
                   <div style={{ fontWeight: 700, color: "#374151", fontSize: "0.95rem", marginBottom: 12, textAlign: "center" as const }}>
                     How often would you like service?
                   </div>
@@ -777,7 +764,7 @@ useEffect(() => {
                       onClick={() => setFrequency("biweekly")}
                     >
                       <div style={{ ...S.optionTitle, textAlign: "center" as const, color: frequency === "biweekly" ? "#065f46" : "#111827" }}>Bi-Weekly</div>
-                      <div style={S.optionMeta}>Every two weeks. Good for high-use vehicles or boats.</div>
+                      <div style={S.optionMeta}>Every two weeks. Good for high-use vehicles.</div>
                     </button>
                     <button
                       style={{ ...S.optionCard, ...(frequency === "monthly" ? S.selectedGreen : {}), textAlign: "center" as const }}
@@ -815,6 +802,7 @@ useEffect(() => {
                     ? `${formatCurrency(packageType === "basic" ? selectedVehicle.basicRate : selectedVehicle.premiumRate)}/hr`
                     : "Select vehicle first";
                   const timeText = !vehicle ? "Time shown after vehicle selection"
+                    : clientType === "maintenance" ? "2 hours"
                     : vehicle === "boat" ? (packageType === "premium" ? "5-8 hours avg" : "3-6 hours avg")
                     : packageType === "premium" ? "3-5 hours avg"
                     : vehicle === "truckSuv" ? "3-5 hours avg" : "3-4 hours avg";
