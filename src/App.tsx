@@ -1392,8 +1392,7 @@ export default function App() {
                 <div style={styles.successBadge}>✅</div>
                 <h2 style={styles.title}>Booking Request Submitted</h2>
                 <p style={styles.successText}>
-                  Someone will be reaching out to you to confirm your service. This private build is
-                  also showing a booking summary for testing.
+                  Someone will be reaching out to you to confirm your service. 
                 </p>
               </div>
 
