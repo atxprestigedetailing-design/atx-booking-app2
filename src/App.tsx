@@ -269,38 +269,15 @@ export default function App() {
     document.body.appendChild(script);
   }, []);
 
- useEffect(() => {
+useEffect(() => {
   if (!googleScriptLoaded || googleUser) return;
   if (!window.google?.accounts?.id) return;
-
   window.google.accounts.id.initialize({
     client_id: GOOGLE_CLIENT_ID,
     callback: handleGoogleCredential,
   });
 }, [googleScriptLoaded, googleUser]);
 
-useEffect(() => {
-  if (!googleScriptLoaded || googleUser) return;
-  if (!window.google?.accounts?.id) return;
-
-  const interval = setInterval(() => {
-    const btnEl = document.getElementById("google-signin-btn");
-    if (btnEl && btnEl.childElementCount === 0) {
-      window.google.accounts.id.renderButton(btnEl, {
-        theme: "outline",
-        size: "large",
-        shape: "rectangular",
-        text: "signin_with",
-        logo_alignment: "left",
-      });
-    }
-    if (btnEl && btnEl.childElementCount > 0) {
-      clearInterval(interval);
-    }
-  }, 150);
-
-  return () => clearInterval(interval);
-}, [googleScriptLoaded, googleUser, view, step]);
 
   function handleGoogleCredential(response: any) {
     try {
@@ -527,7 +504,30 @@ useEffect(() => {
               <button onClick={handleSignOut} style={{ fontSize: "0.8rem", color: "#6b7280", background: "none", border: "1px solid #d1d5db", borderRadius: 8, padding: "4px 10px", cursor: "pointer", marginLeft: 4 }}>Sign out</button>
             </div>
           ) : (
-            <div id="google-signin-btn" />
+            <button
+  onClick={() => window.google?.accounts?.id?.prompt()}
+  style={{
+    display: "flex",
+    alignItems: "center",
+    gap: 8,
+    background: "#fff",
+    border: "1px solid #d1d5db",
+    borderRadius: 8,
+    padding: "8px 14px",
+    fontSize: "0.9rem",
+    fontWeight: 600,
+    cursor: "pointer",
+    color: "#374151",
+    boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
+  }}
+>
+  <img
+    src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg"
+    alt="Google"
+    style={{ width: 18, height: 18 }}
+  />
+  Sign in with Google
+</button>
           )}
         </div>
       </div>
