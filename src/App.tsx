@@ -13,7 +13,7 @@ const GOOGLE_CLIENT_ID =
   "447699234633-ivo2e1c2q843scj32k5323o2rkq6h7dp.apps.googleusercontent.com";
 
 const SCRIPT_URL =
-  "https://script.google.com/macros/s/AKfycbzbxyRymykGfdAdMO8vXxuC5FepgqAOY5QiZ1pw1laEgytzTt7yjPPbE4upADhFdlptsg/exec";
+  "https://script.google.com/macros/s/AKfycbzXgEiKY68xVN-qtwRofMTNdKxr-6HOR835vsJafxcE22HfFIh1UhLTeu_I0rYhe2klIQ/exec";
 
 const TOTAL_STEPS = 9;
 
