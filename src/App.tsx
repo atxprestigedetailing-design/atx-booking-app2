@@ -1,4 +1,3 @@
-
 import logo from "./assets/logo.png";
 import { useEffect, useMemo, useRef, useState } from "react";
 declare global {
@@ -8,20 +7,22 @@ declare global {
 }
 
 const SCRIPT_URL =
-   "https://script.google.com/macros/s/AKfycbwzc5YR9p1-FfoU5fGent2NJwnlUO24uqivy4SRbYCahfNzdjfFu1Sg-Ry0ltuCIoH8bw/exec";
-   type AvailabilitySlot = {
+  "https://script.google.com/macros/s/AKfycbwzc5YR9p1-FfoU5fGent2NJwnlUO24uqivy4SRbYCahfNzdjfFu1Sg-Ry0ltuCIoH8bw/exec";
+
+type AvailabilitySlot = {
   date: string;
   time: string;
   available?: boolean;
   notes?: string;
 };
- 
+
 async function fetchAllAvailability(): Promise<AvailabilitySlot[]> {
   const res = await fetch(`${SCRIPT_URL}?action=getAllAvailability`);
   const data: { slots: AvailabilitySlot[] } = await res.json();
   return data.slots || [];
 }
-type VehicleType = "truckSuv" | "sedan" | "coupe" | "";
+
+type VehicleType = "truckSuv" | "sedan" | "coupe" | "boat" | "";
 type PackageType = "basic" | "premium" | "";
 type ServiceType = "mobile" | "dropoff" | "";
 type AddOn =
@@ -30,7 +31,12 @@ type AddOn =
   | "Paint Correction"
   | "Pet Hair Removal"
   | "Steam Cleaning"
-  | "Ceramic Coating";
+  | "Ceramic Coating"
+  | "Oxidation Removal"
+  | "Gelcoat Polishing"
+  | "Wet Sanding"
+  | "Interior Deep Extraction"
+  | "Sealant & Protection Upgrade";
 
 const vehicleOptions = [
   {
@@ -51,13 +57,17 @@ const vehicleOptions = [
     basicRate: 65,
     premiumRate: 85,
   },
+  {
+    id: "boat" as VehicleType,
+    label: "Boat",
+    basicRate: 90,
+    premiumRate: 110,
+  },
 ];
 
 function formatDateLabel(dateStr: string) {
   const [year, month, day] = dateStr.split("-").map(Number);
-
-  const date = new Date(year, month - 1, day); // 👈 LOCAL date (no timezone shift)
-
+  const date = new Date(year, month - 1, day);
   return date.toLocaleDateString("en-US", {
     weekday: "short",
     month: "short",
@@ -79,6 +89,18 @@ const addOnOptions: {
   { label: "Ceramic Coating", priceText: "Need consultation" },
 ];
 
+const marineAddOnOptions: {
+  label: AddOn;
+  priceText: string;
+  fixedPrice?: number;
+}[] = [
+  { label: "Oxidation Removal", priceText: "Need consultation" },
+  { label: "Gelcoat Polishing", priceText: "Need consultation" },
+  { label: "Wet Sanding", priceText: "Need consultation" },
+  { label: "Interior Deep Extraction", priceText: "$120", fixedPrice: 120 },
+  { label: "Sealant & Protection Upgrade", priceText: "$80", fixedPrice: 80 },
+];
+
 function formatCurrency(value: number) {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
@@ -98,185 +120,172 @@ export default function App() {
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [year, setYear] = useState("");
-const [make, setMake] = useState("");
-const [model, setModel] = useState("");
-const [selectedDate, setSelectedDate] = useState("");
-const [availableSlots, setAvailableSlots] = useState<AvailabilitySlot[]>([]);
-const [allAvailableSlots, setAllAvailableSlots] = useState<AvailabilitySlot[]>([]);
-const [availableDates, setAvailableDates] = useState<string[]>([]);
-const [selectedTime, setSelectedTime] = useState("");
-const [address, setAddress] = useState("");
-const [street, setStreet] = useState("");
-const [city, setCity] = useState("");
-const [stateRegion, setStateRegion] = useState("");
-const [zip, setZip] = useState("");
-const [placeId, setPlaceId] = useState("");
-const [lat, setLat] = useState("");
-const [lng, setLng] = useState("");
-const [addressSelected, setAddressSelected] = useState(false);
-const currentYear = new Date().getFullYear();
-const yearOptions = Array.from(
-  { length: currentYear - 1995 + 1 },
-  (_, i) => String(currentYear - i)
-);
-
-const [makeOptions, setMakeOptions] = useState<string[]>([]);
-const [modelOptions, setModelOptions] = useState<string[]>([]);
-const [loadingMakes, setLoadingMakes] = useState(false);
-const [loadingModels, setLoadingModels] = useState(false);
-
-useEffect(() => {
-  const loadMakes = async () => {
-    try {
-      setLoadingMakes(true);
-
-      const vehicleTypeForApi =
-        vehicle === "truckSuv" ? "truck" : "car";
-
-      const res = await fetch(
-        `https://vpic.nhtsa.dot.gov/api/vehicles/GetMakesForVehicleType/${vehicleTypeForApi}?format=json`
-      );
-      const data = await res.json();
-
-      const makes =
-        data.Results?.map((item: any) => item.MakeName || item.Make_Name)
-          .filter(Boolean)
-          .sort((a: string, b: string) => a.localeCompare(b)) || [];
-
-      setMakeOptions(makes);
-    } catch (err) {
-      console.error("Error loading makes", err);
-      setMakeOptions([]);
-    } finally {
-      setLoadingMakes(false);
-    }
-  };
-
-  if (vehicle) {
-    loadMakes();
-  } else {
-    setMakeOptions([]);
-  }
-}, [vehicle]);
-
-useEffect(() => {
-  const loadModels = async () => {
-    if (!year || !make || !vehicle) {
-      setModelOptions([]);
-      return;
-    }
-
-    try {
-      setLoadingModels(true);
-
-      const vehicleTypeForApi =
-        vehicle === "truckSuv" ? "truck" : "car";
-
-      const res = await fetch(
-        `https://vpic.nhtsa.dot.gov/api/vehicles/GetModelsForMakeYear/make/${encodeURIComponent(
-          make
-        )}/modelyear/${year}/vehicletype/${vehicleTypeForApi}?format=json`
-      );
-      const data = await res.json();
-
-      const models =
-        data.Results?.map((item: any) => item.Model_Name)
-          .filter(Boolean)
-          .sort((a: string, b: string) => a.localeCompare(b)) || [];
-
-      setModelOptions(models);
-    } catch (err) {
-      console.error("Error loading models", err);
-      setModelOptions([]);
-    } finally {
-      setLoadingModels(false);
-    }
-  };
-
-  loadModels();
-}, [year, make, vehicle]);
-
-useEffect(() => {
-  if (step !== 4 || serviceType !== "mobile") return;
-  if (!window.google?.maps?.places) return;
-  if (!addressInputRef.current) return;
-
-  const autocomplete = new window.google.maps.places.Autocomplete(
-    addressInputRef.current,
-    {
-      types: ["address"],
-      componentRestrictions: { country: "us" },
-      fields: ["address_components", "formatted_address", "geometry", "place_id"],
-    }
+  const [make, setMake] = useState("");
+  const [model, setModel] = useState("");
+  const [boatMake, setBoatMake] = useState("");
+  const [boatModel, setBoatModel] = useState("");
+  const [boatSize, setBoatSize] = useState("");
+  const [selectedDate, setSelectedDate] = useState("");
+  const [availableSlots, setAvailableSlots] = useState<AvailabilitySlot[]>([]);
+  const [allAvailableSlots, setAllAvailableSlots] = useState<AvailabilitySlot[]>([]);
+  const [availableDates, setAvailableDates] = useState<string[]>([]);
+  const [selectedTime, setSelectedTime] = useState("");
+  const [address, setAddress] = useState("");
+  const [street, setStreet] = useState("");
+  const [city, setCity] = useState("");
+  const [stateRegion, setStateRegion] = useState("");
+  const [zip, setZip] = useState("");
+  const [placeId, setPlaceId] = useState("");
+  const [lat, setLat] = useState("");
+  const [lng, setLng] = useState("");
+  const [addressSelected, setAddressSelected] = useState(false);
+  const currentYear = new Date().getFullYear();
+  const yearOptions = Array.from(
+    { length: currentYear - 1995 + 1 },
+    (_, i) => String(currentYear - i)
   );
 
-  const listener = autocomplete.addListener("place_changed", () => {
-    const place = autocomplete.getPlace();
-    if (!place?.address_components) return;
+  const [makeOptions, setMakeOptions] = useState<string[]>([]);
+  const [modelOptions, setModelOptions] = useState<string[]>([]);
+  const [loadingMakes, setLoadingMakes] = useState(false);
+  const [loadingModels, setLoadingModels] = useState(false);
 
-    let streetNumber = "";
-    let route = "";
-    let locality = "";
-    let adminArea = "";
-    let postalCode = "";
+  useEffect(() => {
+    const loadMakes = async () => {
+      try {
+        setLoadingMakes(true);
+        const vehicleTypeForApi = vehicle === "truckSuv" ? "truck" : "car";
+        const res = await fetch(
+          `https://vpic.nhtsa.dot.gov/api/vehicles/GetMakesForVehicleType/${vehicleTypeForApi}?format=json`
+        );
+        const data = await res.json();
+        const makes =
+          data.Results?.map((item: any) => item.MakeName || item.Make_Name)
+            .filter(Boolean)
+            .sort((a: string, b: string) => a.localeCompare(b)) || [];
+        setMakeOptions(makes);
+      } catch (err) {
+        console.error("Error loading makes", err);
+        setMakeOptions([]);
+      } finally {
+        setLoadingMakes(false);
+      }
+    };
 
-    place.address_components.forEach((component: any) => {
-      const types = component.types;
+    if (vehicle && vehicle !== "boat") {
+      loadMakes();
+    } else {
+      setMakeOptions([]);
+    }
+  }, [vehicle]);
 
-      if (types.includes("street_number")) streetNumber = component.long_name;
-      if (types.includes("route")) route = component.long_name;
-      if (types.includes("locality")) locality = component.long_name;
-      if (types.includes("administrative_area_level_1")) adminArea = component.short_name;
-      if (types.includes("postal_code")) postalCode = component.long_name;
+  useEffect(() => {
+    const loadModels = async () => {
+      if (!year || !make || !vehicle || vehicle === "boat") {
+        setModelOptions([]);
+        return;
+      }
+      try {
+        setLoadingModels(true);
+        const vehicleTypeForApi = vehicle === "truckSuv" ? "truck" : "car";
+        const res = await fetch(
+          `https://vpic.nhtsa.dot.gov/api/vehicles/GetModelsForMakeYear/make/${encodeURIComponent(
+            make
+          )}/modelyear/${year}/vehicletype/${vehicleTypeForApi}?format=json`
+        );
+        const data = await res.json();
+        const models =
+          data.Results?.map((item: any) => item.Model_Name)
+            .filter(Boolean)
+            .sort((a: string, b: string) => a.localeCompare(b)) || [];
+        setModelOptions(models);
+      } catch (err) {
+        console.error("Error loading models", err);
+        setModelOptions([]);
+      } finally {
+        setLoadingModels(false);
+      }
+    };
+
+    loadModels();
+  }, [year, make, vehicle]);
+
+  useEffect(() => {
+    if (step !== 4 || serviceType !== "mobile") return;
+    if (!window.google?.maps?.places) return;
+    if (!addressInputRef.current) return;
+
+    const autocomplete = new window.google.maps.places.Autocomplete(
+      addressInputRef.current,
+      {
+        types: ["address"],
+        componentRestrictions: { country: "us" },
+        fields: ["address_components", "formatted_address", "geometry", "place_id"],
+      }
+    );
+
+    const listener = autocomplete.addListener("place_changed", () => {
+      const place = autocomplete.getPlace();
+      if (!place?.address_components) return;
+
+      let streetNumber = "";
+      let route = "";
+      let locality = "";
+      let adminArea = "";
+      let postalCode = "";
+
+      place.address_components.forEach((component: any) => {
+        const types = component.types;
+        if (types.includes("street_number")) streetNumber = component.long_name;
+        if (types.includes("route")) route = component.long_name;
+        if (types.includes("locality")) locality = component.long_name;
+        if (types.includes("administrative_area_level_1")) adminArea = component.short_name;
+        if (types.includes("postal_code")) postalCode = component.long_name;
+      });
+
+      const streetValue = [streetNumber, route].filter(Boolean).join(" ");
+      setAddress(place.formatted_address || "");
+      setStreet(streetValue);
+      setCity(locality);
+      setStateRegion(adminArea);
+      setZip(postalCode);
+      setPlaceId(place.place_id || "");
+      setLat(place.geometry?.location?.lat?.() ?? "");
+      setLng(place.geometry?.location?.lng?.() ?? "");
+      setAddressSelected(true);
     });
 
-    const streetValue = [streetNumber, route].filter(Boolean).join(" ");
+    return () => {
+      if (listener) {
+        window.google.maps.event.removeListener(listener);
+      }
+    };
+  }, [step, serviceType]);
 
-    setAddress(place.formatted_address || "");
-    setStreet(streetValue);
-    setCity(locality);
-    setStateRegion(adminArea);
-    setZip(postalCode);
-    setPlaceId(place.place_id || "");
-    setLat(place.geometry?.location?.lat?.() ?? "");
-    setLng(place.geometry?.location?.lng?.() ?? "");
-    setAddressSelected(true);
-  });
+  useEffect(() => {
+    const loadAllAvailability = async () => {
+      try {
+        const slots = await fetchAllAvailability();
+        setAllAvailableSlots(slots);
+        const uniqueDates = [...new Set(slots.map((slot) => slot.date))];
+        setAvailableDates(uniqueDates);
+      } catch (err) {
+        console.error("Error loading all availability", err);
+        setAllAvailableSlots([]);
+        setAvailableDates([]);
+      }
+    };
+    loadAllAvailability();
+  }, []);
 
-  return () => {
-    if (listener) {
-      window.google.maps.event.removeListener(listener);
+  useEffect(() => {
+    if (!selectedDate) {
+      setAvailableSlots([]);
+      return;
     }
-  };
-}, [step, serviceType]);
-
-
-useEffect(() => {
-  const loadAllAvailability = async () => {
-    try {
-      const slots = await fetchAllAvailability();
-      setAllAvailableSlots(slots);
-
-      const uniqueDates = [...new Set(slots.map((slot) => slot.date))];
-      setAvailableDates(uniqueDates);
-    } catch (err) {
-      console.error("Error loading all availability", err);
-      setAllAvailableSlots([]);
-      setAvailableDates([]);
-    }
-  };
-
-  loadAllAvailability();
-}, []);
-useEffect(() => {
-  if (!selectedDate) {
-    setAvailableSlots([]);
-    return;
-  }
-
-  const filtered = allAvailableSlots.filter((slot) => slot.date === selectedDate);
-  setAvailableSlots(filtered);
-}, [selectedDate, allAvailableSlots]);
+    const filtered = allAvailableSlots.filter((slot) => slot.date === selectedDate);
+    setAvailableSlots(filtered);
+  }, [selectedDate, allAvailableSlots]);
 
   const selectedVehicle = vehicleOptions.find((v) => v.id === vehicle);
 
@@ -287,6 +296,7 @@ useEffect(() => {
 
   const packageHours = useMemo(() => {
     if (!vehicle || !pkg) return "Select vehicle first";
+    if (vehicle === "boat") return pkg === "premium" ? "5–8 hours avg" : "3–6 hours avg";
     if (vehicle === "truckSuv") return "3–5 hours avg";
     if (vehicle === "sedan") return pkg === "premium" ? "3–5 hours avg" : "3–4 hours avg";
     if (vehicle === "coupe") return pkg === "premium" ? "3–5 hours avg" : "3–4 hours avg";
@@ -295,7 +305,8 @@ useEffect(() => {
 
   const addOnEstimate = useMemo(() => {
     return addOns.reduce((sum, selected) => {
-      const found = addOnOptions.find((option) => option.label === selected);
+      const allOptions = [...addOnOptions, ...marineAddOnOptions];
+      const found = allOptions.find((option) => option.label === selected);
       return sum + (found?.fixedPrice ?? 0);
     }, 0);
   }, [addOns]);
@@ -325,327 +336,341 @@ useEffect(() => {
   }
 
   const styles = {
-  page: {
-    minHeight: "100vh",
-    background: "linear-gradient(180deg, #f7f7f8 0%, #efeff1 100%)",
-    color: "#171717",
-    padding: "32px 16px",
-    fontFamily:
-      'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-  } as const,
-  container: {
-    maxWidth: 920,
-    margin: "0 auto",
-  } as const,
-brand: {
-  display: "flex",
-  justifyContent: "center",
-  marginBottom: 32,
-} as const,
-brandRow: {
-  display: "grid",
-  gridTemplateColumns: "110px auto",
-  alignItems: "center",
-  gap: 20,
-  maxWidth: 760,
-  width: "100%",
-} as const,
+    page: {
+      minHeight: "100vh",
+      background: "linear-gradient(180deg, #f7f7f8 0%, #efeff1 100%)",
+      color: "#171717",
+      padding: "32px 16px",
+      fontFamily:
+        'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    } as const,
+    container: {
+      maxWidth: 920,
+      margin: "0 auto",
+    } as const,
+    brand: {
+      display: "flex",
+      justifyContent: "center",
+      marginBottom: 32,
+    } as const,
+    brandRow: {
+      display: "grid",
+      gridTemplateColumns: "110px auto",
+      alignItems: "center",
+      gap: 20,
+      maxWidth: 760,
+      width: "100%",
+    } as const,
+    logo: {
+      width: 110,
+      height: 110,
+      objectFit: "contain" as const,
+      opacity: 1,
+    },
+    brandTitle: {
+      fontSize: "2.8rem",
+      fontWeight: 800,
+      letterSpacing: "-1px",
+      color: "#111827",
+      margin: 0,
+      lineHeight: 1.05,
+    },
+    brandSub: {
+      color: "#6b7280",
+      fontSize: "1.05rem",
+      marginTop: 10,
+      marginBottom: 0,
+      lineHeight: 1.45,
+      fontStyle: "italic",
+    },
+    progressWrap: {
+      marginBottom: 28,
+    },
+    progressText: {
+      display: "flex",
+      justifyContent: "space-between",
+      color: "#6b7280",
+      fontSize: "0.9rem",
+      marginBottom: 8,
+    },
+    progressBar: {
+      height: 8,
+      background: "#e5e7eb",
+      borderRadius: 999,
+      overflow: "hidden",
+      border: "1px solid #d1d5db",
+    } as const,
+    progressFill: {
+      height: "100%",
+      width: `${((step + 1) / 8) * 100}%`,
+      background: "linear-gradient(90deg, #6b7280 0%, #9ca3af 100%)",
+      borderRadius: 999,
+      transition: "width 0.25s ease",
+    },
+    card: {
+      background: "rgba(255, 255, 255, 0.96)",
+      border: "1px solid #e5e7eb",
+      borderRadius: 24,
+      boxShadow: "0 18px 45px rgba(17, 24, 39, 0.08)",
+      padding: 28,
+    } as const,
+    title: {
+      fontSize: "3rem",
+      fontWeight: 800,
+      letterSpacing: "-1px",
+      color: "#111827",
+      margin: "0 0 14px",
+      textAlign: "center" as const,
+    },
+    subtitle: {
+      fontSize: "1rem",
+      color: "#6b7280",
+      margin: "0 0 28px",
+      textAlign: "center" as const,
+    },
+    primaryButton: {
+      background: "#111827",
+      color: "#ffffff",
+      border: "none",
+      borderRadius: 14,
+      padding: "14px 20px",
+      fontSize: "1rem",
+      fontWeight: 700,
+      cursor: "pointer",
+      boxShadow: "0 10px 24px rgba(17, 24, 39, 0.16)",
+    } as const,
+    secondaryButton: {
+      background: "#ffffff",
+      color: "#111827",
+      border: "1px solid #d1d5db",
+      borderRadius: 14,
+      padding: "13px 18px",
+      fontSize: "1rem",
+      fontWeight: 600,
+      cursor: "pointer",
+    } as const,
+    disabledButton: {
+      opacity: 0.45,
+      cursor: "not-allowed",
+    } as const,
+    heroButtonWrap: {
+      display: "flex",
+      justifyContent: "center",
+      padding: "10px 0 2px",
+    },
+    optionGrid: {
+      display: "grid",
+      gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+      gap: 14,
+      marginBottom: 20,
+    } as const,
+    optionCard: {
+      background: "#ffffff",
+      border: "1px solid #e5e7eb",
+      borderRadius: 18,
+      padding: 18,
+      cursor: "pointer",
+      textAlign: "left" as const,
+      transition: "all 0.2s ease",
+    },
+    selectedCard: {
+      border: "2px solid #2563eb",
+      background: "#eff6ff",
+      boxShadow: "0 0 0 2px rgba(37, 99, 235, 0.1)",
+    },
+    optionTitle: {
+      fontWeight: 700,
+      fontSize: "1.05rem",
+      marginBottom: 8,
+      color: "#111827",
+    },
+    optionMeta: {
+      color: "#6b7280",
+      fontSize: "0.95rem",
+      lineHeight: 1.45,
+    },
+    estimateBox: {
+      background: "#f9fafb",
+      border: "1px solid #e5e7eb",
+      borderRadius: 16,
+      padding: 16,
+      textAlign: "center" as const,
+      marginTop: 6,
+    } as const,
+    estimateLabel: {
+      color: "#6b7280",
+      fontSize: "0.95rem",
+      marginBottom: 6,
+    },
+    estimateValue: {
+      fontSize: "1.05rem",
+      fontWeight: 800,
+      color: "#111827",
+      lineHeight: 1.5,
+    },
+    noteBox: {
+      marginTop: 14,
+      background: "#f3f4f6",
+      border: "1px solid #e5e7eb",
+      borderRadius: 16,
+      padding: 14,
+      color: "#374151",
+      textAlign: "center" as const,
+      lineHeight: 1.45,
+    } as const,
+    addOnGrid: {
+      display: "grid",
+      gap: 12,
+      marginBottom: 18,
+    } as const,
+    addOnRow: {
+      display: "flex",
+      alignItems: "center",
+      gap: 14,
+      padding: 16,
+      borderRadius: 16,
+      border: "1px solid #e5e7eb",
+      background: "#ffffff",
+      cursor: "pointer",
+      justifyContent: "space-between",
+      flexWrap: "wrap" as const,
+    },
+    checkWrap: {
+      display: "flex",
+      alignItems: "center",
+      gap: 12,
+      flex: 1,
+      minWidth: 220,
+    },
+    checkbox: {
+      width: 18,
+      height: 18,
+      accentColor: "#111827",
+    },
+    addOnPrice: {
+      color: "#374151",
+      fontWeight: 700,
+    },
+    inputGrid: {
+      display: "grid",
+      gap: 14,
+      maxWidth: 560,
+      margin: "0 auto",
+    } as const,
+    input: {
+      width: "100%",
+      boxSizing: "border-box" as const,
+      background: "#ffffff",
+      color: "#111827",
+      border: "1px solid #d1d5db",
+      borderRadius: 14,
+      padding: "14px 16px",
+      fontSize: "1rem",
+      outline: "none",
+    },
+    buttonRow: {
+      display: "flex",
+      justifyContent: "space-between",
+      gap: 12,
+      flexWrap: "wrap" as const,
+      marginTop: 24,
+    },
+    rightButtons: {
+      display: "flex",
+      gap: 12,
+      marginLeft: "auto",
+    } as const,
+    summaryGrid: {
+      display: "grid",
+      gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+      gap: 14,
+      marginTop: 22,
+    } as const,
+    summaryCard: {
+      background: "#ffffff",
+      border: "1px solid #e5e7eb",
+      borderRadius: 16,
+      padding: 16,
+    },
+    sectionLabel: {
+      fontSize: "0.95rem",
+      fontWeight: 700,
+      color: "#374151",
+      marginTop: 6,
+      marginBottom: -4,
+      textAlign: "left" as const,
+    },
+    vehicleRow: {
+      display: "flex",
+      gap: 10,
+      alignItems: "center",
+    } as const,
+    summaryHeading: {
+      fontSize: "0.92rem",
+      color: "#6b7280",
+      marginBottom: 8,
+      textTransform: "uppercase" as const,
+      letterSpacing: "0.04em",
+    },
+    summaryValue: {
+      fontSize: "1rem",
+      fontWeight: 700,
+      lineHeight: 1.5,
+      color: "#111827",
+      wordBreak: "break-word" as const,
+    },
+    submittedWrap: {
+      textAlign: "center" as const,
+      padding: "10px 0",
+    },
+    successBadge: {
+      fontSize: "3rem",
+      marginBottom: 6,
+    },
+    successText: {
+      fontSize: "1.05rem",
+      color: "#4b5563",
+      lineHeight: 1.6,
+      maxWidth: 620,
+      margin: "0 auto 24px",
+    },
+  };
 
+  // Determine vehicle display string for summaries
+  const vehicleSummary =
+    vehicle === "boat"
+      ? [boatSize, boatMake, boatModel].filter(Boolean).join(" ") || "N/A"
+      : [year, make, model].filter(Boolean).join(" ") || "N/A";
 
-logo: {
-  width: 110,
-  height: 110,
-  objectFit: "contain" as const,
-  opacity: 1,
-},
- brandTitle: {
-  fontSize: "2.8rem",
-  fontWeight: 800,
-  letterSpacing: "-1px",
-  color: "#111827",
-  margin: 0,
-  lineHeight: 1.05,
-},
- brandSub: {
-  color: "#6b7280",
-  fontSize: "1.05rem",
-  marginTop: 10,
-  marginBottom: 0,
-  lineHeight: 1.45,
-  fontStyle: "italic",
-},
-  progressWrap: {
-    marginBottom: 28,
-  },
-  progressText: {
-    display: "flex",
-    justifyContent: "space-between",
-    color: "#6b7280",
-    fontSize: "0.9rem",
-    marginBottom: 8,
-  },
-  progressBar: {
-    height: 8,
-    background: "#e5e7eb",
-    borderRadius: 999,
-    overflow: "hidden",
-    border: "1px solid #d1d5db",
-  } as const,
-  progressFill: {
-    height: "100%",
-    width: `${((step + 1) / 8) * 100}%`,
-    background: "linear-gradient(90deg, #6b7280 0%, #9ca3af 100%)",
-    borderRadius: 999,
-    transition: "width 0.25s ease",
-  },
-  card: {
-    background: "rgba(255, 255, 255, 0.96)",
-    border: "1px solid #e5e7eb",
-    borderRadius: 24,
-    boxShadow: "0 18px 45px rgba(17, 24, 39, 0.08)",
-    padding: 28,
-  } as const,
-  title: {
-  fontSize: "3rem",
-  fontWeight: 800,
-  letterSpacing: "-1px",
-  color: "#111827",
-  margin: "0 0 14px",
-  textAlign: "center" as const,
-},
-  subtitle: {
-  fontSize: "1rem",
-  color: "#6b7280",
-  margin: "0 0 28px",
-  textAlign: "center" as const,
-},
-  primaryButton: {
-    background: "#111827",
-    color: "#ffffff",
-    border: "none",
-    borderRadius: 14,
-    padding: "14px 20px",
-    fontSize: "1rem",
-    fontWeight: 700,
-    cursor: "pointer",
-    boxShadow: "0 10px 24px rgba(17, 24, 39, 0.16)",
-  } as const,
-  secondaryButton: {
-    background: "#ffffff",
-    color: "#111827",
-    border: "1px solid #d1d5db",
-    borderRadius: 14,
-    padding: "13px 18px",
-    fontSize: "1rem",
-    fontWeight: 600,
-    cursor: "pointer",
-  } as const,
-  disabledButton: {
-    opacity: 0.45,
-    cursor: "not-allowed",
-  } as const,
-  heroButtonWrap: {
-    display: "flex",
-    justifyContent: "center",
-    padding: "10px 0 2px",
-  },
-  optionGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-    gap: 14,
-    marginBottom: 20,
-  } as const,
-  optionCard: {
-  background: "#ffffff",
-  border: "1px solid #e5e7eb",
-  borderRadius: 18,
-  padding: 18,
-  cursor: "pointer",
-  textAlign: "left" as const,
-  transition: "all 0.2s ease",
-},
-  selectedCard: {
-  border: "2px solid #2563eb",
-  background: "#eff6ff",
-  boxShadow: "0 0 0 2px rgba(37, 99, 235, 0.1)",
-},
-  optionTitle: {
-  fontWeight: 700,
-  fontSize: "1.05rem",
-  marginBottom: 8,
-  color: "#111827",
-},
-  optionMeta: {
-  color: "#6b7280",
-  fontSize: "0.95rem",
-  lineHeight: 1.45,
-},
-  estimateBox: {
-    background: "#f9fafb",
-    border: "1px solid #e5e7eb",
-    borderRadius: 16,
-    padding: 16,
-    textAlign: "center" as const,
-    marginTop: 6,
-  } as const,
-  estimateLabel: {
-    color: "#6b7280",
-    fontSize: "0.95rem",
-    marginBottom: 6,
-  },
-  estimateValue: {
-    fontSize: "1.05rem",
-    fontWeight: 800,
-    color: "#111827",
-    lineHeight: 1.5,
-  },
-  noteBox: {
-    marginTop: 14,
-    background: "#f3f4f6",
-    border: "1px solid #e5e7eb",
-    borderRadius: 16,
-    padding: 14,
-    color: "#374151",
-    textAlign: "center" as const,
-    lineHeight: 1.45,
-  } as const,
-  addOnGrid: {
-    display: "grid",
-    gap: 12,
-    marginBottom: 18,
-  } as const,
-  addOnRow: {
-    display: "flex",
-    alignItems: "center",
-    gap: 14,
-    padding: 16,
-    borderRadius: 16,
-    border: "1px solid #e5e7eb",
-    background: "#ffffff",
-    cursor: "pointer",
-    justifyContent: "space-between",
-    flexWrap: "wrap" as const,
-  },
-  checkWrap: {
-    display: "flex",
-    alignItems: "center",
-    gap: 12,
-    flex: 1,
-    minWidth: 220,
-  },
-  checkbox: {
-    width: 18,
-    height: 18,
-    accentColor: "#111827",
-  },
-  addOnPrice: {
-    color: "#374151",
-    fontWeight: 700,
-  },
-  inputGrid: {
-    display: "grid",
-    gap: 14,
-    maxWidth: 560,
-    margin: "0 auto",
-  } as const,
-  input: {
-    width: "100%",
-    boxSizing: "border-box" as const,
-    background: "#ffffff",
-    color: "#111827",
-    border: "1px solid #d1d5db",
-    borderRadius: 14,
-    padding: "14px 16px",
-    fontSize: "1rem",
-    outline: "none",
-  },
-  buttonRow: {
-    display: "flex",
-    justifyContent: "space-between",
-    gap: 12,
-    flexWrap: "wrap" as const,
-    marginTop: 24,
-  },
-  rightButtons: {
-    display: "flex",
-    gap: 12,
-    marginLeft: "auto",
-  } as const,
-  summaryGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-    gap: 14,
-    marginTop: 22,
-  } as const,
-  summaryCard: {
-    background: "#ffffff",
-    border: "1px solid #e5e7eb",
-    borderRadius: 16,
-    padding: 16,
-  },
-  sectionLabel: {
-  fontSize: "0.95rem",
-  fontWeight: 700,
-  color: "#374151",
-  marginTop: 6,
-  marginBottom: -4,
-  textAlign: "left" as const,
-},
-
-vehicleRow: {
-  display: "flex",
-  gap: 10,
-  alignItems: "center",
-} as const,
-  summaryHeading: {
-    fontSize: "0.92rem",
-    color: "#6b7280",
-    marginBottom: 8,
-    textTransform: "uppercase" as const,
-    letterSpacing: "0.04em",
-  },
-  summaryValue: {
-    fontSize: "1rem",
-    fontWeight: 700,
-    lineHeight: 1.5,
-    color: "#111827",
-    wordBreak: "break-word" as const,
-  },
-  submittedWrap: {
-    textAlign: "center" as const,
-    padding: "10px 0",
-  },
-  successBadge: {
-    fontSize: "3rem",
-    marginBottom: 6,
-  },
-  successText: {
-    fontSize: "1.05rem",
-    color: "#4b5563",
-    lineHeight: 1.6,
-    maxWidth: 620,
-    margin: "0 auto 24px",
-  },
-};
+  // Step 5 Next button disabled logic
+  const step5Disabled =
+    !name ||
+    !phone ||
+    !email ||
+    !selectedDate ||
+    !selectedTime ||
+    (vehicle === "boat"
+      ? !boatSize || !boatMake || !boatModel
+      : !year || !make || !model);
 
   return (
     <div style={styles.page}>
       <div style={styles.container}>
-<div style={styles.brand}>
-  <div style={styles.brandRow}>
-    <img
-      src={logo}
-      alt="ATX Prestige Detailing logo"
-      style={styles.logo}
-    />
-    <div>
-      <h1 style={styles.brandTitle}>ATX Prestige Detailing</h1>
-      <p style={styles.brandSub}>
-        Defined by Detail, Driven by Standards, Trusted for Prestige
-      </p>
-    </div>
-  </div>
-</div>
+        <div style={styles.brand}>
+          <div style={styles.brandRow}>
+            <img
+              src={logo}
+              alt="ATX Prestige Detailing logo"
+              style={styles.logo}
+            />
+            <div>
+              <h1 style={styles.brandTitle}>ATX Prestige Detailing</h1>
+              <p style={styles.brandSub}>
+                Defined by Detail, Driven by Standards, Trusted for Prestige
+              </p>
+            </div>
+          </div>
+        </div>
 
         <div style={styles.progressWrap}>
           <div style={styles.progressText}>
@@ -658,6 +683,7 @@ vehicleRow: {
         </div>
 
         <div style={styles.card}>
+          {/* ── STEP 0: Landing ── */}
           {step === 0 && (
             <>
               <h2 style={styles.title}>Book a Detail Service</h2>
@@ -669,6 +695,7 @@ vehicleRow: {
             </>
           )}
 
+          {/* ── STEP 1: Vehicle Type ── */}
           {step === 1 && (
             <>
               <h2 style={styles.title}>Choose a Vehicle Type</h2>
@@ -685,15 +712,17 @@ vehicleRow: {
                         ...(isSelected ? styles.selectedCard : {}),
                       }}
                       onClick={() => {
-  setVehicle(option.id);
-  setPkg("");
-
-  // 👇 ADD THIS
-  setMake("");
-  setModel("");
-  setMakeOptions([]);
-  setModelOptions([]);
-}}
+                        setVehicle(option.id);
+                        setPkg("");
+                        setMake("");
+                        setModel("");
+                        setMakeOptions([]);
+                        setModelOptions([]);
+                        setBoatMake("");
+                        setBoatModel("");
+                        setBoatSize("");
+                        setAddOns([]);
+                      }}
                     >
                       <div style={styles.optionTitle}>{option.label}</div>
                       <div style={styles.optionMeta}>
@@ -724,6 +753,7 @@ vehicleRow: {
             </>
           )}
 
+          {/* ── STEP 2: Package ── */}
           {step === 2 && (
             <>
               <h2 style={styles.title}>Choose a Detail Package</h2>
@@ -740,13 +770,19 @@ vehicleRow: {
                           : selectedVehicle.premiumRate
                       )}/hr`
                     : "Select vehicle first";
-                  const timeText = !vehicle
-                    ? "Average time shown after vehicle selection"
-                    : packageType === "premium"
-                    ? "3–5 hours avg"
-                    : vehicle === "truckSuv"
-                    ? "3–5 hours avg"
-                    : "3–4 hours avg";
+
+                  let timeText = "";
+                  if (!vehicle) {
+                    timeText = "Average time shown after vehicle selection";
+                  } else if (vehicle === "boat") {
+                    timeText = packageType === "premium" ? "5–8 hours avg" : "3–6 hours avg";
+                  } else if (packageType === "premium") {
+                    timeText = "3–5 hours avg";
+                  } else if (vehicle === "truckSuv") {
+                    timeText = "3–5 hours avg";
+                  } else {
+                    timeText = "3–4 hours avg";
+                  }
 
                   return (
                     <button
@@ -768,14 +804,17 @@ vehicleRow: {
                 })}
               </div>
 
-              <div style={{
-  marginTop: 8,
-  fontSize: "0.9rem",
-  color: "#6b7280",
-  fontStyle: "italic"
-}}>
-  Estimated time is based on the condition of the vehicle and may vary at the time of service.
-</div>
+              <div
+                style={{
+                  marginTop: 8,
+                  fontSize: "0.9rem",
+                  color: "#6b7280",
+                  fontStyle: "italic",
+                }}
+              >
+                Estimated time is based on the condition of the vehicle and may vary at the time of
+                service.
+              </div>
 
               <div style={styles.estimateBox}>
                 <div style={styles.estimateLabel}>Estimate</div>
@@ -783,22 +822,22 @@ vehicleRow: {
               </div>
 
               <div style={styles.noteBox}>
-                If wanting to see what’s included in basic/premium packages go to
+                If wanting to see what's included in basic/premium packages go to
                 <br />
                 <a
-  href="https://ATXPrestigeDetailing.com"
-  target="_blank"
-  rel="noopener noreferrer"
-  style={{
-  color: "#111827",
-  textDecoration: "none",
-  fontWeight: 600,
-  fontStyle:"italic",
-  borderBottom: "1px solid #d1d5db",
-}}
->
-  ATXPrestigeDetailing.com
-</a>
+                  href="https://ATXPrestigeDetailing.com"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    color: "#111827",
+                    textDecoration: "none",
+                    fontWeight: 600,
+                    fontStyle: "italic",
+                    borderBottom: "1px solid #d1d5db",
+                  }}
+                >
+                  ATXPrestigeDetailing.com
+                </a>
               </div>
 
               <div style={styles.buttonRow}>
@@ -821,13 +860,18 @@ vehicleRow: {
             </>
           )}
 
+          {/* ── STEP 3: Add-Ons (auto or marine) ── */}
           {step === 3 && (
             <>
               <h2 style={styles.title}>Choose Add-Ons</h2>
-              <p style={styles.subtitle}>Optional upgrades for the appointment.</p>
+              <p style={styles.subtitle}>
+                {vehicle === "boat"
+                  ? "Optional marine upgrades for the appointment."
+                  : "Optional upgrades for the appointment."}
+              </p>
 
               <div style={styles.addOnGrid}>
-                {addOnOptions.map((option) => (
+                {(vehicle === "boat" ? marineAddOnOptions : addOnOptions).map((option) => (
                   <label key={option.label} style={styles.addOnRow}>
                     <div style={styles.checkWrap}>
                       <input
@@ -864,6 +908,7 @@ vehicleRow: {
             </>
           )}
 
+          {/* ── STEP 4: Mobile or Drop-Off ── */}
           {step === 4 && (
             <>
               <h2 style={styles.title}>Mobile or Drop-Off Service</h2>
@@ -876,9 +921,9 @@ vehicleRow: {
                     ...(serviceType === "mobile" ? styles.selectedCard : {}),
                   }}
                   onClick={() => {
-  setServiceType("mobile");
-  setAddressSelected(false);
-}}
+                    setServiceType("mobile");
+                    setAddressSelected(false);
+                  }}
                 >
                   <div style={styles.optionTitle}>Mobile Service</div>
                   <div style={styles.optionMeta}>
@@ -892,17 +937,17 @@ vehicleRow: {
                     ...(serviceType === "dropoff" ? styles.selectedCard : {}),
                   }}
                   onClick={() => {
-  setServiceType("dropoff");
-  setAddress("");
-  setStreet("");
-  setCity("");
-  setStateRegion("");
-  setZip("");
-  setPlaceId("");
-  setLat("");
-  setLng("");
-  setAddressSelected(false);
-}}
+                    setServiceType("dropoff");
+                    setAddress("");
+                    setStreet("");
+                    setCity("");
+                    setStateRegion("");
+                    setZip("");
+                    setPlaceId("");
+                    setLat("");
+                    setLng("");
+                    setAddressSelected(false);
+                  }}
                 >
                   <div style={styles.optionTitle}>Drop-Off Service</div>
                   <div style={styles.optionMeta}>
@@ -914,16 +959,16 @@ vehicleRow: {
               {serviceType === "mobile" && (
                 <div style={{ marginTop: 18 }}>
                   <input
-  ref={addressInputRef}
-  type="text"
-  value={address}
-  onChange={(e) => {
-    setAddress(e.target.value);
-    setAddressSelected(false);
-  }}
-  placeholder="Start typing your service address"
-  style={styles.input}
-/>
+                    ref={addressInputRef}
+                    type="text"
+                    value={address}
+                    onChange={(e) => {
+                      setAddress(e.target.value);
+                      setAddressSelected(false);
+                    }}
+                    placeholder="Start typing your service address"
+                    style={styles.input}
+                  />
                 </div>
               )}
 
@@ -935,12 +980,14 @@ vehicleRow: {
                   <button
                     style={{
                       ...styles.primaryButton,
-                      ...((!serviceType || (serviceType === "mobile" && !address.trim()))
+                      ...(!serviceType || (serviceType === "mobile" && !address.trim())
                         ? styles.disabledButton
                         : {}),
                     }}
                     onClick={next}
-                    disabled={!serviceType || (serviceType === "mobile" && !address.trim())}
+                    disabled={
+                      !serviceType || (serviceType === "mobile" && !address.trim())
+                    }
                   >
                     Next
                   </button>
@@ -949,6 +996,7 @@ vehicleRow: {
             </>
           )}
 
+          {/* ── STEP 5: Customer Information ── */}
           {step === 5 && (
             <>
               <h2 style={styles.title}>Customer Information</h2>
@@ -957,160 +1005,207 @@ vehicleRow: {
               </p>
 
               <div style={styles.inputGrid}>
-  <div style={{ marginTop: 20 }}>
-    <div style={styles.sectionLabel}>Select Appointment Date</div>
+                <div style={{ marginTop: 20 }}>
+                  <div style={styles.sectionLabel}>Select Appointment Date</div>
+                  <select
+                    style={{
+                      ...styles.input,
+                      backgroundColor: "#ffffff",
+                      color: "#111827",
+                      cursor: "pointer",
+                    }}
+                    value={selectedDate}
+                    onChange={(e) => {
+                      setSelectedDate(e.target.value);
+                      setSelectedTime("");
+                    }}
+                  >
+                    <option value="">Select a date</option>
+                    {availableDates.map((date, index) => (
+                      <option key={index} value={date}>
+                        {formatDateLabel(date)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
-  <select
-    style={{
-      ...styles.input,
-      backgroundColor: "#ffffff",
-      color: "#111827",
-      cursor: "pointer",
-    }}
-    value={selectedDate}
-    onChange={(e) => {
-      setSelectedDate(e.target.value);
-      setSelectedTime("");
-    }}
-  >
-    <option value="">Select a date</option>
+                <div style={{ marginTop: 20 }}>
+                  <div style={styles.sectionLabel}>Available Time</div>
+                  <select
+                    style={{
+                      ...styles.input,
+                      backgroundColor: "#ffffff",
+                      color: "#111827",
+                      cursor: "pointer",
+                    }}
+                    value={selectedTime}
+                    onChange={(e) => setSelectedTime(e.target.value)}
+                  >
+                    <option value="">Select a time</option>
+                    {availableSlots.map((slot, index) => (
+                      <option key={index} value={slot.time}>
+                        {slot.time}
+                      </option>
+                    ))}
+                  </select>
+                  {selectedDate && availableSlots.length === 0 && (
+                    <div style={{ marginTop: 8, color: "#b91c1c", fontSize: "0.95rem" }}>
+                      No available times found for this date.
+                    </div>
+                  )}
+                </div>
 
-   {availableDates.map((date, index) => (
-  <option key={index} value={date}>
-    {formatDateLabel(date)}
-  </option>
-))}
-  </select>
-</div>
-
-<div style={{ marginTop: 20 }}>
-  <div style={styles.sectionLabel}>Available Time</div>
-
- <select
-  style={{
-    ...styles.input,
-    backgroundColor: "#ffffff",
-    color: "#111827",
-    cursor: "pointer",
-  }}
-  value={selectedTime}
-  onChange={(e) => setSelectedTime(e.target.value)}
-  disabled={false}
->
-  <option value="">Select a time</option>
-
-  {availableSlots.map((slot, index) => (
-    <option key={index} value={slot.time}>
-      {slot.time}
-    </option>
-  ))}
-</select>
-
-  {selectedDate && availableSlots.length === 0 && (
-  <div style={{ marginTop: 8, color: "#b91c1c", fontSize: "0.95rem" }}>
-    No available times found for this date.
-  </div>
-)}
-</div>
                 <input
                   style={styles.input}
                   placeholder="Full name"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                 />
-           <input
-  style={styles.input}
-  placeholder="Phone number"
-  value={phone}
-  type="tel"
-  inputMode="numeric"
-  onChange={(e) => {
-    const raw = e.target.value.replace(/\D/g, "").slice(0, 10);
-
-    const formatted =
-      raw.length > 6
-        ? `(${raw.slice(0, 3)}) ${raw.slice(3, 6)}-${raw.slice(6)}`
-        : raw.length > 3
-        ? `(${raw.slice(0, 3)}) ${raw.slice(3)}`
-        : raw;
-
-    setPhone(formatted);
-  }}
-/>
+                <input
+                  style={styles.input}
+                  placeholder="Phone number"
+                  value={phone}
+                  type="tel"
+                  inputMode="numeric"
+                  onChange={(e) => {
+                    const raw = e.target.value.replace(/\D/g, "").slice(0, 10);
+                    const formatted =
+                      raw.length > 6
+                        ? `(${raw.slice(0, 3)}) ${raw.slice(3, 6)}-${raw.slice(6)}`
+                        : raw.length > 3
+                        ? `(${raw.slice(0, 3)}) ${raw.slice(3)}`
+                        : raw;
+                    setPhone(formatted);
+                  }}
+                />
                 <input
                   style={styles.input}
                   placeholder="Email address"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                 />
-              </div> <div style={{ display: "flex", gap: 8 }}>
-                
-  </div>
+              </div>
 
-<div style={{ marginTop: 24 }}>
-  <div style={styles.sectionLabel}>Vehicle Information</div>
+              {/* ── Vehicle / Boat Information ── */}
+              <div style={{ marginTop: 24 }}>
+                <div style={styles.sectionLabel}>
+                  {vehicle === "boat" ? "Boat Information" : "Vehicle Information"}
+                </div>
 
-  <div style={{ display: "flex", gap: 12, marginTop: 10, flexWrap: "wrap" as const }}>
-    <select
-      style={{ ...styles.input, flex: 1, minWidth: 120, backgroundColor: "#fff", color: "#111827" }}
-      value={year}
-      onChange={(e) => {
-  setYear(e.target.value);
+                {vehicle === "boat" ? (
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: 12,
+                      marginTop: 10,
+                      flexWrap: "wrap" as const,
+                    }}
+                  >
+                    <input
+                      style={{ ...styles.input, flex: 1, minWidth: 120 }}
+                      placeholder="Size (e.g. 24 ft)"
+                      value={boatSize}
+                      onChange={(e) => setBoatSize(e.target.value)}
+                    />
+                    <input
+                      style={{ ...styles.input, flex: 2, minWidth: 180 }}
+                      placeholder="Make (e.g. Sea Ray)"
+                      value={boatMake}
+                      onChange={(e) => setBoatMake(e.target.value)}
+                    />
+                    <input
+                      style={{ ...styles.input, flex: 2, minWidth: 180 }}
+                      placeholder="Model (e.g. Sundancer 320)"
+                      value={boatModel}
+                      onChange={(e) => setBoatModel(e.target.value)}
+                    />
+                  </div>
+                ) : (
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: 12,
+                      marginTop: 10,
+                      flexWrap: "wrap" as const,
+                    }}
+                  >
+                    <select
+                      style={{
+                        ...styles.input,
+                        flex: 1,
+                        minWidth: 120,
+                        backgroundColor: "#fff",
+                        color: "#111827",
+                      }}
+                      value={year}
+                      onChange={(e) => {
+                        setYear(e.target.value);
+                        setModel("");
+                        setModelOptions([]);
+                      }}
+                    >
+                      <option value="">Year</option>
+                      {yearOptions.map((yr) => (
+                        <option key={yr} value={yr}>
+                          {yr}
+                        </option>
+                      ))}
+                    </select>
 
-  // 👇 ADD THIS
-  setModel("");
-  setModelOptions([]);
-}}
-    >
-      <option value="">Year</option>
-      {yearOptions.map((yr) => (
-        <option key={yr} value={yr}>
-          {yr}
-        </option>
-      ))}
-    </select>
+                    <select
+                      style={{
+                        ...styles.input,
+                        flex: 2,
+                        minWidth: 180,
+                        backgroundColor: "#fff",
+                        color: "#111827",
+                      }}
+                      value={make}
+                      onChange={(e) => {
+                        setMake(e.target.value);
+                        setModel("");
+                        setModelOptions([]);
+                      }}
+                      disabled={loadingMakes}
+                    >
+                      <option value="">
+                        {loadingMakes ? "Loading makes..." : "Make"}
+                      </option>
+                      {makeOptions.map((mk) => (
+                        <option key={mk} value={mk}>
+                          {mk}
+                        </option>
+                      ))}
+                    </select>
 
-    <select
-      style={{ ...styles.input, flex: 2, minWidth: 180, backgroundColor: "#fff", color: "#111827" }}
-      value={make}
-      onChange={(e) => {
-  setMake(e.target.value);
-
-  // 👇 ADD THIS
-  setModel("");
-  setModelOptions([]);
-}}
-      disabled={loadingMakes}
-    >
-      <option value="">{loadingMakes ? "Loading makes..." : "Make"}</option>
-      {makeOptions.map((mk) => (
-        <option key={mk} value={mk}>
-          {mk}
-        </option>
-      ))}
-    </select>
-
-    <select
-      style={{ ...styles.input, flex: 2, minWidth: 180, backgroundColor: "#fff", color: "#111827" }}
-      value={model}
-      onChange={(e) => setModel(e.target.value)}
-      disabled={!year || !make || loadingModels}
-    >
-      <option value="">
-        {!year || !make
-          ? "Select year and make first"
-          : loadingModels
-          ? "Loading models..."
-          : "Model"}
-      </option>
-      {modelOptions.map((mdl) => (
-        <option key={mdl} value={mdl}>
-          {mdl}
-        </option>
-      ))}
-    </select>
-  </div>
-</div>
+                    <select
+                      style={{
+                        ...styles.input,
+                        flex: 2,
+                        minWidth: 180,
+                        backgroundColor: "#fff",
+                        color: "#111827",
+                      }}
+                      value={model}
+                      onChange={(e) => setModel(e.target.value)}
+                      disabled={!year || !make || loadingModels}
+                    >
+                      <option value="">
+                        {!year || !make
+                          ? "Select year and make first"
+                          : loadingModels
+                          ? "Loading models..."
+                          : "Model"}
+                      </option>
+                      {modelOptions.map((mdl) => (
+                        <option key={mdl} value={mdl}>
+                          {mdl}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </div>
 
               <div style={styles.buttonRow}>
                 <button style={styles.secondaryButton} onClick={back}>
@@ -1120,30 +1215,10 @@ vehicleRow: {
                   <button
                     style={{
                       ...styles.primaryButton,
-                     ...(
-  (!name ||
-    !phone ||
-    !email ||
-    !year ||
-    !make ||
-    !model ||
-    !selectedDate ||
-    !selectedTime)
-    ? styles.disabledButton
-    : {}
-),
+                      ...(step5Disabled ? styles.disabledButton : {}),
                     }}
                     onClick={next}
-                    disabled={
-  !name ||
-  !phone ||
-  !email ||
-  !year ||
-  !make ||
-  !model ||
-  !selectedDate ||
-  !selectedTime
-}
+                    disabled={step5Disabled}
                   >
                     Review Booking
                   </button>
@@ -1152,6 +1227,7 @@ vehicleRow: {
             </>
           )}
 
+          {/* ── STEP 6: Review ── */}
           {step === 6 && (
             <>
               <h2 style={styles.title}>Review Booking</h2>
@@ -1168,14 +1244,15 @@ vehicleRow: {
                     {email}
                   </div>
                 </div>
-               <div style={styles.summaryCard}>
-  <div style={styles.summaryHeading}>Appointment</div>
-  <div style={styles.summaryValue}>
-    {selectedDate ? formatDateLabel(selectedDate) : "N/A"}
-    <br />
-    {selectedTime || "N/A"}
-  </div>
-</div>
+
+                <div style={styles.summaryCard}>
+                  <div style={styles.summaryHeading}>Appointment</div>
+                  <div style={styles.summaryValue}>
+                    {selectedDate ? formatDateLabel(selectedDate) : "N/A"}
+                    <br />
+                    {selectedTime || "N/A"}
+                  </div>
+                </div>
 
                 <div style={styles.summaryCard}>
                   <div style={styles.summaryHeading}>Service</div>
@@ -1187,30 +1264,34 @@ vehicleRow: {
                     {estimateText || "N/A"}
                   </div>
                 </div>
-<div style={styles.summaryCard}>
-  <div style={styles.summaryHeading}>Appointment Type</div>
-  <div style={styles.summaryValue}>
-    {serviceType === "mobile"
-      ? "Mobile Service"
-      : serviceType === "dropoff"
-      ? "Drop-Off Service"
-      : "N/A"}
-    {serviceType === "mobile" && address && (
-      <>
-        <br />
-        {address}
-      </>
-    )}
-  </div>
-</div>
+
                 <div style={styles.summaryCard}>
-  <div style={styles.summaryHeading}>Vehicle</div>
-  <div style={styles.summaryValue}>
-    {year || "N/A"} {make || ""} {model || ""}
-    <br />
-    {selectedVehicle?.label || "N/A"}
-  </div>
-</div>
+                  <div style={styles.summaryHeading}>Appointment Type</div>
+                  <div style={styles.summaryValue}>
+                    {serviceType === "mobile"
+                      ? "Mobile Service"
+                      : serviceType === "dropoff"
+                      ? "Drop-Off Service"
+                      : "N/A"}
+                    {serviceType === "mobile" && address && (
+                      <>
+                        <br />
+                        {address}
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                <div style={styles.summaryCard}>
+                  <div style={styles.summaryHeading}>
+                    {vehicle === "boat" ? "Boat" : "Vehicle"}
+                  </div>
+                  <div style={styles.summaryValue}>
+                    {vehicleSummary}
+                    <br />
+                    {selectedVehicle?.label || "N/A"}
+                  </div>
+                </div>
 
                 <div style={styles.summaryCard}>
                   <div style={styles.summaryHeading}>Add-Ons</div>
@@ -1218,8 +1299,6 @@ vehicleRow: {
                     {addOns.length ? addOns.join(", ") : "No add-ons selected"}
                   </div>
                 </div>
-
-              
 
                 <div style={styles.summaryCard}>
                   <div style={styles.summaryHeading}>Estimated Add-Ons</div>
@@ -1238,83 +1317,83 @@ vehicleRow: {
                 </button>
                 <div style={styles.rightButtons}>
                   <button
-  style={styles.primaryButton}
-  onClick={async () => {
-  try {
-    if (serviceType === "mobile") {
-      if (!address.trim()) {
-        alert("Please enter your service address.");
-        return;
-      }
-
-      if (!addressSelected) {
-        alert("Please select a valid address from the dropdown.");
-        return;
-      }
-    }
-const [yearPart, monthPart, dayPart] = selectedDate.split("-");
-const safeDate = `${monthPart}/${dayPart}/${yearPart}`;
-    const res = await fetch(SCRIPT_URL, {
-      method: "POST",
-      body: JSON.stringify({
-        action: "bookAppointment",
-        name,
-        phone,
-        email,
-       date: selectedDate,        // for backend slot matching
-       displayDate: safeDate,     // for email / human-readable use
-        time: selectedTime,
-        year,
-        make,
-        model,
-        vehicle,
-        packageType: pkg,
-        hourlyRate,
-        addOns: addOns.join(", "),
-        addOnEstimate,
-        serviceType,
-        address,
-        street,
-        city,
-        state: stateRegion,
-        zip,
-        placeId,
-        lat,
-        lng,
-        avgTime: packageHours,
-      }),
-    });
-
-    const data = await res.json();
-
-    if (data.success) {
-      alert("Booking submitted successfully!");
-      next();
-    } else {
-      alert("Something went wrong.");
-      console.error(data);
-    }
-  } catch (err) {
-    alert("Something went wrong.");
-    console.error(err);
-  }
-}}
->
-  Submit Booking
-</button>
+                    style={styles.primaryButton}
+                    onClick={async () => {
+                      try {
+                        if (serviceType === "mobile") {
+                          if (!address.trim()) {
+                            alert("Please enter your service address.");
+                            return;
+                          }
+                          if (!addressSelected) {
+                            alert("Please select a valid address from the dropdown.");
+                            return;
+                          }
+                        }
+                        const [yearPart, monthPart, dayPart] = selectedDate.split("-");
+                        const safeDate = `${monthPart}/${dayPart}/${yearPart}`;
+                        const res = await fetch(SCRIPT_URL, {
+                          method: "POST",
+                          body: JSON.stringify({
+                            action: "bookAppointment",
+                            name,
+                            phone,
+                            email,
+                            date: selectedDate,
+                            displayDate: safeDate,
+                            time: selectedTime,
+                            // Vehicle fields
+                            year: vehicle === "boat" ? "" : year,
+                            make: vehicle === "boat" ? boatMake : make,
+                            model: vehicle === "boat" ? boatModel : model,
+                            boatSize: vehicle === "boat" ? boatSize : "",
+                            vehicle,
+                            packageType: pkg,
+                            hourlyRate,
+                            addOns: addOns.join(", "),
+                            addOnEstimate,
+                            serviceType,
+                            address,
+                            street,
+                            city,
+                            state: stateRegion,
+                            zip,
+                            placeId,
+                            lat,
+                            lng,
+                            avgTime: packageHours,
+                          }),
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                          alert("Booking submitted successfully!");
+                          next();
+                        } else {
+                          alert("Something went wrong.");
+                          console.error(data);
+                        }
+                      } catch (err) {
+                        alert("Something went wrong.");
+                        console.error(err);
+                      }
+                    }}
+                  >
+                    Submit Booking
+                  </button>
                 </div>
               </div>
             </>
           )}
 
+          {/* ── STEP 7: Confirmation ── */}
           {step === 7 && (
             <>
               <div style={styles.submittedWrap}>
                 <div style={styles.successBadge}>✅</div>
                 <h2 style={styles.title}>Booking Request Submitted</h2>
                 <p style={styles.successText}>
-                  Someone will be reaching out to you to confirm your service.
-                  This private build is also showing a booking summary for testing.
+                  Someone will be reaching out to you to confirm your service. This private build is
+                  also showing a booking summary for testing.
                 </p>
               </div>
 
@@ -1329,14 +1408,15 @@ const safeDate = `${monthPart}/${dayPart}/${yearPart}`;
                     {email}
                   </div>
                 </div>
-              <div style={styles.summaryCard}>
-  <div style={styles.summaryHeading}>Appointment</div>
-  <div style={styles.summaryValue}>
-    {selectedDate ? formatDateLabel(selectedDate) : "N/A"}
-    <br />
-    {selectedTime || "N/A"}
-  </div>
-</div>
+
+                <div style={styles.summaryCard}>
+                  <div style={styles.summaryHeading}>Appointment</div>
+                  <div style={styles.summaryValue}>
+                    {selectedDate ? formatDateLabel(selectedDate) : "N/A"}
+                    <br />
+                    {selectedTime || "N/A"}
+                  </div>
+                </div>
 
                 <div style={styles.summaryCard}>
                   <div style={styles.summaryHeading}>Service</div>
@@ -1348,34 +1428,30 @@ const safeDate = `${monthPart}/${dayPart}/${yearPart}`;
                     {estimateText || "N/A"}
                   </div>
                 </div>
+
                 <div style={styles.summaryCard}>
+                  <div style={styles.summaryHeading}>Appointment Type</div>
+                  <div style={styles.summaryValue}>
+                    {serviceType === "mobile"
+                      ? "Mobile Service"
+                      : serviceType === "dropoff"
+                      ? "Drop-Off Service"
+                      : "N/A"}
+                    <br />
+                    {address || "No address provided"}
+                  </div>
+                </div>
 
-  <div style={styles.summaryCard}>
-    <div style={styles.summaryHeading}>Appointment Type</div>
-    <div style={styles.summaryValue}>
-      {serviceType === "mobile" ? "Mobile Service" : serviceType === "dropoff" ? "Drop-Off Service" : "N/A"}
-      <br />
-      {address || "No address provided"}
-    </div>
-  </div>
-  <div style={styles.summaryHeading}>Vehicle</div>
-  <div style={styles.summaryValue}>
-    {year || "N/A"} {make || ""} {model || ""}
-    <br />
-    {selectedVehicle?.label || "N/A"}
-  </div>
-</div>
-
-
-
-<div style={styles.summaryCard}>
-  <div style={styles.summaryHeading}>Vehicle</div>
-  <div style={styles.summaryValue}>
-    {[year, make, model].filter(Boolean).join(" ") || "N/A"}
-    <br />
-    {selectedVehicle?.label || "N/A"}
-  </div>
-</div>
+                <div style={styles.summaryCard}>
+                  <div style={styles.summaryHeading}>
+                    {vehicle === "boat" ? "Boat" : "Vehicle"}
+                  </div>
+                  <div style={styles.summaryValue}>
+                    {vehicleSummary}
+                    <br />
+                    {selectedVehicle?.label || "N/A"}
+                  </div>
+                </div>
 
                 <div style={styles.summaryCard}>
                   <div style={styles.summaryHeading}>Add-Ons</div>
