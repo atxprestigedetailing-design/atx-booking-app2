@@ -11,7 +11,7 @@ const GOOGLE_CLIENT_ID =
   "447699234633-ivo2e1c2q843scj32k5323o2rkq6h7dp.apps.googleusercontent.com";
 
 const SCRIPT_URL =
-  "https://script.google.com/macros/s/AKfycbxziEf5nybRQnNWAU5_zdESYWQ5LT1DGOc1CcNT0i1zvn5RHFNZkpBpiuEbS6mSbSPUMg/exec";
+  "https://script.google.com/macros/s/AKfycbxEcUvboPuOqqzro3QQfznOaNppMU8vq7eKvgansWdxnVdRJXzxP3JyUnWytY7nGpJazQ/exec";
 
 const TOTAL_STEPS = 9;
 const ADMIN_EMAIL = "atxprestigedetailing@gmail.com";
@@ -474,8 +474,22 @@ export default function App() {
   async function handleMarkPaid(booking: Booking) {
     try {
       const ok = await updateBooking(booking.rowIndex, { invoiceStatus: "paid" });
-      if (ok) { await loadAdminBookings(); }
-      else { alert("Something went wrong."); }
+      if (ok) {
+        // Send payment confirmed email
+        try {
+          await fetch(SCRIPT_URL, {
+            method: "POST",
+            body: JSON.stringify({
+              action: "sendPaymentConfirmedEmail",
+              customerName: booking.name,
+              customerEmail: booking.email,
+              invoiceAmount: booking.invoiceAmount,
+              serviceDate: booking.date,
+            }),
+          });
+        } catch (emailErr) { console.error("Payment confirmed email failed", emailErr); }
+        await loadAdminBookings();
+      } else { alert("Something went wrong."); }
     } catch (e) { alert("Something went wrong."); }
   }
 
@@ -870,31 +884,62 @@ export default function App() {
 
                       {outstanding.length > 0 && (
                         <>
-                          <div style={{ background: "#fefce8", border: "1px solid #fde047", borderRadius: 14, padding: "14px 18px", marginBottom: 20, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap" as const, gap: 8 }}>
-                            <div>
-                              <div style={{ fontWeight: 700, color: "#713f12", fontSize: "1rem" }}>Total Balance Due</div>
-                              <div style={{ fontSize: "1.6rem", fontWeight: 800, color: "#92400e" }}>${totalOwed.toFixed(2)}</div>
+                          <div style={{ background: "#fefce8", border: "1px solid #fde047", borderRadius: 14, padding: "14px 18px", marginBottom: 20 }}>
+                            <div style={{ fontWeight: 700, color: "#713f12", fontSize: "1rem", marginBottom: 8 }}>Total Balance Due</div>
+                            <div style={{ display: "flex", gap: 20, flexWrap: "wrap" as const }}>
+                              <div>
+                                <div style={{ fontSize: "0.78rem", color: "#92400e" }}>Venmo / Cash App</div>
+                                <div style={{ fontSize: "1.6rem", fontWeight: 800, color: "#92400e" }}>${totalOwed.toFixed(2)}</div>
+                              </div>
+                              <div>
+                                <div style={{ fontSize: "0.78rem", color: "#92400e" }}>Square / Card (+ 4%)</div>
+                                <div style={{ fontSize: "1.6rem", fontWeight: 800, color: "#92400e" }}>${(totalOwed * 1.04).toFixed(2)}</div>
+                              </div>
                             </div>
-                            <div style={{ fontSize: "0.85rem", color: "#92400e" }}>Choose a payment method below</div>
                           </div>
 
-                          {outstanding.map((b, i) => (
+                          {outstanding.map((b, i) => {
+                            const baseAmt = parseFloat(b.invoiceAmount || "0");
+                            const squareAmt = (baseAmt * 1.04).toFixed(2);
+                            return (
                             <div key={i} style={{ background: "#fff", border: "1px solid #fde047", borderRadius: 16, padding: 18, marginBottom: 14 }}>
                               <div style={{ fontWeight: 700, color: "#111827", marginBottom: 4 }}>{formatDateLabel(b.date)} — {b.packageType === "basic" ? "Basic Detail" : "Premium Detail"}</div>
                               <div style={{ fontSize: "0.9rem", color: "#6b7280", marginBottom: 10 }}>
                                 {[b.year, b.make, b.model, b.boatSize].filter(Boolean).join(" ")}
                                 {b.invoiceNote ? ` — ${b.invoiceNote}` : ""}
                               </div>
-                              <div style={{ fontSize: "1.2rem", fontWeight: 800, color: "#92400e", marginBottom: 14 }}>${b.invoiceAmount}</div>
+                              {/* Amount due box showing both prices */}
+                              <div style={{ background: "#fefce8", border: "1px solid #fde047", borderRadius: 12, padding: "12px 16px", marginBottom: 14, display: "flex", gap: 16, flexWrap: "wrap" as const, alignItems: "center" }}>
+                                <div style={{ textAlign: "center" as const }}>
+                                  <div style={{ fontSize: "0.75rem", color: "#92400e", marginBottom: 2 }}>Venmo / Cash App</div>
+                                  <div style={{ fontSize: "1.4rem", fontWeight: 800, color: "#92400e" }}>${baseAmt.toFixed(2)}</div>
+                                  <div style={{ fontSize: "0.7rem", color: "#9ca3af" }}>No fee</div>
+                                </div>
+                                <div style={{ color: "#d1d5db", fontSize: "1.2rem" }}>|</div>
+                                <div style={{ textAlign: "center" as const }}>
+                                  <div style={{ fontSize: "0.75rem", color: "#92400e", marginBottom: 2 }}>Square (Card)</div>
+                                  <div style={{ fontSize: "1.4rem", fontWeight: 800, color: "#92400e" }}>${squareAmt}</div>
+                                  <div style={{ fontSize: "0.7rem", color: "#9ca3af" }}>Includes 4% fee</div>
+                                </div>
+                              </div>
 
                               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
-                                <a href={VENMO_URL} target="_blank" rel="noopener noreferrer" style={{ display: "block", background: "#008CFF", color: "#fff", borderRadius: 10, padding: "10px 8px", textAlign: "center", textDecoration: "none", fontWeight: 700, fontSize: "0.85rem" }}>Pay with Venmo</a>
-                                <a href={CASHAPP_URL} target="_blank" rel="noopener noreferrer" style={{ display: "block", background: "#00C244", color: "#fff", borderRadius: 10, padding: "10px 8px", textAlign: "center", textDecoration: "none", fontWeight: 700, fontSize: "0.85rem" }}>Pay with Cash App</a>
-                                <button onClick={() => handleSquareRequest(b)} style={{ background: "#111827", color: "#fff", border: "none", borderRadius: 10, padding: "10px 8px", fontWeight: 700, fontSize: "0.85rem", cursor: "pointer" }}>Pay with Card</button>
+                                <div>
+                                  <a href={VENMO_URL} target="_blank" rel="noopener noreferrer" style={{ display: "block", background: "#008CFF", color: "#fff", borderRadius: 10, padding: "8px 6px", textAlign: "center", textDecoration: "none", fontWeight: 700, fontSize: "0.82rem" }}>Venmo</a>
+                                  <div style={{ fontSize: "0.72rem", color: "#6b7280", textAlign: "center" as const, marginTop: 3 }}>${baseAmt.toFixed(2)}</div>
+                                </div>
+                                <div>
+                                  <a href={CASHAPP_URL} target="_blank" rel="noopener noreferrer" style={{ display: "block", background: "#00C244", color: "#fff", borderRadius: 10, padding: "8px 6px", textAlign: "center", textDecoration: "none", fontWeight: 700, fontSize: "0.82rem" }}>Cash App</a>
+                                  <div style={{ fontSize: "0.72rem", color: "#6b7280", textAlign: "center" as const, marginTop: 3 }}>${baseAmt.toFixed(2)}</div>
+                                </div>
+                                <div>
+                                  <button onClick={() => handleSquareRequest(b)} style={{ display: "block", width: "100%", background: "#111827", color: "#fff", border: "none", borderRadius: 10, padding: "8px 6px", fontWeight: 700, fontSize: "0.82rem", cursor: "pointer" }}>Card (Square)</button>
+                                  <div style={{ fontSize: "0.72rem", color: "#6b7280", textAlign: "center" as const, marginTop: 3 }}>${squareAmt}</div>
+                                </div>
                               </div>
-                              <div style={{ fontSize: "0.75rem", color: "#9ca3af", marginTop: 6, textAlign: "center" as const }}>Card payments via Square include a 4% processing fee.</div>
                             </div>
-                          ))}
+                            );
+                          })}
                         </>
                       )}
 
@@ -977,24 +1022,41 @@ export default function App() {
                         </button>
                       ))}
                     </div>
-                    {/* Maintenance future schedule summary */}
+                    {/* Maintenance schedule summary — all upcoming grouped by client */}
                     {adminFilter === "maintenance" && (() => {
                       const futureMain = adminBookings.filter(b => b.clientType === "maintenance" && isUpcoming(b.date) && b.status !== "Completed");
                       const grouped: Record<string, Booking[]> = {};
-                      futureMain.forEach(b => { if (!grouped[b.email]) grouped[b.email] = []; grouped[b.email].push(b); });
+                      futureMain.forEach(b => {
+                        if (!grouped[b.email]) grouped[b.email] = [];
+                        grouped[b.email].push(b);
+                      });
                       return Object.keys(grouped).length > 0 ? (
-                        <div style={{ marginBottom: 16 }}>
-                          {Object.entries(grouped).map(([email, bookings]) => (
-                            <div key={email} style={{ background: "#ecfdf5", border: "1px solid #6ee7b7", borderRadius: 12, padding: "12px 16px", marginBottom: 8 }}>
-                              <div style={{ fontWeight: 700, color: "#065f46", marginBottom: 4 }}>{bookings[0].name} — {bookings[0].recurringFrequency === "biweekly" ? "Bi-Weekly" : "Monthly"}</div>
-                              <div style={{ fontSize: "0.85rem", color: "#047857" }}>{email}</div>
-                              <div style={{ marginTop: 6, display: "flex", gap: 8, flexWrap: "wrap" as const }}>
-                                {bookings.sort((a, b) => a.date.localeCompare(b.date)).map((b, i) => (
-                                  <span key={i} style={{ background: "#fff", border: "1px solid #6ee7b7", borderRadius: 8, padding: "3px 10px", fontSize: "0.82rem", color: "#065f46" }}>{formatDateLabel(b.date)}</span>
-                                ))}
+                        <div style={{ marginBottom: 20 }}>
+                          <div style={{ fontWeight: 700, color: "#374151", fontSize: "0.85rem", textTransform: "uppercase" as const, letterSpacing: "0.04em", marginBottom: 10 }}>Maintenance Schedule Overview</div>
+                          {Object.entries(grouped).map(([email, bookings]) => {
+                            const sorted = [...bookings].sort((a, b) => a.date.localeCompare(b.date));
+                            return (
+                              <div key={email} style={{ background: "#ecfdf5", border: "1px solid #6ee7b7", borderRadius: 12, padding: "14px 16px", marginBottom: 10 }}>
+                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap" as const, gap: 4, marginBottom: 8 }}>
+                                  <div>
+                                    <div style={{ fontWeight: 700, color: "#065f46", fontSize: "0.95rem" }}>{sorted[0].name}</div>
+                                    <div style={{ fontSize: "0.82rem", color: "#047857" }}>{email}</div>
+                                  </div>
+                                  <span style={{ background: "#fff", border: "1px solid #6ee7b7", borderRadius: 999, padding: "2px 10px", fontSize: "0.78rem", fontWeight: 700, color: "#059669" }}>
+                                    {sorted[0].recurringFrequency === "biweekly" ? "Bi-Weekly" : "Monthly"}
+                                  </span>
+                                </div>
+                                <div style={{ display: "grid", gap: 6 }}>
+                                  {sorted.map((b, i) => (
+                                    <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "#fff", borderRadius: 8, padding: "7px 12px", fontSize: "0.85rem" }}>
+                                      <span style={{ color: "#065f46", fontWeight: 600 }}>{i === 0 ? "Next: " : (i + 1) + ". "}{formatDateLabel(b.date)}{b.time ? ` at ${b.time}` : ""}</span>
+                                      <span style={{ color: "#6b7280", fontSize: "0.78rem" }}>{b.packageType === "basic" ? "Basic" : "Premium"}</span>
+                                    </div>
+                                  ))}
+                                </div>
                               </div>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       ) : null;
                     })()}
