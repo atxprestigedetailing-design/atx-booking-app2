@@ -266,7 +266,12 @@ function BookingCard({ booking, upcoming, onRequestChange }: {
 export default function App() {
   const addressInputRef = useRef(null);
 
-  const [googleUser, setGoogleUser]                     = useState<GoogleUser | null>(null);
+  const [googleUser, setGoogleUser]                     = useState<GoogleUser | null>(() => {
+    try {
+      const saved = localStorage.getItem("atx_google_user");
+      return saved ? JSON.parse(saved) : null;
+    } catch { return null; }
+  });
   const [googleScriptLoaded, setGoogleScriptLoaded]     = useState(false);
   const [view, setView]                                 = useState<"booking" | "myBookings" | "requestChange" | "admin" | "balance">("booking");
   const [adminTab, setAdminTab]                         = useState<"bookings" | "invoices">("bookings");
@@ -275,6 +280,7 @@ export default function App() {
   const [adminFilter, setAdminFilter]                   = useState<"all" | "upcoming" | "past" | "maintenance">("all");
   const [selectedAdminBooking, setSelectedAdminBooking] = useState<Booking | null>(null);
   const [completeAmount, setCompleteAmount]             = useState("");
+  const [completeHours, setCompleteHours]               = useState("");
   const [completeNote, setCompleteNote]                 = useState("");
   const [completeLoading, setCompleteLoading]           = useState(false);
   const [squarePopup, setSquarePopup]                   = useState(false);
@@ -350,13 +356,16 @@ export default function App() {
   function handleGoogleCredential(response: any) {
     try {
       const payload = JSON.parse(atob(response.credential.split(".")[1]));
-      setGoogleUser({ name: payload.name || "", email: payload.email || "", picture: payload.picture || "" });
+      const user = { name: payload.name || "", email: payload.email || "", picture: payload.picture || "" };
+      setGoogleUser(user);
       setEmail(payload.email || "");
+      localStorage.setItem("atx_google_user", JSON.stringify(user));
     } catch (e) { console.error("Google sign-in error", e); }
   }
 
   function handleSignOut() {
     if (window.google?.accounts?.id) window.google.accounts.id.disableAutoSelect();
+    localStorage.removeItem("atx_google_user");
     setGoogleUser(null); setEmail(""); setView("booking"); setUserBookings([]);
   }
 
@@ -384,12 +393,18 @@ export default function App() {
   }, []);
 
   async function handleMarkComplete() {
-    if (!selectedAdminBooking || !completeAmount) return;
+    if (!selectedAdminBooking) return;
+    // Calculate final amount: for non-maintenance use hours × rate, for maintenance use fixed amount
+    const rate = parseFloat(selectedAdminBooking.hourlyRate || "0");
+    const finalAmount = selectedAdminBooking.clientType !== "maintenance" && completeHours
+      ? String((parseFloat(completeHours) * rate).toFixed(2))
+      : completeAmount;
+    if (!finalAmount || parseFloat(finalAmount) <= 0) { alert("Please enter the hours or amount."); return; }
     setCompleteLoading(true);
     try {
       const ok = await updateBooking(selectedAdminBooking.rowIndex, {
         status: "Completed",
-        invoiceAmount: completeAmount,
+        invoiceAmount: finalAmount,
         invoiceStatus: "pending",
         invoiceNote: completeNote,
       });
@@ -434,6 +449,7 @@ export default function App() {
         await loadAdminBookings();
         setSelectedAdminBooking(null);
         setCompleteAmount("");
+        setCompleteHours("");
         setCompleteNote("");
       } else { alert("Something went wrong. Please try again."); }
     } catch (e) { alert("Something went wrong."); }
@@ -1196,7 +1212,7 @@ export default function App() {
 
                             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" as const, marginTop: 8, alignItems: "center" }}>
                               {!isComplete && (
-                                <button onClick={() => { setSelectedAdminBooking(isSelected ? null : b); setCompleteAmount(b.hourlyRate ? String(parseFloat(b.hourlyRate) * 2) : ""); setCompleteNote(""); setEditingBooking(null); }}
+                                <button onClick={() => { setSelectedAdminBooking(isSelected ? null : b); setCompleteAmount(b.hourlyRate ? String(parseFloat(b.hourlyRate) * 2) : ""); setCompleteHours(b.clientType === "maintenance" ? "2" : ""); setCompleteNote(""); setEditingBooking(null); }}
                                   style={{ background: isSelected ? "#f3f4f6" : "#111827", color: isSelected ? "#111827" : "#fff", border: "none", borderRadius: 8, padding: "7px 14px", fontSize: "0.82rem", fontWeight: 600, cursor: "pointer" }}>
                                   {isSelected ? "Cancel" : "Mark Complete"}
                                 </button>
@@ -1281,19 +1297,69 @@ export default function App() {
                             {isSelected && (
                               <div style={{ marginTop: 14, padding: 16, background: "#f9fafb", borderRadius: 12, border: "1px solid #e5e7eb" }}>
                                 <div style={{ fontWeight: 700, color: "#374151", marginBottom: 10 }}>Confirm Service & Set Invoice</div>
-                                <div style={{ display: "flex", gap: 10, marginBottom: 10, flexWrap: "wrap" as const }}>
-                                  <div style={{ flex: 1, minWidth: 120 }}>
-                                    <div style={{ fontSize: "0.82rem", color: "#6b7280", marginBottom: 4 }}>Amount ($)</div>
-                                    <input style={{ ...S.input, padding: "10px 12px" }} type="number" placeholder="0.00" value={completeAmount} onChange={e => setCompleteAmount(e.target.value)} />
+
+                                {b.clientType !== "maintenance" ? (
+                                  /* Non-maintenance: enter hours, auto-calculate amount */
+                                  <div style={{ marginBottom: 10 }}>
+                                    <div style={{ fontSize: "0.82rem", color: "#6b7280", marginBottom: 6 }}>
+                                      Rate: <strong>${b.hourlyRate}/hr</strong> — Enter total hours to calculate invoice
+                                    </div>
+                                    <div style={{ display: "flex", gap: 10, flexWrap: "wrap" as const }}>
+                                      <div style={{ flex: 1, minWidth: 120 }}>
+                                        <div style={{ fontSize: "0.78rem", color: "#6b7280", marginBottom: 4 }}>Hours Worked</div>
+                                        <input
+                                          style={{ ...S.input, padding: "10px 12px" }}
+                                          type="number"
+                                          step="0.5"
+                                          placeholder="e.g. 8"
+                                          value={completeHours}
+                                          onChange={e => {
+                                            setCompleteHours(e.target.value);
+                                            const hrs = parseFloat(e.target.value);
+                                            const rate2 = parseFloat(b.hourlyRate || "0");
+                                            if (hrs > 0 && rate2 > 0) setCompleteAmount((hrs * rate2).toFixed(2));
+                                            else setCompleteAmount("");
+                                          }}
+                                        />
+                                      </div>
+                                      <div style={{ flex: 1, minWidth: 120 }}>
+                                        <div style={{ fontSize: "0.78rem", color: "#6b7280", marginBottom: 4 }}>Invoice Amount</div>
+                                        <input
+                                          style={{ ...S.input, padding: "10px 12px", background: "#f3f4f6", fontWeight: 700 }}
+                                          type="number"
+                                          placeholder="Auto-calculated"
+                                          value={completeAmount}
+                                          onChange={e => setCompleteAmount(e.target.value)}
+                                        />
+                                      </div>
+                                      <div style={{ flex: 2, minWidth: 180 }}>
+                                        <div style={{ fontSize: "0.78rem", color: "#6b7280", marginBottom: 4 }}>Note (optional)</div>
+                                        <input style={{ ...S.input, padding: "10px 12px" }} placeholder="e.g. Boat detail, full interior" value={completeNote} onChange={e => setCompleteNote(e.target.value)} />
+                                      </div>
+                                    </div>
+                                    {completeHours && completeAmount && (
+                                      <div style={{ marginTop: 8, fontSize: "0.85rem", color: "#059669", fontWeight: 600 }}>
+                                        {completeHours} hrs × ${b.hourlyRate}/hr = ${completeAmount}
+                                      </div>
+                                    )}
                                   </div>
-                                  <div style={{ flex: 2, minWidth: 180 }}>
-                                    <div style={{ fontSize: "0.82rem", color: "#6b7280", marginBottom: 4 }}>Note (optional)</div>
-                                    <input style={{ ...S.input, padding: "10px 12px" }} placeholder="e.g. 2 hrs at $80/hr" value={completeNote} onChange={e => setCompleteNote(e.target.value)} />
+                                ) : (
+                                  /* Maintenance: fixed 2hr amount, can adjust */
+                                  <div style={{ display: "flex", gap: 10, marginBottom: 10, flexWrap: "wrap" as const }}>
+                                    <div style={{ flex: 1, minWidth: 120 }}>
+                                      <div style={{ fontSize: "0.82rem", color: "#6b7280", marginBottom: 4 }}>Amount ($)</div>
+                                      <input style={{ ...S.input, padding: "10px 12px" }} type="number" placeholder="0.00" value={completeAmount} onChange={e => setCompleteAmount(e.target.value)} />
+                                    </div>
+                                    <div style={{ flex: 2, minWidth: 180 }}>
+                                      <div style={{ fontSize: "0.82rem", color: "#6b7280", marginBottom: 4 }}>Note (optional)</div>
+                                      <input style={{ ...S.input, padding: "10px 12px" }} placeholder="e.g. 2 hrs at $80/hr" value={completeNote} onChange={e => setCompleteNote(e.target.value)} />
+                                    </div>
                                   </div>
-                                </div>
+                                )}
+
                                 <div style={{ fontSize: "0.8rem", color: "#9ca3af", marginBottom: 10 }}>This creates a pending invoice. You must release it from the Invoices tab before the client can see it.</div>
-                                <button onClick={handleMarkComplete} disabled={!completeAmount || completeLoading}
-                                  style={{ background: "#059669", color: "#fff", border: "none", borderRadius: 8, padding: "9px 18px", fontWeight: 700, fontSize: "0.88rem", cursor: "pointer", opacity: !completeAmount || completeLoading ? 0.5 : 1 }}>
+                                <button onClick={handleMarkComplete} disabled={completeLoading || (!completeAmount && !completeHours)}
+                                  style={{ background: "#059669", color: "#fff", border: "none", borderRadius: 8, padding: "9px 18px", fontWeight: 700, fontSize: "0.88rem", cursor: "pointer", opacity: completeLoading || (!completeAmount && !completeHours) ? 0.5 : 1 }}>
                                   {completeLoading ? "Saving..." : "Confirm Complete"}
                                 </button>
                               </div>
