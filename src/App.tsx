@@ -11,9 +11,12 @@ const GOOGLE_CLIENT_ID =
   "447699234633-ivo2e1c2q843scj32k5323o2rkq6h7dp.apps.googleusercontent.com";
 
 const SCRIPT_URL =
-  "https://script.google.com/macros/s/AKfycbyUAEOmRpO99rLB4M_ITUmjh7Z1Kl9iwhE8YwGRvZLyRoQ5G5ynCeN_R_jZglE6br18hQ/exec";
+  "https://script.google.com/macros/s/AKfycbwzc5YR9p1-FfoU5fGent2NJwnlUO24uqivy4SRbYCahfNzdjfFu1Sg-Ry0ltuCIoH8bw/exec";
 
 const TOTAL_STEPS = 9;
+const ADMIN_EMAIL = "atxprestigedetailing@gmail.com";
+const VENMO_URL = "https://venmo.com/u/emilio512";
+const CASHAPP_URL = "https://cash.app/$Emiliofive12";
 
 type AvailabilitySlot = {
   date: string;
@@ -65,6 +68,13 @@ type Booking = {
   clientType: string;
   recurringFrequency: string;
   status: string;
+  invoiceAmount: string;
+  invoiceStatus: string;
+  invoiceNote: string;
+  name: string;
+  phone: string;
+  email: string;
+  rowIndex: number;
 };
 
 const vehicleOptions = [
@@ -196,6 +206,21 @@ async function fetchBookingsForEmail(email: string): Promise<Booking[]> {
   return data.bookings || [];
 }
 
+async function fetchAllBookings(): Promise<Booking[]> {
+  const res = await fetch(`${SCRIPT_URL}?action=getAllBookings`);
+  const data: { bookings: Booking[] } = await res.json();
+  return data.bookings || [];
+}
+
+async function updateBooking(rowIndex: number, updates: Record<string, string>): Promise<boolean> {
+  const res = await fetch(SCRIPT_URL, {
+    method: "POST",
+    body: JSON.stringify({ action: "updateBooking", rowIndex, ...updates }),
+  });
+  const data = await res.json();
+  return data.success;
+}
+
 function BookingCard({ booking, upcoming, onRequestChange }: {
   booking: Booking; upcoming: boolean; onRequestChange: (b: Booking) => void;
 }) {
@@ -223,6 +248,12 @@ function BookingCard({ booking, upcoming, onRequestChange }: {
         {booking.addOns && <div>Add-Ons: {booking.addOns}</div>}
         {booking.notes && <div>Notes: {booking.notes}</div>}
       </div>
+      {booking.invoiceStatus === "released" && booking.invoiceAmount && (
+        <div style={{ marginTop: 10, background: "#fef9c3", border: "1px solid #fde047", borderRadius: 10, padding: "10px 14px", fontSize: "0.88rem", color: "#713f12" }}>
+          <span style={{ fontWeight: 700 }}>Balance due: ${booking.invoiceAmount}</span>
+          {booking.invoiceNote ? ` — ${booking.invoiceNote}` : ""}
+        </div>
+      )}
       {upcoming && (
         <button onClick={() => onRequestChange(booking)} style={{ marginTop: 14, background: "#111827", color: "#fff", border: "none", borderRadius: 10, padding: "9px 16px", fontSize: "0.9rem", fontWeight: 600, cursor: "pointer" }}>
           Request a Change
@@ -285,7 +316,17 @@ export default function App() {
 
   const [googleUser, setGoogleUser]                     = useState<GoogleUser | null>(null);
   const [googleScriptLoaded, setGoogleScriptLoaded]     = useState(false);
-  const [view, setView]                                 = useState<"booking" | "myBookings" | "requestChange">("booking");
+  const [view, setView]                                 = useState<"booking" | "myBookings" | "requestChange" | "admin" | "balance">("booking");
+  const [adminTab, setAdminTab]                         = useState<"bookings" | "invoices">("bookings");
+  const [adminBookings, setAdminBookings]               = useState<Booking[]>([]);
+  const [adminLoading, setAdminLoading]                 = useState(false);
+  const [adminFilter, setAdminFilter]                   = useState<"all" | "upcoming" | "past" | "maintenance">("all");
+  const [selectedAdminBooking, setSelectedAdminBooking] = useState<Booking | null>(null);
+  const [completeAmount, setCompleteAmount]             = useState("");
+  const [completeNote, setCompleteNote]                 = useState("");
+  const [completeLoading, setCompleteLoading]           = useState(false);
+  const [squarePopup, setSquarePopup]                   = useState(false);
+  const [squareBooking, setSquareBooking]               = useState<Booking | null>(null);
   const [bookingsTab, setBookingsTab]                   = useState<"appointments" | "maintenance">("appointments");
   const [userBookings, setUserBookings]                 = useState<Booking[]>([]);
   const [bookingsLoading, setBookingsLoading]           = useState(false);
@@ -376,6 +417,69 @@ export default function App() {
 
   function openMyBookings() {
     setView("myBookings"); setBookingsTab("appointments"); loadMyBookings();
+  }
+
+  const loadAdminBookings = useCallback(async () => {
+    setAdminLoading(true);
+    try {
+      const bookings = await fetchAllBookings();
+      setAdminBookings(bookings);
+    } catch (e) { console.error("Failed to load admin bookings", e); }
+    finally { setAdminLoading(false); }
+  }, []);
+
+  async function handleMarkComplete() {
+    if (!selectedAdminBooking || !completeAmount) return;
+    setCompleteLoading(true);
+    try {
+      const ok = await updateBooking(selectedAdminBooking.rowIndex, {
+        status: "Completed",
+        invoiceAmount: completeAmount,
+        invoiceStatus: "pending",
+        invoiceNote: completeNote,
+      });
+      if (ok) {
+        await loadAdminBookings();
+        setSelectedAdminBooking(null);
+        setCompleteAmount("");
+        setCompleteNote("");
+      } else { alert("Something went wrong. Please try again."); }
+    } catch (e) { alert("Something went wrong."); }
+    finally { setCompleteLoading(false); }
+  }
+
+  async function handleReleaseInvoice(booking: Booking) {
+    try {
+      const ok = await updateBooking(booking.rowIndex, { invoiceStatus: "released" });
+      if (ok) { await loadAdminBookings(); }
+      else { alert("Something went wrong."); }
+    } catch (e) { alert("Something went wrong."); }
+  }
+
+  async function handleMarkPaid(booking: Booking) {
+    try {
+      const ok = await updateBooking(booking.rowIndex, { invoiceStatus: "paid" });
+      if (ok) { await loadAdminBookings(); }
+      else { alert("Something went wrong."); }
+    } catch (e) { alert("Something went wrong."); }
+  }
+
+  async function handleSquareRequest(booking: Booking) {
+    setSquareBooking(booking);
+    setSquarePopup(true);
+    // Send email to admin
+    try {
+      await fetch(SCRIPT_URL, {
+        method: "POST",
+        body: JSON.stringify({
+          action: "squareInvoiceRequest",
+          customerName: booking.name,
+          customerEmail: booking.email,
+          amount: booking.invoiceAmount,
+          date: booking.date,
+        }),
+      });
+    } catch (e) { console.error("Square request email failed", e); }
   }
 
   useEffect(() => {
@@ -619,17 +723,37 @@ export default function App() {
     </div>
   );
 
+  // SQUARE POPUP MODAL — defined here so it's available in all views
+  const SquarePopup = () => squarePopup ? (
+    <div style={{ position: "fixed" as const, inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 16 }}>
+      <div style={{ background: "#fff", borderRadius: 20, padding: 28, maxWidth: 400, width: "100%", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
+        <h3 style={{ margin: "0 0 12px", fontWeight: 800, color: "#111827" }}>Square Invoice Request</h3>
+        <p style={{ color: "#6b7280", fontSize: "0.95rem", lineHeight: 1.6, margin: "0 0 20px" }}>
+          We received your request. We will send you a Square invoice to <strong>{squareBooking?.email}</strong> shortly so you can pay by credit or debit card.
+        </p>
+        <p style={{ color: "#9ca3af", fontSize: "0.82rem", margin: "0 0 20px" }}>Note: A 4% processing fee applies to card payments.</p>
+        <button onClick={() => { setSquarePopup(false); setSquareBooking(null); }} style={{ background: "#111827", color: "#fff", border: "none", borderRadius: 12, padding: "12px 20px", fontWeight: 700, cursor: "pointer", width: "100%" }}>Got it</button>
+      </div>
+    </div>
+  ) : null;
+
   // MY BOOKINGS VIEW
   if (view === "myBookings") {
     return (
       <div style={S.page}>
         <div style={S.container}>
           <Header />
+          <SquarePopup />
           <div style={S.card}>
             <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 24, flexWrap: "wrap" as const }}>
               <button onClick={() => setView("booking")} style={{ ...S.secondary, padding: "9px 14px", fontSize: "0.9rem" }}>Back</button>
               <h2 style={{ ...S.title, margin: 0, fontSize: "1.8rem" }}>My Bookings</h2>
-              <button onClick={() => { setView("booking"); setStep(1); }} style={{ ...S.primary, marginLeft: "auto", padding: "10px 16px", fontSize: "0.9rem" }}>Book New Service</button>
+              <div style={{ display: "flex", gap: 8, marginLeft: "auto" }}>
+                {googleUser?.email === ADMIN_EMAIL && (
+                  <button onClick={() => { setView("admin"); loadAdminBookings(); }} style={{ ...S.secondary, padding: "10px 16px", fontSize: "0.9rem" }}>Admin</button>
+                )}
+                <button onClick={() => { setView("booking"); setStep(1); }} style={{ ...S.primary, padding: "10px 16px", fontSize: "0.9rem" }}>Book New Service</button>
+              </div>
             </div>
 
             <div style={{ display: "flex", gap: 4, marginBottom: 24, borderBottom: "2px solid #e5e7eb" }}>
@@ -641,6 +765,9 @@ export default function App() {
                   Maintenance Plan
                 </button>
               )}
+              <button onClick={() => setBookingsTab("balance" as any)} style={{ background: "none", border: "none", cursor: "pointer", padding: "10px 18px", fontSize: "0.95rem", fontWeight: 700, color: (bookingsTab as string) === "balance" ? "#d97706" : "#9ca3af", borderBottom: (bookingsTab as string) === "balance" ? "3px solid #d97706" : "3px solid transparent", marginBottom: -2 }}>
+                Balance
+              </button>
             </div>
 
             {bookingsLoading ? (
@@ -701,6 +828,275 @@ export default function App() {
                           {pastMaintenance.map((b, i) => <MaintenanceCard key={i} booking={b} onRequestChange={() => {}} />)}
                         </div>
                       </>
+                    )}
+                  </>
+                )}
+              </>
+            )}
+
+            {/* Balance tab */}
+            {(bookingsTab as string) === "balance" && (
+              <>
+                {(() => {
+                  const releasedInvoices = userBookings.filter(b => b.invoiceStatus === "released" || b.invoiceStatus === "paid");
+                  const outstanding = releasedInvoices.filter(b => b.invoiceStatus === "released");
+                  const paid = releasedInvoices.filter(b => b.invoiceStatus === "paid");
+                  const totalOwed = outstanding.reduce((sum, b) => sum + parseFloat(b.invoiceAmount || "0"), 0);
+
+                  return (
+                    <>
+                      {outstanding.length === 0 && paid.length === 0 && (
+                        <div style={{ textAlign: "center", padding: 40, color: "#6b7280" }}>No invoices on file yet.</div>
+                      )}
+
+                      {outstanding.length > 0 && (
+                        <>
+                          <div style={{ background: "#fefce8", border: "1px solid #fde047", borderRadius: 14, padding: "14px 18px", marginBottom: 20, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap" as const, gap: 8 }}>
+                            <div>
+                              <div style={{ fontWeight: 700, color: "#713f12", fontSize: "1rem" }}>Total Balance Due</div>
+                              <div style={{ fontSize: "1.6rem", fontWeight: 800, color: "#92400e" }}>${totalOwed.toFixed(2)}</div>
+                            </div>
+                            <div style={{ fontSize: "0.85rem", color: "#92400e" }}>Choose a payment method below</div>
+                          </div>
+
+                          {outstanding.map((b, i) => (
+                            <div key={i} style={{ background: "#fff", border: "1px solid #fde047", borderRadius: 16, padding: 18, marginBottom: 14 }}>
+                              <div style={{ fontWeight: 700, color: "#111827", marginBottom: 4 }}>{formatDateLabel(b.date)} — {b.packageType === "basic" ? "Basic Detail" : "Premium Detail"}</div>
+                              <div style={{ fontSize: "0.9rem", color: "#6b7280", marginBottom: 10 }}>
+                                {[b.year, b.make, b.model, b.boatSize].filter(Boolean).join(" ")}
+                                {b.invoiceNote ? ` — ${b.invoiceNote}` : ""}
+                              </div>
+                              <div style={{ fontSize: "1.2rem", fontWeight: 800, color: "#92400e", marginBottom: 14 }}>${b.invoiceAmount}</div>
+
+                              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+                                <a href={VENMO_URL} target="_blank" rel="noopener noreferrer" style={{ display: "block", background: "#008CFF", color: "#fff", borderRadius: 10, padding: "10px 8px", textAlign: "center", textDecoration: "none", fontWeight: 700, fontSize: "0.85rem" }}>Pay with Venmo</a>
+                                <a href={CASHAPP_URL} target="_blank" rel="noopener noreferrer" style={{ display: "block", background: "#00C244", color: "#fff", borderRadius: 10, padding: "10px 8px", textAlign: "center", textDecoration: "none", fontWeight: 700, fontSize: "0.85rem" }}>Pay with Cash App</a>
+                                <button onClick={() => handleSquareRequest(b)} style={{ background: "#111827", color: "#fff", border: "none", borderRadius: 10, padding: "10px 8px", fontWeight: 700, fontSize: "0.85rem", cursor: "pointer" }}>Pay with Card</button>
+                              </div>
+                              <div style={{ fontSize: "0.75rem", color: "#9ca3af", marginTop: 6, textAlign: "center" as const }}>Card payments via Square include a 4% processing fee.</div>
+                            </div>
+                          ))}
+                        </>
+                      )}
+
+                      {paid.length > 0 && (
+                        <>
+                          <div style={{ fontWeight: 700, color: "#9ca3af", fontSize: "0.85rem", textTransform: "uppercase" as const, letterSpacing: "0.04em", marginTop: 16, marginBottom: 10 }}>Paid</div>
+                          {paid.map((b, i) => (
+                            <div key={i} style={{ background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: 14, padding: 14, marginBottom: 10 }}>
+                              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                <div>
+                                  <div style={{ fontWeight: 600, color: "#374151", fontSize: "0.9rem" }}>{formatDateLabel(b.date)}</div>
+                                  <div style={{ fontSize: "0.85rem", color: "#9ca3af" }}>{b.packageType === "basic" ? "Basic Detail" : "Premium Detail"}</div>
+                                </div>
+                                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                  <span style={{ fontWeight: 700, color: "#374151" }}>${b.invoiceAmount}</span>
+                                  <span style={{ background: "#dcfce7", color: "#166534", fontSize: "0.72rem", fontWeight: 700, borderRadius: 999, padding: "2px 8px" }}>PAID</span>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </>
+                      )}
+                    </>
+                  );
+                })()}
+              </>
+            )}
+
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ADMIN VIEW
+  if (view === "admin" && googleUser?.email === ADMIN_EMAIL) {
+    const filtered = adminBookings.filter(b => {
+      if (adminFilter === "upcoming") return isUpcoming(b.date) && b.status !== "Completed";
+      if (adminFilter === "past") return !isUpcoming(b.date) || b.status === "Completed";
+      if (adminFilter === "maintenance") return b.clientType === "maintenance";
+      return true;
+    });
+
+    const pendingInvoices = adminBookings.filter(b => b.invoiceStatus === "pending");
+    const releasedInvoices = adminBookings.filter(b => b.invoiceStatus === "released");
+    const paidInvoices = adminBookings.filter(b => b.invoiceStatus === "paid");
+
+    return (
+      <div style={S.page}>
+        <div style={S.container}>
+          <Header />
+          <SquarePopup />
+          <div style={S.card}>
+            <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 24, flexWrap: "wrap" as const }}>
+              <button onClick={() => setView("myBookings")} style={{ ...S.secondary, padding: "9px 14px", fontSize: "0.9rem" }}>Back</button>
+              <h2 style={{ ...S.title, margin: 0, fontSize: "1.8rem" }}>Admin</h2>
+              <button onClick={loadAdminBookings} style={{ ...S.secondary, marginLeft: "auto", padding: "9px 14px", fontSize: "0.9rem" }}>Refresh</button>
+            </div>
+
+            {/* Admin tabs */}
+            <div style={{ display: "flex", gap: 4, marginBottom: 24, borderBottom: "2px solid #e5e7eb" }}>
+              <button onClick={() => setAdminTab("bookings")} style={{ background: "none", border: "none", cursor: "pointer", padding: "10px 18px", fontSize: "0.95rem", fontWeight: 700, color: adminTab === "bookings" ? "#111827" : "#9ca3af", borderBottom: adminTab === "bookings" ? "3px solid #111827" : "3px solid transparent", marginBottom: -2 }}>All Bookings</button>
+              <button onClick={() => setAdminTab("invoices")} style={{ background: "none", border: "none", cursor: "pointer", padding: "10px 18px", fontSize: "0.95rem", fontWeight: 700, color: adminTab === "invoices" ? "#d97706" : "#9ca3af", borderBottom: adminTab === "invoices" ? "3px solid #d97706" : "3px solid transparent", marginBottom: -2 }}>
+                Invoices {pendingInvoices.length > 0 && <span style={{ background: "#ef4444", color: "#fff", borderRadius: 999, padding: "1px 6px", fontSize: "0.72rem", marginLeft: 4 }}>{pendingInvoices.length}</span>}
+              </button>
+            </div>
+
+            {adminLoading ? (
+              <div style={{ textAlign: "center", padding: 40, color: "#6b7280" }}>Loading...</div>
+            ) : (
+              <>
+                {/* All Bookings tab */}
+                {adminTab === "bookings" && (
+                  <>
+                    {/* Filter bar */}
+                    <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" as const }}>
+                      {(["all", "upcoming", "past", "maintenance"] as const).map(f => (
+                        <button key={f} onClick={() => setAdminFilter(f)} style={{ background: adminFilter === f ? "#111827" : "#f3f4f6", color: adminFilter === f ? "#fff" : "#374151", border: "none", borderRadius: 999, padding: "6px 14px", fontSize: "0.85rem", fontWeight: 600, cursor: "pointer", textTransform: "capitalize" as const }}>
+                          {f === "all" ? "All" : f === "upcoming" ? "Upcoming" : f === "past" ? "Past" : "Maintenance"}
+                        </button>
+                      ))}
+                    </div>
+
+                    {filtered.length === 0 && <div style={{ textAlign: "center", padding: 40, color: "#6b7280" }}>No bookings found.</div>}
+
+                    <div style={{ display: "grid", gap: 12 }}>
+                      {filtered.map((b, i) => {
+                        const vl = b.vehicle === "boat" ? [b.boatSize, b.make, b.model].filter(Boolean).join(" ") : [b.year, b.make, b.model].filter(Boolean).join(" ");
+                        const isComplete = b.status === "Completed";
+                        const isSelected = selectedAdminBooking?.rowIndex === b.rowIndex;
+
+                        return (
+                          <div key={i} style={{ background: "#fff", border: `1.5px solid ${isComplete ? "#e5e7eb" : isUpcoming(b.date) ? "#2563eb" : "#e5e7eb"}`, borderRadius: 14, padding: 16 }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8, marginBottom: 6, flexWrap: "wrap" as const }}>
+                              <div>
+                                <div style={{ fontWeight: 700, color: "#111827", fontSize: "0.95rem" }}>{b.name} — {formatDateLabel(b.date)}{b.time ? ` at ${b.time}` : ""}</div>
+                                <div style={{ fontSize: "0.85rem", color: "#6b7280" }}>{b.email} · {b.phone}</div>
+                                <div style={{ fontSize: "0.85rem", color: "#6b7280" }}>{vl} · {b.packageType === "basic" ? "Basic" : "Premium"} · ${b.hourlyRate}/hr</div>
+                                {b.clientType === "maintenance" && <div style={{ fontSize: "0.8rem", color: "#059669", fontWeight: 600 }}>{b.recurringFrequency === "biweekly" ? "Bi-Weekly" : "Monthly"} Maintenance</div>}
+                                {b.serviceType === "mobile" && b.address && <div style={{ fontSize: "0.8rem", color: "#6b7280" }}>{b.address}</div>}
+                                {b.notes && <div style={{ fontSize: "0.8rem", color: "#9ca3af" }}>Notes: {b.notes}</div>}
+                              </div>
+                              <div style={{ display: "flex", flexDirection: "column" as const, alignItems: "flex-end", gap: 4 }}>
+                                <span style={{ background: isComplete ? "#dcfce7" : isUpcoming(b.date) ? "#eff6ff" : "#f3f4f6", color: isComplete ? "#166534" : isUpcoming(b.date) ? "#2563eb" : "#9ca3af", fontSize: "0.72rem", fontWeight: 700, borderRadius: 999, padding: "2px 8px" }}>
+                                  {isComplete ? "COMPLETED" : isUpcoming(b.date) ? "UPCOMING" : "PAST"}
+                                </span>
+                                {b.invoiceStatus && b.invoiceStatus !== "" && (
+                                  <span style={{ background: b.invoiceStatus === "paid" ? "#dcfce7" : b.invoiceStatus === "released" ? "#fef9c3" : "#fef3c7", color: b.invoiceStatus === "paid" ? "#166534" : "#92400e", fontSize: "0.72rem", fontWeight: 700, borderRadius: 999, padding: "2px 8px" }}>
+                                    {b.invoiceStatus === "pending" ? "INVOICE PENDING" : b.invoiceStatus === "released" ? `INVOICE SENT $${b.invoiceAmount}` : `PAID $${b.invoiceAmount}`}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            {!isComplete && (
+                              <button onClick={() => { setSelectedAdminBooking(isSelected ? null : b); setCompleteAmount(b.hourlyRate ? String(parseFloat(b.hourlyRate) * 2) : ""); setCompleteNote(""); }}
+                                style={{ background: isSelected ? "#f3f4f6" : "#111827", color: isSelected ? "#111827" : "#fff", border: "none", borderRadius: 8, padding: "7px 14px", fontSize: "0.82rem", fontWeight: 600, cursor: "pointer", marginTop: 4 }}>
+                                {isSelected ? "Cancel" : "Mark Complete"}
+                              </button>
+                            )}
+
+                            {isSelected && (
+                              <div style={{ marginTop: 14, padding: 16, background: "#f9fafb", borderRadius: 12, border: "1px solid #e5e7eb" }}>
+                                <div style={{ fontWeight: 700, color: "#374151", marginBottom: 10 }}>Confirm Service & Set Invoice</div>
+                                <div style={{ display: "flex", gap: 10, marginBottom: 10, flexWrap: "wrap" as const }}>
+                                  <div style={{ flex: 1, minWidth: 120 }}>
+                                    <div style={{ fontSize: "0.82rem", color: "#6b7280", marginBottom: 4 }}>Amount ($)</div>
+                                    <input style={{ ...S.input, padding: "10px 12px" }} type="number" placeholder="0.00" value={completeAmount} onChange={e => setCompleteAmount(e.target.value)} />
+                                  </div>
+                                  <div style={{ flex: 2, minWidth: 180 }}>
+                                    <div style={{ fontSize: "0.82rem", color: "#6b7280", marginBottom: 4 }}>Note (optional)</div>
+                                    <input style={{ ...S.input, padding: "10px 12px" }} placeholder="e.g. 2 hrs at $80/hr" value={completeNote} onChange={e => setCompleteNote(e.target.value)} />
+                                  </div>
+                                </div>
+                                <div style={{ fontSize: "0.8rem", color: "#9ca3af", marginBottom: 10 }}>This creates a pending invoice. You must release it from the Invoices tab before the client can see it.</div>
+                                <button onClick={handleMarkComplete} disabled={!completeAmount || completeLoading}
+                                  style={{ background: "#059669", color: "#fff", border: "none", borderRadius: 8, padding: "9px 18px", fontWeight: 700, fontSize: "0.88rem", cursor: "pointer", opacity: !completeAmount || completeLoading ? 0.5 : 1 }}>
+                                  {completeLoading ? "Saving..." : "Confirm Complete"}
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </>
+                )}
+
+                {/* Invoices tab */}
+                {adminTab === "invoices" && (
+                  <>
+                    {pendingInvoices.length > 0 && (
+                      <>
+                        <div style={{ fontWeight: 700, color: "#92400e", fontSize: "0.85rem", textTransform: "uppercase" as const, letterSpacing: "0.04em", marginBottom: 10 }}>Pending Review — Not Visible to Client</div>
+                        <div style={{ display: "grid", gap: 10, marginBottom: 24 }}>
+                          {pendingInvoices.map((b, i) => (
+                            <div key={i} style={{ background: "#fff", border: "1px solid #fde68a", borderRadius: 14, padding: 16 }}>
+                              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap" as const, gap: 8 }}>
+                                <div>
+                                  <div style={{ fontWeight: 700, color: "#111827" }}>{b.name} — {formatDateLabel(b.date)}</div>
+                                  <div style={{ fontSize: "0.85rem", color: "#6b7280" }}>{b.email}</div>
+                                  {b.invoiceNote && <div style={{ fontSize: "0.85rem", color: "#9ca3af" }}>{b.invoiceNote}</div>}
+                                </div>
+                                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                                  <span style={{ fontWeight: 800, color: "#92400e", fontSize: "1.1rem" }}>${b.invoiceAmount}</span>
+                                  <button onClick={() => handleReleaseInvoice(b)} style={{ background: "#111827", color: "#fff", border: "none", borderRadius: 8, padding: "7px 14px", fontWeight: 600, fontSize: "0.82rem", cursor: "pointer" }}>Release to Client</button>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </>
+                    )}
+
+                    {releasedInvoices.length > 0 && (
+                      <>
+                        <div style={{ fontWeight: 700, color: "#374151", fontSize: "0.85rem", textTransform: "uppercase" as const, letterSpacing: "0.04em", marginBottom: 10 }}>Sent to Client — Awaiting Payment</div>
+                        <div style={{ display: "grid", gap: 10, marginBottom: 24 }}>
+                          {releasedInvoices.map((b, i) => (
+                            <div key={i} style={{ background: "#fff", border: "1px solid #fde047", borderRadius: 14, padding: 16 }}>
+                              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap" as const, gap: 8 }}>
+                                <div>
+                                  <div style={{ fontWeight: 700, color: "#111827" }}>{b.name} — {formatDateLabel(b.date)}</div>
+                                  <div style={{ fontSize: "0.85rem", color: "#6b7280" }}>{b.email}</div>
+                                  {b.invoiceNote && <div style={{ fontSize: "0.85rem", color: "#9ca3af" }}>{b.invoiceNote}</div>}
+                                </div>
+                                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                                  <span style={{ fontWeight: 800, color: "#92400e", fontSize: "1.1rem" }}>${b.invoiceAmount}</span>
+                                  <button onClick={() => handleMarkPaid(b)} style={{ background: "#059669", color: "#fff", border: "none", borderRadius: 8, padding: "7px 14px", fontWeight: 600, fontSize: "0.82rem", cursor: "pointer" }}>Mark Paid</button>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </>
+                    )}
+
+                    {paidInvoices.length > 0 && (
+                      <>
+                        <div style={{ fontWeight: 700, color: "#9ca3af", fontSize: "0.85rem", textTransform: "uppercase" as const, letterSpacing: "0.04em", marginBottom: 10 }}>Paid</div>
+                        <div style={{ display: "grid", gap: 10 }}>
+                          {paidInvoices.map((b, i) => (
+                            <div key={i} style={{ background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: 14, padding: 14 }}>
+                              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                <div>
+                                  <div style={{ fontWeight: 600, color: "#374151" }}>{b.name} — {formatDateLabel(b.date)}</div>
+                                  <div style={{ fontSize: "0.82rem", color: "#9ca3af" }}>{b.email}</div>
+                                </div>
+                                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                  <span style={{ fontWeight: 700, color: "#374151" }}>${b.invoiceAmount}</span>
+                                  <span style={{ background: "#dcfce7", color: "#166534", fontSize: "0.72rem", fontWeight: 700, borderRadius: 999, padding: "2px 8px" }}>PAID</span>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </>
+                    )}
+
+                    {pendingInvoices.length === 0 && releasedInvoices.length === 0 && paidInvoices.length === 0 && (
+                      <div style={{ textAlign: "center", padding: 40, color: "#6b7280" }}>No invoices yet. Mark a service complete to create one.</div>
                     )}
                   </>
                 )}
@@ -769,6 +1165,7 @@ export default function App() {
   return (
     <div style={S.page}>
       <div style={S.container}>
+        <SquarePopup />
         <Header />
         {step > 0 && step < TOTAL_STEPS - 1 && <ProgressBar />}
         <div style={S.card}>
