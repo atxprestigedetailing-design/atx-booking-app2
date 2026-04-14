@@ -886,25 +886,57 @@ export default function App() {
                 })()}
 
                 {bookingsTab === "maintenance" && isMaintenance && (() => {
-                  // Build 6-month schedule: booked upcoming rows + calculated future dates
                   const sixMonthsOut = new Date();
                   sixMonthsOut.setMonth(sixMonthsOut.getMonth() + 6);
 
-                  // Get reference booking for cadence
-                  const allSorted = [...maintenanceBookings].sort((a, b) => b.date.localeCompare(a.date));
-                  const ref = allSorted[0];
+                  // Use earliest upcoming booked row as reference, fall back to most recent
+                  const allSorted = [...maintenanceBookings].sort((a, b) => a.date.localeCompare(b.date));
+                  const ref = allSorted.find(b => isUpcoming(b.date)) || allSorted[allSorted.length - 1];
                   const freq = ref?.recurringFrequency || "";
 
-                  // Calculate future dates beyond what's already booked (up to 6 months)
-                  let futureDates: { date: string; label: string }[] = [];
+                  // Map of booked upcoming dates for quick lookup
+                  const bookedMap: Record<string, typeof upcomingMaintenance[0]> = {};
+                  upcomingMaintenance.forEach(b => { bookedMap[b.date] = b; });
+
+                  // Generate all dates from ref forward, filter to upcoming + within 6 months
+                  const scheduleDates: { dateStr: string; label: string; booked: boolean; booking?: typeof upcomingMaintenance[0] }[] = [];
+
                   if (ref && freq && ref.date) {
-                    futureDates = nextMaintenanceDates
-                      .filter(nd => {
-                        // parse the label back — it's "Mon, Apr 27, 2026" format
-                        const d = new Date(nd.dateLabel);
-                        return d <= sixMonthsOut;
-                      })
-                      .map(nd => ({ date: nd.dateLabel, label: nd.dateLabel }));
+                    const [ry, rm, rd] = ref.date.split("-").map(Number);
+                    const refStart = new Date(ry, rm - 1, rd);
+                    const today = new Date(); today.setHours(0,0,0,0);
+
+                    const rawDates: string[] = [];
+                    if (freq === "biweekly") {
+                      let cur = new Date(refStart);
+                      for (let i = 0; i < 30; i++) {
+                        rawDates.push(fmtDate(cur));
+                        cur.setDate(cur.getDate() + 14);
+                      }
+                    } else if (freq === "monthly") {
+                      const dow = refStart.getDay();
+                      const weekPos = Math.ceil(refStart.getDate() / 7);
+                      const isLastW = new Date(ry, rm - 1, rd + 7).getMonth() !== refStart.getMonth();
+                      let cm = rm - 1; let cy = ry;
+                      for (let i = 0; i < 12; i++) {
+                        const d = getNthWeekday(cy, cm, dow, weekPos, isLastW);
+                        if (d) rawDates.push(fmtDate(d));
+                        cm++; if (cm > 11) { cm = 0; cy++; }
+                      }
+                    }
+
+                    rawDates.forEach(ds => {
+                      const [y2, m2, d2] = ds.split("-").map(Number);
+                      const dt = new Date(y2, m2 - 1, d2);
+                      if (dt >= today && dt <= sixMonthsOut) {
+                        scheduleDates.push({
+                          dateStr: ds,
+                          label: formatDateLabel(ds),
+                          booked: !!bookedMap[ds],
+                          booking: bookedMap[ds],
+                        });
+                      }
+                    });
                   }
 
                   const scheduleLabel = freq === "biweekly" ? "Bi-Weekly" : freq === "monthly" ? "Monthly" : "Recurring";
@@ -920,46 +952,36 @@ export default function App() {
                         </div>
                       </div>
 
-                      {/* Upcoming booked rows */}
-                      {upcomingMaintenance.length > 0 && (
-                        <>
-                          <div style={{ fontWeight: 700, color: "#374151", fontSize: "0.82rem", textTransform: "uppercase" as const, letterSpacing: "0.04em", marginBottom: 8 }}>Confirmed</div>
-                          <div style={{ display: "grid", gap: 10, marginBottom: 16 }}>
-                            {upcomingMaintenance.map((b, i) => {
-                              const vl = b.vehicle === "boat" ? [b.boatSize, b.make, b.model].filter(Boolean).join(" ") : [b.year, b.make, b.model].filter(Boolean).join(" ");
-                              return (
-                                <div key={i} style={{ background: "#fff", border: "1.5px solid #059669", borderRadius: 14, padding: "14px 16px", display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap" as const, gap: 8 }}>
-                                  <div>
-                                    <div style={{ fontWeight: 700, color: "#111827", fontSize: "0.95rem" }}>{formatDateLabel(b.date)}{b.time ? ` at ${b.time}` : ""}</div>
-                                    <div style={{ fontSize: "0.85rem", color: "#6b7280" }}>{vl && `${vl} · `}{b.packageType === "basic" ? "Basic Detail" : "Premium Detail"}</div>
-                                    {b.serviceType === "mobile" && b.address && <div style={{ fontSize: "0.82rem", color: "#9ca3af" }}>{b.address}</div>}
-                                  </div>
-                                  <span style={{ background: "#ecfdf5", color: "#059669", fontSize: "0.72rem", fontWeight: 700, borderRadius: 999, padding: "3px 9px" }}>CONFIRMED</span>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </>
-                      )}
-
-                      {/* Calculated future dates */}
-                      {futureDates.length > 0 && (
-                        <>
-                          <div style={{ fontWeight: 700, color: "#9ca3af", fontSize: "0.82rem", textTransform: "uppercase" as const, letterSpacing: "0.04em", marginBottom: 8 }}>Scheduled</div>
-                          <div style={{ display: "grid", gap: 8 }}>
-                            {futureDates.map((d, i) => (
-                              <div key={i} style={{ background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: 12, padding: "12px 16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                                <div style={{ fontWeight: 600, color: "#374151", fontSize: "0.9rem" }}>{d.label}</div>
-                                <span style={{ background: "#f3f4f6", color: "#9ca3af", fontSize: "0.72rem", fontWeight: 700, borderRadius: 999, padding: "3px 9px" }}>SCHEDULED</span>
-                              </div>
-                            ))}
-                          </div>
-                        </>
-                      )}
-
-                      {upcomingMaintenance.length === 0 && futureDates.length === 0 && (
+                      {scheduleDates.length === 0 && (
                         <div style={{ textAlign: "center", padding: 30, color: "#6b7280", fontSize: "0.9rem" }}>No upcoming services scheduled.</div>
                       )}
+
+                      <div style={{ display: "grid", gap: 10 }}>
+                        {scheduleDates.map((sd, i) => {
+                          const b = sd.booking;
+                          const vl = b ? (b.vehicle === "boat"
+                            ? [b.boatSize, b.make, b.model].filter(Boolean).join(" ")
+                            : [b.year, b.make, b.model].filter(Boolean).join(" ")) : "";
+                          return (
+                            <div key={i} style={{ background: sd.booked ? "#fff" : "#f9fafb", border: sd.booked ? "1.5px solid #059669" : "1px solid #e5e7eb", borderRadius: 14, padding: "14px 16px", display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap" as const, gap: 8 }}>
+                              <div>
+                                <div style={{ fontWeight: 700, color: "#111827", fontSize: "0.95rem" }}>
+                                  {sd.label}{b?.time ? ` at ${b.time}` : ""}
+                                </div>
+                                {b && (
+                                  <>
+                                    <div style={{ fontSize: "0.85rem", color: "#6b7280" }}>{vl && `${vl} · `}{b.packageType === "basic" ? "Basic Detail" : "Premium Detail"}</div>
+                                    {b.serviceType === "mobile" && b.address && <div style={{ fontSize: "0.82rem", color: "#9ca3af" }}>{b.address}</div>}
+                                  </>
+                                )}
+                              </div>
+                              <span style={{ background: sd.booked ? "#ecfdf5" : "#f3f4f6", color: sd.booked ? "#059669" : "#9ca3af", fontSize: "0.72rem", fontWeight: 700, borderRadius: 999, padding: "3px 9px", whiteSpace: "nowrap" as const }}>
+                                {sd.booked ? "CONFIRMED" : "SCHEDULED"}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </>
                   );
                 })()}
