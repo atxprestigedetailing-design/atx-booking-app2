@@ -462,7 +462,7 @@ export default function App() {
             if (nextDate) {
               const nextDateStr = fmtDate(nextDate);
               // Check not already booked
-              // will be checked server-side
+              const alreadyExists = false; // will be checked server-side
               try {
                 await fetch(SCRIPT_URL, {
                   method: "POST",
@@ -719,7 +719,7 @@ export default function App() {
     // No upcoming rows exist — calculate next date from the most recent completed booking
     const nextDates = calcRecurringDates(ref.date, ref.recurringFrequency, 3);
     return nextDates
-      .filter(() => {
+      .filter(dateLabel => {
         // Convert label back to a date to check if it's in the future
         // calcRecurringDates returns formatted labels like "Mon, Apr 27, 2026"
         // We just show them — they are by definition future dates
@@ -886,93 +886,144 @@ export default function App() {
               </div>
             </div>
 
-            <div style={{ display: "flex", gap: 4, marginBottom: 24, borderBottom: "2px solid #e5e7eb" }}>
-              <button onClick={() => setBookingsTab("appointments")} style={{ background: "none", border: "none", cursor: "pointer", padding: "10px 18px", fontSize: "0.95rem", fontWeight: 700, color: bookingsTab === "appointments" ? "#111827" : "#9ca3af", borderBottom: bookingsTab === "appointments" ? "3px solid #111827" : "3px solid transparent", marginBottom: -2 }}>
-                My Appointments
-              </button>
-              {isMaintenance && (
-                <button onClick={() => setBookingsTab("maintenance")} style={{ background: "none", border: "none", cursor: "pointer", padding: "10px 18px", fontSize: "0.95rem", fontWeight: 700, color: bookingsTab === "maintenance" ? "#059669" : "#9ca3af", borderBottom: bookingsTab === "maintenance" ? "3px solid #059669" : "3px solid transparent", marginBottom: -2 }}>
-                  Maintenance Plan
+            <div style={{ overflowX: "auto" as const, marginBottom: 24, borderBottom: "2px solid #e5e7eb" }}>
+              <div style={{ display: "flex", gap: 0, minWidth: "max-content" }}>
+                <button onClick={() => setBookingsTab("appointments")} style={{ background: "none", border: "none", cursor: "pointer", padding: "10px 16px", fontSize: "0.9rem", fontWeight: 700, color: bookingsTab === "appointments" ? "#111827" : "#9ca3af", borderBottom: bookingsTab === "appointments" ? "3px solid #111827" : "3px solid transparent", marginBottom: -2, whiteSpace: "nowrap" as const }}>
+                  My Appointments
                 </button>
-              )}
-              <button onClick={() => setBookingsTab("balance" as any)} style={{ background: "none", border: "none", cursor: "pointer", padding: "10px 18px", fontSize: "0.95rem", fontWeight: 700, color: (bookingsTab as string) === "balance" ? "#d97706" : "#9ca3af", borderBottom: (bookingsTab as string) === "balance" ? "3px solid #d97706" : "3px solid transparent", marginBottom: -2 }}>
-                Balance
-              </button>
+                {isMaintenance && (
+                  <button onClick={() => setBookingsTab("maintenance")} style={{ background: "none", border: "none", cursor: "pointer", padding: "10px 16px", fontSize: "0.9rem", fontWeight: 700, color: bookingsTab === "maintenance" ? "#059669" : "#9ca3af", borderBottom: bookingsTab === "maintenance" ? "3px solid #059669" : "3px solid transparent", marginBottom: -2, whiteSpace: "nowrap" as const }}>
+                    Maintenance Plan
+                  </button>
+                )}
+                <button onClick={() => setBookingsTab("balance" as any)} style={{ background: "none", border: "none", cursor: "pointer", padding: "10px 16px", fontSize: "0.9rem", fontWeight: 700, color: (bookingsTab as string) === "balance" ? "#d97706" : "#9ca3af", borderBottom: (bookingsTab as string) === "balance" ? "3px solid #d97706" : "3px solid transparent", marginBottom: -2, whiteSpace: "nowrap" as const }}>
+                  Balance
+                </button>
+              </div>
             </div>
 
             {bookingsLoading ? (
               <div style={{ textAlign: "center", padding: 40, color: "#6b7280" }}>Loading your bookings...</div>
             ) : (
               <>
-                {bookingsTab === "appointments" && (
-                  <>
-                    {upcomingStandard.length === 0 && pastStandard.length === 0 && (
-                      <div style={{ textAlign: "center", padding: 40, color: "#6b7280" }}>
-                        No bookings found for {googleUser?.email}.<br />
-                        <button onClick={() => { setView("booking"); setStep(1); }} style={{ ...S.primary, marginTop: 16, display: "inline-block" }}>Book Your First Service</button>
-                      </div>
-                    )}
-                    {upcomingStandard.length > 0 && (
-                      <>
-                        <div style={{ fontWeight: 700, color: "#374151", fontSize: "0.95rem", marginBottom: 12, textTransform: "uppercase" as const, letterSpacing: "0.04em" }}>Upcoming</div>
-                        <div style={{ display: "grid", gap: 14, marginBottom: 28 }}>
-                          {upcomingStandard.map((b, i) => (
-                            <BookingCard key={i} booking={b} upcoming onRequestChange={(b) => { setChangeTarget(b); setChangeNote(""); setChangeSubmitted(false); setView("requestChange"); }} />
-                          ))}
+                {bookingsTab === "appointments" && (() => {
+                  // All bookings — standard AND maintenance combined
+                  const allUpcoming = [...upcomingStandard, ...upcomingMaintenance].sort((a, b) => a.date.localeCompare(b.date));
+                  const allPast = [...pastStandard, ...pastMaintenance].sort((a, b) => b.date.localeCompare(a.date));
+                  return (
+                    <>
+                      {allUpcoming.length === 0 && allPast.length === 0 && (
+                        <div style={{ textAlign: "center", padding: 40, color: "#6b7280" }}>
+                          No bookings found for {googleUser?.email}.<br />
+                          <button onClick={() => { setView("booking"); setStep(1); }} style={{ ...S.primary, marginTop: 16, display: "inline-block" }}>Book Your First Service</button>
                         </div>
-                      </>
-                    )}
-                    {pastStandard.length > 0 && (
-                      <>
-                        <div style={{ fontWeight: 700, color: "#9ca3af", fontSize: "0.95rem", marginBottom: 12, textTransform: "uppercase" as const, letterSpacing: "0.04em" }}>Past Services</div>
-                        <div style={{ display: "grid", gap: 14 }}>
-                          {pastStandard.map((b, i) => <BookingCard key={i} booking={b} upcoming={false} onRequestChange={() => {}} />)}
-                        </div>
-                      </>
-                    )}
-                  </>
-                )}
+                      )}
+                      {allUpcoming.length > 0 && (
+                        <>
+                          <div style={{ fontWeight: 700, color: "#374151", fontSize: "0.95rem", marginBottom: 12, textTransform: "uppercase" as const, letterSpacing: "0.04em" }}>Upcoming</div>
+                          <div style={{ display: "grid", gap: 14, marginBottom: 28 }}>
+                            {allUpcoming.map((b, i) => (
+                              <BookingCard key={i} booking={b} upcoming onRequestChange={(b) => { setChangeTarget(b); setChangeNote(""); setChangeSubmitted(false); setView("requestChange"); }} />
+                            ))}
+                          </div>
+                        </>
+                      )}
+                      {allPast.length > 0 && (
+                        <>
+                          <div style={{ fontWeight: 700, color: "#9ca3af", fontSize: "0.95rem", marginBottom: 12, textTransform: "uppercase" as const, letterSpacing: "0.04em" }}>Past Services</div>
+                          <div style={{ display: "grid", gap: 14 }}>
+                            {allPast.map((b, i) => <BookingCard key={i} booking={b} upcoming={false} onRequestChange={() => {}} />)}
+                          </div>
+                        </>
+                      )}
+                    </>
+                  );
+                })()}
 
-                {bookingsTab === "maintenance" && isMaintenance && (
-                  <>
-                    <div style={{ background: "#ecfdf5", border: "1px solid #6ee7b7", borderRadius: 14, padding: "14px 18px", marginBottom: 24 }}>
-                      <div style={{ fontWeight: 700, color: "#065f46", marginBottom: 4 }}>Maintenance Client</div>
-                      <div style={{ color: "#047857", fontSize: "0.92rem", lineHeight: 1.6 }}>
-                        Your maintenance schedule is managed by ATX Prestige Detailing. Use "Request a Change" on any upcoming service to reschedule or adjust. You can also book additional one-time services for family or extra vehicles through the normal booking flow.
+                {bookingsTab === "maintenance" && isMaintenance && (() => {
+                  // Build 6-month schedule: booked upcoming rows + calculated future dates
+                  const sixMonthsOut = new Date();
+                  sixMonthsOut.setMonth(sixMonthsOut.getMonth() + 6);
+
+                  // Get all upcoming maintenance rows
+                  const bookedDates = new Set(upcomingMaintenance.map(b => b.date));
+
+                  // Get reference booking for cadence
+                  const allSorted = [...maintenanceBookings].sort((a, b) => b.date.localeCompare(a.date));
+                  const ref = allSorted[0];
+                  const freq = ref?.recurringFrequency || "";
+
+                  // Calculate future dates beyond what's already booked (up to 6 months)
+                  let futureDates: { date: string; label: string }[] = [];
+                  if (ref && freq && ref.date) {
+                    const calculated = calcRecurringDates(ref.date, freq, 12);
+                    // calcRecurringDates returns formatted labels, we need to cross-ref with booked
+                    // Use the raw dates from upcomingMaintenance + nextMaintenanceDates
+                    futureDates = nextMaintenanceDates
+                      .filter(nd => {
+                        // parse the label back — it's "Mon, Apr 27, 2026" format
+                        const d = new Date(nd.dateLabel);
+                        return d <= sixMonthsOut;
+                      })
+                      .map(nd => ({ date: nd.dateLabel, label: nd.dateLabel }));
+                  }
+
+                  const scheduleLabel = freq === "biweekly" ? "Bi-Weekly" : freq === "monthly" ? "Monthly" : "Recurring";
+                  const cadence = ref ? getCadenceLabel(ref.date, freq) : "";
+
+                  return (
+                    <>
+                      <div style={{ background: "#ecfdf5", border: "1px solid #6ee7b7", borderRadius: 14, padding: "14px 18px", marginBottom: 20 }}>
+                        <div style={{ fontWeight: 700, color: "#065f46", marginBottom: 2 }}>Maintenance Plan — {scheduleLabel}</div>
+                        {cadence && <div style={{ fontSize: "0.88rem", color: "#047857" }}>{cadence}</div>}
+                        <div style={{ color: "#047857", fontSize: "0.88rem", marginTop: 4, lineHeight: 1.5 }}>
+                          Your schedule below shows the next 6 months of services. Contact us through My Appointments to request any changes.
+                        </div>
                       </div>
-                    </div>
-                    {(upcomingMaintenance.length > 0 || nextMaintenanceDates.length > 0) && (
-                      <>
-                        <div style={{ fontWeight: 700, color: "#374151", fontSize: "0.95rem", marginBottom: 12, textTransform: "uppercase" as const, letterSpacing: "0.04em" }}>Upcoming</div>
-                        <div style={{ display: "grid", gap: 14, marginBottom: 28 }}>
-                          {upcomingMaintenance.map((b, i) => (
-                            <MaintenanceCard key={i} booking={b} onRequestChange={(b) => { setChangeTarget(b); setChangeNote(""); setChangeSubmitted(false); setView("requestChange"); }} />
-                          ))}
-                          {/* Show calculated next dates if no upcoming rows exist yet */}
-                          {upcomingMaintenance.length === 0 && nextMaintenanceDates.map((nd, i) => (
-                            <div key={i} style={{ background: "#fff", border: "1.5px solid #059669", borderRadius: 16, padding: 18 }}>
-                              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8, marginBottom: 4 }}>
-                                <div style={{ fontSize: "1rem", fontWeight: 700, color: "#111827" }}>{nd.dateLabel}</div>
-                                <span style={{ background: "#ecfdf5", color: "#059669", fontSize: "0.72rem", fontWeight: 700, borderRadius: 999, padding: "3px 9px", whiteSpace: "nowrap" as const }}>
-                                  {nd.freq === "biweekly" ? "BI-WEEKLY" : "MONTHLY"}
-                                </span>
+
+                      {/* Upcoming booked rows */}
+                      {upcomingMaintenance.length > 0 && (
+                        <>
+                          <div style={{ fontWeight: 700, color: "#374151", fontSize: "0.82rem", textTransform: "uppercase" as const, letterSpacing: "0.04em", marginBottom: 8 }}>Confirmed</div>
+                          <div style={{ display: "grid", gap: 10, marginBottom: 16 }}>
+                            {upcomingMaintenance.map((b, i) => {
+                              const vl = b.vehicle === "boat" ? [b.boatSize, b.make, b.model].filter(Boolean).join(" ") : [b.year, b.make, b.model].filter(Boolean).join(" ");
+                              return (
+                                <div key={i} style={{ background: "#fff", border: "1.5px solid #059669", borderRadius: 14, padding: "14px 16px", display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap" as const, gap: 8 }}>
+                                  <div>
+                                    <div style={{ fontWeight: 700, color: "#111827", fontSize: "0.95rem" }}>{formatDateLabel(b.date)}{b.time ? ` at ${b.time}` : ""}</div>
+                                    <div style={{ fontSize: "0.85rem", color: "#6b7280" }}>{vl && `${vl} · `}{b.packageType === "basic" ? "Basic Detail" : "Premium Detail"}</div>
+                                    {b.serviceType === "mobile" && b.address && <div style={{ fontSize: "0.82rem", color: "#9ca3af" }}>{b.address}</div>}
+                                  </div>
+                                  <span style={{ background: "#ecfdf5", color: "#059669", fontSize: "0.72rem", fontWeight: 700, borderRadius: 999, padding: "3px 9px" }}>CONFIRMED</span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </>
+                      )}
+
+                      {/* Calculated future dates */}
+                      {futureDates.length > 0 && (
+                        <>
+                          <div style={{ fontWeight: 700, color: "#9ca3af", fontSize: "0.82rem", textTransform: "uppercase" as const, letterSpacing: "0.04em", marginBottom: 8 }}>Scheduled</div>
+                          <div style={{ display: "grid", gap: 8 }}>
+                            {futureDates.map((d, i) => (
+                              <div key={i} style={{ background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: 12, padding: "12px 16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                <div style={{ fontWeight: 600, color: "#374151", fontSize: "0.9rem" }}>{d.label}</div>
+                                <span style={{ background: "#f3f4f6", color: "#9ca3af", fontSize: "0.72rem", fontWeight: 700, borderRadius: 999, padding: "3px 9px" }}>SCHEDULED</span>
                               </div>
-                              <div style={{ fontSize: "0.85rem", color: "#9ca3af" }}>Next scheduled service — booking details will be confirmed by ATX Prestige Detailing.</div>
-                            </div>
-                          ))}
-                        </div>
-                      </>
-                    )}
-                    {pastMaintenance.length > 0 && (
-                      <>
-                        <div style={{ fontWeight: 700, color: "#9ca3af", fontSize: "0.95rem", marginBottom: 12, textTransform: "uppercase" as const, letterSpacing: "0.04em" }}>Past Services</div>
-                        <div style={{ display: "grid", gap: 14 }}>
-                          {pastMaintenance.map((b, i) => <MaintenanceCard key={i} booking={b} onRequestChange={() => {}} />)}
-                        </div>
-                      </>
-                    )}
-                  </>
-                )}
+                            ))}
+                          </div>
+                        </>
+                      )}
+
+                      {upcomingMaintenance.length === 0 && futureDates.length === 0 && (
+                        <div style={{ textAlign: "center", padding: 30, color: "#6b7280", fontSize: "0.9rem" }}>No upcoming services scheduled.</div>
+                      )}
+                    </>
+                  );
+                })()}
               </>
             )}
 
