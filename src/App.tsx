@@ -462,7 +462,7 @@ export default function App() {
             if (nextDate) {
               const nextDateStr = fmtDate(nextDate);
               // Check not already booked
-              const alreadyExists = false; // will be checked server-side
+              // will be checked server-side
               try {
                 await fetch(SCRIPT_URL, {
                   method: "POST",
@@ -719,7 +719,7 @@ export default function App() {
     // No upcoming rows exist — calculate next date from the most recent completed booking
     const nextDates = calcRecurringDates(ref.date, ref.recurringFrequency, 3);
     return nextDates
-      .filter(dateLabel => {
+      .filter(() => {
         // Convert label back to a date to check if it's in the future
         // calcRecurringDates returns formatted labels like "Mon, Apr 27, 2026"
         // We just show them — they are by definition future dates
