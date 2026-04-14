@@ -263,54 +263,6 @@ function BookingCard({ booking, upcoming, onRequestChange }: {
   );
 }
 
-function MaintenanceCard({ booking, onRequestChange }: {
-  booking: Booking; onRequestChange: (b: Booking) => void;
-}) {
-  const vehicleLabel =
-    booking.vehicle === "boat"
-      ? [booking.boatSize, booking.make, booking.model].filter(Boolean).join(" ")
-      : [booking.year, booking.make, booking.model].filter(Boolean).join(" ");
-
-  const freqLabel =
-    booking.recurringFrequency === "biweekly" ? "Bi-Weekly"
-    : booking.recurringFrequency === "monthly" ? "Monthly"
-    : booking.recurringFrequency || "Recurring";
-
-  const upcoming = isUpcoming(booking.date);
-
-  return (
-    <div style={{ background: "#fff", border: "1.5px solid #059669", borderRadius: 16, padding: 18 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8, marginBottom: 2 }}>
-        <div style={{ fontSize: "1rem", fontWeight: 700, color: "#111827", flex: 1, minWidth: 0 }}>
-          {formatDateLabel(booking.date)}{booking.time ? ` at ${booking.time}` : ""}
-        </div>
-        <span style={{ background: "#ecfdf5", color: "#059669", fontSize: "0.72rem", fontWeight: 700, borderRadius: 999, padding: "3px 9px", whiteSpace: "nowrap" as const, flexShrink: 0 }}>
-          {freqLabel.toUpperCase()}
-        </span>
-      </div>
-      {booking.recurringFrequency && booking.date && (
-        <div style={{ fontSize: "0.82rem", color: "#059669", marginBottom: 6 }}>
-          {getCadenceLabel(booking.date, booking.recurringFrequency)}
-        </div>
-      )}
-      <div style={{ fontSize: "0.92rem", color: "#6b7280", lineHeight: 1.6 }}>
-        {vehicleLabel && <div>{vehicleLabel}</div>}
-        <div>{booking.packageType === "basic" ? "Basic Detail" : booking.packageType === "premium" ? "Premium Detail" : booking.packageType}</div>
-        {booking.serviceType && (
-          <div>{booking.serviceType === "mobile" ? `Mobile Service${booking.address ? ` - ${booking.address}` : ""}` : "Drop-Off Service"}</div>
-        )}
-        {booking.addOns && <div>Add-Ons: {booking.addOns}</div>}
-        {booking.notes && <div>Notes: {booking.notes}</div>}
-      </div>
-      {upcoming && (
-        <button onClick={() => onRequestChange(booking)} style={{ marginTop: 14, background: "#059669", color: "#fff", border: "none", borderRadius: 10, padding: "9px 16px", fontSize: "0.9rem", fontWeight: 600, cursor: "pointer" }}>
-          Request a Change
-        </button>
-      )}
-    </div>
-  );
-}
-
 export default function App() {
   const addressInputRef = useRef(null);
 
@@ -461,8 +413,6 @@ export default function App() {
                 );
             if (nextDate) {
               const nextDateStr = fmtDate(nextDate);
-              // Check not already booked
-              const alreadyExists = false; // will be checked server-side
               try {
                 await fetch(SCRIPT_URL, {
                   method: "POST",
@@ -719,12 +669,7 @@ export default function App() {
     // No upcoming rows exist — calculate next date from the most recent completed booking
     const nextDates = calcRecurringDates(ref.date, ref.recurringFrequency, 3);
     return nextDates
-      .filter(dateLabel => {
-        // Convert label back to a date to check if it's in the future
-        // calcRecurringDates returns formatted labels like "Mon, Apr 27, 2026"
-        // We just show them — they are by definition future dates
-        return true;
-      })
+      .filter(() => true)
       .map(d => ({ dateLabel: d, freq: ref.recurringFrequency }));
   })();
 
@@ -945,9 +890,6 @@ export default function App() {
                   const sixMonthsOut = new Date();
                   sixMonthsOut.setMonth(sixMonthsOut.getMonth() + 6);
 
-                  // Get all upcoming maintenance rows
-                  const bookedDates = new Set(upcomingMaintenance.map(b => b.date));
-
                   // Get reference booking for cadence
                   const allSorted = [...maintenanceBookings].sort((a, b) => b.date.localeCompare(a.date));
                   const ref = allSorted[0];
@@ -956,9 +898,6 @@ export default function App() {
                   // Calculate future dates beyond what's already booked (up to 6 months)
                   let futureDates: { date: string; label: string }[] = [];
                   if (ref && freq && ref.date) {
-                    const calculated = calcRecurringDates(ref.date, freq, 12);
-                    // calcRecurringDates returns formatted labels, we need to cross-ref with booked
-                    // Use the raw dates from upcomingMaintenance + nextMaintenanceDates
                     futureDates = nextMaintenanceDates
                       .filter(nd => {
                         // parse the label back — it's "Mon, Apr 27, 2026" format
