@@ -11,7 +11,7 @@ const GOOGLE_CLIENT_ID =
   "447699234633-ivo2e1c2q843scj32k5323o2rkq6h7dp.apps.googleusercontent.com";
 
 const SCRIPT_URL =
-  "https://script.google.com/macros/s/AKfycbwKEWLhjBetIt2a4WSi_vINQb6nMtM_e8nLkK5mBDa2b6UCGjEtYd-z-Y5pCzzgvzm42A/exec";
+  "https://script.google.com/macros/s/AKfycbxziEf5nybRQnNWAU5_zdESYWQ5LT1DGOc1CcNT0i1zvn5RHFNZkpBpiuEbS6mSbSPUMg/exec";
 
 const TOTAL_STEPS = 9;
 const ADMIN_EMAIL = "atxprestigedetailing@gmail.com";
@@ -451,8 +451,23 @@ export default function App() {
   async function handleReleaseInvoice(booking: Booking) {
     try {
       const ok = await updateBooking(booking.rowIndex, { invoiceStatus: "released" });
-      if (ok) { await loadAdminBookings(); }
-      else { alert("Something went wrong."); }
+      if (ok) {
+        // Send invoice email to customer
+        try {
+          await fetch(SCRIPT_URL, {
+            method: "POST",
+            body: JSON.stringify({
+              action: "sendInvoiceEmail",
+              customerName: booking.name,
+              customerEmail: booking.email,
+              invoiceAmount: booking.invoiceAmount,
+              invoiceNote: booking.invoiceNote,
+              serviceDate: booking.date,
+            }),
+          });
+        } catch (emailErr) { console.error("Invoice email failed", emailErr); }
+        await loadAdminBookings();
+      } else { alert("Something went wrong."); }
     } catch (e) { alert("Something went wrong."); }
   }
 
@@ -593,10 +608,14 @@ export default function App() {
   const standardBookings    = userBookings.filter((b) => b.clientType !== "maintenance");
   const maintenanceBookings = userBookings.filter((b) => b.clientType === "maintenance");
   const isMaintenance       = maintenanceBookings.length > 0;
-  const upcomingStandard    = standardBookings.filter((b) => isUpcoming(b.date)).sort((a, b) => a.date.localeCompare(b.date));
-  const pastStandard        = standardBookings.filter((b) => !isUpcoming(b.date)).sort((a, b) => b.date.localeCompare(a.date));
-  const upcomingMaintenance = maintenanceBookings.filter((b) => isUpcoming(b.date)).sort((a, b) => a.date.localeCompare(b.date));
-  const pastMaintenance     = maintenanceBookings.filter((b) => !isUpcoming(b.date)).sort((a, b) => b.date.localeCompare(a.date));
+
+  // A booking is "done" if admin marked it Completed AND invoice is paid (or no invoice)
+  const isDone = (b: Booking) => b.status === "Completed" && (b.invoiceStatus === "paid" || b.invoiceStatus === "");
+
+  const upcomingStandard    = standardBookings.filter((b) => isUpcoming(b.date) && !isDone(b)).sort((a, b) => a.date.localeCompare(b.date));
+  const pastStandard        = standardBookings.filter((b) => !isUpcoming(b.date) || isDone(b)).sort((a, b) => b.date.localeCompare(a.date));
+  const upcomingMaintenance = maintenanceBookings.filter((b) => isUpcoming(b.date) && !isDone(b)).sort((a, b) => a.date.localeCompare(b.date));
+  const pastMaintenance     = maintenanceBookings.filter((b) => !isUpcoming(b.date) || isDone(b)).sort((a, b) => b.date.localeCompare(a.date));
 
   async function submitChangeRequest() {
     if (!changeTarget || !changeNote.trim()) return;
@@ -958,6 +977,27 @@ export default function App() {
                         </button>
                       ))}
                     </div>
+                    {/* Maintenance future schedule summary */}
+                    {adminFilter === "maintenance" && (() => {
+                      const futureMain = adminBookings.filter(b => b.clientType === "maintenance" && isUpcoming(b.date) && b.status !== "Completed");
+                      const grouped: Record<string, Booking[]> = {};
+                      futureMain.forEach(b => { if (!grouped[b.email]) grouped[b.email] = []; grouped[b.email].push(b); });
+                      return Object.keys(grouped).length > 0 ? (
+                        <div style={{ marginBottom: 16 }}>
+                          {Object.entries(grouped).map(([email, bookings]) => (
+                            <div key={email} style={{ background: "#ecfdf5", border: "1px solid #6ee7b7", borderRadius: 12, padding: "12px 16px", marginBottom: 8 }}>
+                              <div style={{ fontWeight: 700, color: "#065f46", marginBottom: 4 }}>{bookings[0].name} — {bookings[0].recurringFrequency === "biweekly" ? "Bi-Weekly" : "Monthly"}</div>
+                              <div style={{ fontSize: "0.85rem", color: "#047857" }}>{email}</div>
+                              <div style={{ marginTop: 6, display: "flex", gap: 8, flexWrap: "wrap" as const }}>
+                                {bookings.sort((a, b) => a.date.localeCompare(b.date)).map((b, i) => (
+                                  <span key={i} style={{ background: "#fff", border: "1px solid #6ee7b7", borderRadius: 8, padding: "3px 10px", fontSize: "0.82rem", color: "#065f46" }}>{formatDateLabel(b.date)}</span>
+                                ))}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : null;
+                    })()}
 
                     {filtered.length === 0 && <div style={{ textAlign: "center", padding: 40, color: "#6b7280" }}>No bookings found.</div>}
 
