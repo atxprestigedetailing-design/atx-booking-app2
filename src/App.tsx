@@ -11,7 +11,7 @@ const GOOGLE_CLIENT_ID =
   "447699234633-ivo2e1c2q843scj32k5323o2rkq6h7dp.apps.googleusercontent.com";
 
 const SCRIPT_URL =
-  "https://script.google.com/macros/s/AKfycbxEcUvboPuOqqzro3QQfznOaNppMU8vq7eKvgansWdxnVdRJXzxP3JyUnWytY7nGpJazQ/exec";
+  "https://script.google.com/macros/s/AKfycbxxAXBQ9k4UAsVd1Fjdo0ZrC-2zvsRdkLSBOgg0pIAu2Ah8SRjNZMZvxEKxzcr3q_Sdrw/exec";
 
 const TOTAL_STEPS = 9;
 const ADMIN_EMAIL = "atxprestigedetailing@gmail.com";
@@ -623,13 +623,49 @@ export default function App() {
   const maintenanceBookings = userBookings.filter((b) => b.clientType === "maintenance");
   const isMaintenance       = maintenanceBookings.length > 0;
 
-  // A booking is "done" if admin marked it Completed AND invoice is paid (or no invoice)
-  const isDone = (b: Booking) => b.status === "Completed" && (b.invoiceStatus === "paid" || b.invoiceStatus === "");
+  // A booking is "done" if admin explicitly marked it Completed
+  // (regardless of invoice — a past date with no status is also done)
+  const isDone = (b: Booking) => b.status === "Completed";
 
-  const upcomingStandard    = standardBookings.filter((b) => isUpcoming(b.date) && !isDone(b)).sort((a, b) => a.date.localeCompare(b.date));
-  const pastStandard        = standardBookings.filter((b) => !isUpcoming(b.date) || isDone(b)).sort((a, b) => b.date.localeCompare(a.date));
-  const upcomingMaintenance = maintenanceBookings.filter((b) => isUpcoming(b.date) && !isDone(b)).sort((a, b) => a.date.localeCompare(b.date));
-  const pastMaintenance     = maintenanceBookings.filter((b) => !isUpcoming(b.date) || isDone(b)).sort((a, b) => b.date.localeCompare(a.date));
+  // Standard bookings: upcoming = future date and not done
+  const upcomingStandard = standardBookings
+    .filter((b) => isUpcoming(b.date) && !isDone(b))
+    .sort((a, b) => a.date.localeCompare(b.date));
+  const pastStandard = standardBookings
+    .filter((b) => !isUpcoming(b.date) || isDone(b))
+    .sort((a, b) => b.date.localeCompare(a.date));
+
+  // Maintenance bookings: upcoming = future date and not done
+  const upcomingMaintenance = maintenanceBookings
+    .filter((b) => isUpcoming(b.date) && !isDone(b))
+    .sort((a, b) => a.date.localeCompare(b.date));
+  const pastMaintenance = maintenanceBookings
+    .filter((b) => !isUpcoming(b.date) || isDone(b))
+    .sort((a, b) => b.date.localeCompare(a.date));
+
+  // For maintenance clients: calculate next upcoming dates beyond what's booked
+  // This handles the case where future rows don't exist yet in the sheet
+  const nextMaintenanceDates: { dateLabel: string; freq: string }[] = (() => {
+    if (!isMaintenance) return [];
+    // Find the most recent maintenance booking (completed or not) to get cadence info
+    const allSorted = [...maintenanceBookings].sort((a, b) => b.date.localeCompare(a.date));
+    if (allSorted.length === 0) return [];
+    const ref = allSorted[0];
+    if (!ref.recurringFrequency || !ref.date) return [];
+    // Get all dates already booked (upcoming and not done)
+    const bookedUpcoming = new Set(upcomingMaintenance.map(b => b.date));
+    if (bookedUpcoming.size > 0) return []; // already have upcoming rows, no need to calculate
+    // No upcoming rows exist — calculate next date from the most recent completed booking
+    const nextDates = calcRecurringDates(ref.date, ref.recurringFrequency, 3);
+    return nextDates
+      .filter(dateLabel => {
+        // Convert label back to a date to check if it's in the future
+        // calcRecurringDates returns formatted labels like "Mon, Apr 27, 2026"
+        // We just show them — they are by definition future dates
+        return true;
+      })
+      .map(d => ({ dateLabel: d, freq: ref.recurringFrequency }));
+  })();
 
   async function submitChangeRequest() {
     if (!changeTarget || !changeNote.trim()) return;
@@ -844,12 +880,24 @@ export default function App() {
                         Your maintenance schedule is managed by ATX Prestige Detailing. Use "Request a Change" on any upcoming service to reschedule or adjust. You can also book additional one-time services for family or extra vehicles through the normal booking flow.
                       </div>
                     </div>
-                    {upcomingMaintenance.length > 0 && (
+                    {(upcomingMaintenance.length > 0 || nextMaintenanceDates.length > 0) && (
                       <>
                         <div style={{ fontWeight: 700, color: "#374151", fontSize: "0.95rem", marginBottom: 12, textTransform: "uppercase" as const, letterSpacing: "0.04em" }}>Upcoming</div>
                         <div style={{ display: "grid", gap: 14, marginBottom: 28 }}>
                           {upcomingMaintenance.map((b, i) => (
                             <MaintenanceCard key={i} booking={b} onRequestChange={(b) => { setChangeTarget(b); setChangeNote(""); setChangeSubmitted(false); setView("requestChange"); }} />
+                          ))}
+                          {/* Show calculated next dates if no upcoming rows exist yet */}
+                          {upcomingMaintenance.length === 0 && nextMaintenanceDates.map((nd, i) => (
+                            <div key={i} style={{ background: "#fff", border: "1.5px solid #059669", borderRadius: 16, padding: 18 }}>
+                              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8, marginBottom: 4 }}>
+                                <div style={{ fontSize: "1rem", fontWeight: 700, color: "#111827" }}>{nd.dateLabel}</div>
+                                <span style={{ background: "#ecfdf5", color: "#059669", fontSize: "0.72rem", fontWeight: 700, borderRadius: 999, padding: "3px 9px", whiteSpace: "nowrap" as const }}>
+                                  {nd.freq === "biweekly" ? "BI-WEEKLY" : "MONTHLY"}
+                                </span>
+                              </div>
+                              <div style={{ fontSize: "0.85rem", color: "#9ca3af" }}>Next scheduled service — booking details will be confirmed by ATX Prestige Detailing.</div>
+                            </div>
                           ))}
                         </div>
                       </>
@@ -1092,12 +1140,23 @@ export default function App() {
                               </div>
                             </div>
 
-                            {!isComplete && (
-                              <button onClick={() => { setSelectedAdminBooking(isSelected ? null : b); setCompleteAmount(b.hourlyRate ? String(parseFloat(b.hourlyRate) * 2) : ""); setCompleteNote(""); }}
-                                style={{ background: isSelected ? "#f3f4f6" : "#111827", color: isSelected ? "#111827" : "#fff", border: "none", borderRadius: 8, padding: "7px 14px", fontSize: "0.82rem", fontWeight: 600, cursor: "pointer", marginTop: 4 }}>
-                                {isSelected ? "Cancel" : "Mark Complete"}
-                              </button>
-                            )}
+                            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" as const, marginTop: 8, alignItems: "center" }}>
+                              {!isComplete && (
+                                <button onClick={() => { setSelectedAdminBooking(isSelected ? null : b); setCompleteAmount(b.hourlyRate ? String(parseFloat(b.hourlyRate) * 2) : ""); setCompleteNote(""); }}
+                                  style={{ background: isSelected ? "#f3f4f6" : "#111827", color: isSelected ? "#111827" : "#fff", border: "none", borderRadius: 8, padding: "7px 14px", fontSize: "0.82rem", fontWeight: 600, cursor: "pointer" }}>
+                                  {isSelected ? "Cancel" : "Mark Complete"}
+                                </button>
+                              )}
+                              {isComplete && b.clientType === "maintenance" && b.recurringFrequency && b.date && (() => {
+                                const nextDates = calcRecurringDates(b.date, b.recurringFrequency, 1);
+                                if (nextDates.length === 0) return null;
+                                return (
+                                  <div style={{ fontSize: "0.8rem", color: "#059669", background: "#ecfdf5", borderRadius: 8, padding: "4px 10px", fontWeight: 600 }}>
+                                    Next: {nextDates[0]}
+                                  </div>
+                                );
+                              })()}
+                            </div>
 
                             {isSelected && (
                               <div style={{ marginTop: 14, padding: 16, background: "#f9fafb", borderRadius: 12, border: "1px solid #e5e7eb" }}>
