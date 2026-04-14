@@ -658,12 +658,8 @@ export default function App() {
     // No upcoming rows exist — calculate next date from the most recent completed booking
     const nextDates = calcRecurringDates(ref.date, ref.recurringFrequency, 3);
     return nextDates
-      .filter(dateLabel => {
-        // Convert label back to a date to check if it's in the future
-        // calcRecurringDates returns formatted labels like "Mon, Apr 27, 2026"
-        // We just show them — they are by definition future dates
-        return true;
-      })
+      // REPLACE WITH:
+      .filter(() => true)
       .map(d => ({ dateLabel: d, freq: ref.recurringFrequency }));
   })();
 
