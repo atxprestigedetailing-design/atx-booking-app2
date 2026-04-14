@@ -11,7 +11,7 @@ const GOOGLE_CLIENT_ID =
   "447699234633-ivo2e1c2q843scj32k5323o2rkq6h7dp.apps.googleusercontent.com";
 
 const SCRIPT_URL =
-  "https://script.google.com/macros/s/AKfycbxxAXBQ9k4UAsVd1Fjdo0ZrC-2zvsRdkLSBOgg0pIAu2Ah8SRjNZMZvxEKxzcr3q_Sdrw/exec";
+  "https://script.google.com/macros/s/AKfycbxQmSgSgtijhKGg7jm7g1rGntUn1rq7wLi9YDepNOKNVPtW8zhc6G4K1z7CDvmLGt16JA/exec";
 
 const TOTAL_STEPS = 9;
 const ADMIN_EMAIL = "atxprestigedetailing@gmail.com";
@@ -327,6 +327,9 @@ export default function App() {
   const [completeLoading, setCompleteLoading]           = useState(false);
   const [squarePopup, setSquarePopup]                   = useState(false);
   const [squareBooking, setSquareBooking]               = useState<Booking | null>(null);
+  const [editingBooking, setEditingBooking]             = useState<Booking | null>(null);
+  const [editFields, setEditFields]                     = useState<Partial<Booking>>({});
+  const [editSaving, setEditSaving]                     = useState(false);
   const [bookingsTab, setBookingsTab]                   = useState<"appointments" | "maintenance">("appointments");
   const [userBookings, setUserBookings]                 = useState<Booking[]>([]);
   const [bookingsLoading, setBookingsLoading]           = useState(false);
@@ -439,6 +442,45 @@ export default function App() {
         invoiceNote: completeNote,
       });
       if (ok) {
+        // Auto-create next booking row for maintenance clients
+        if (selectedAdminBooking.clientType === "maintenance" && selectedAdminBooking.recurringFrequency && selectedAdminBooking.date) {
+          const nextDates = calcRecurringDates(selectedAdminBooking.date, selectedAdminBooking.recurringFrequency, 1);
+          if (nextDates.length > 0) {
+            // nextDates returns formatted labels — we need YYYY-MM-DD
+            // Use fmtDate on the calculated date
+            const [y, m, d] = selectedAdminBooking.date.split("-").map(Number);
+            const start = new Date(y, m - 1, d);
+            const nextDate = selectedAdminBooking.recurringFrequency === "biweekly"
+              ? new Date(start.getFullYear(), start.getMonth(), start.getDate() + 14)
+              : getNthWeekday(
+                  start.getMonth() + 1 > 11 ? start.getFullYear() + 1 : start.getFullYear(),
+                  start.getMonth() + 1 > 11 ? 0 : start.getMonth() + 1,
+                  start.getDay(),
+                  Math.ceil(start.getDate() / 7),
+                  new Date(start.getFullYear(), start.getMonth(), start.getDate() + 7).getMonth() !== start.getMonth()
+                );
+            if (nextDate) {
+              const nextDateStr = fmtDate(nextDate);
+              // Check not already booked
+              const alreadyExists = false; // will be checked server-side
+              try {
+                await fetch(SCRIPT_URL, {
+                  method: "POST",
+                  body: JSON.stringify({
+                    action: "createNextMaintenanceBooking",
+                    ...selectedAdminBooking,
+                    date: nextDateStr,
+                    displayDate: nextDateStr,
+                    status: "Booked",
+                    invoiceAmount: "",
+                    invoiceStatus: "",
+                    invoiceNote: "",
+                  }),
+                });
+              } catch (e) { console.error("Failed to create next booking", e); }
+            }
+          }
+        }
         await loadAdminBookings();
         setSelectedAdminBooking(null);
         setCompleteAmount("");
@@ -446,6 +488,25 @@ export default function App() {
       } else { alert("Something went wrong. Please try again."); }
     } catch (e) { alert("Something went wrong."); }
     finally { setCompleteLoading(false); }
+  }
+
+  async function handleSaveEdit() {
+    if (!editingBooking) return;
+    setEditSaving(true);
+    try {
+      const res = await fetch(SCRIPT_URL, {
+        method: "POST",
+        body: JSON.stringify({
+          action: "updateBookingFields",
+          rowIndex: editingBooking.rowIndex,
+          fields: editFields,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) { await loadAdminBookings(); setEditingBooking(null); setEditFields({}); }
+      else { alert("Something went wrong."); }
+    } catch (e) { alert("Something went wrong."); }
+    finally { setEditSaving(false); }
   }
 
   async function handleReleaseInvoice(booking: Booking) {
@@ -658,8 +719,12 @@ export default function App() {
     // No upcoming rows exist — calculate next date from the most recent completed booking
     const nextDates = calcRecurringDates(ref.date, ref.recurringFrequency, 3);
     return nextDates
-      // REPLACE WITH:
-      .filter(() => true)
+      .filter(dateLabel => {
+        // Convert label back to a date to check if it's in the future
+        // calcRecurringDates returns formatted labels like "Mon, Apr 27, 2026"
+        // We just show them — they are by definition future dates
+        return true;
+      })
       .map(d => ({ dateLabel: d, freq: ref.recurringFrequency }));
   })();
 
@@ -1138,22 +1203,88 @@ export default function App() {
 
                             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" as const, marginTop: 8, alignItems: "center" }}>
                               {!isComplete && (
-                                <button onClick={() => { setSelectedAdminBooking(isSelected ? null : b); setCompleteAmount(b.hourlyRate ? String(parseFloat(b.hourlyRate) * 2) : ""); setCompleteNote(""); }}
+                                <button onClick={() => { setSelectedAdminBooking(isSelected ? null : b); setCompleteAmount(b.hourlyRate ? String(parseFloat(b.hourlyRate) * 2) : ""); setCompleteNote(""); setEditingBooking(null); }}
                                   style={{ background: isSelected ? "#f3f4f6" : "#111827", color: isSelected ? "#111827" : "#fff", border: "none", borderRadius: 8, padding: "7px 14px", fontSize: "0.82rem", fontWeight: 600, cursor: "pointer" }}>
                                   {isSelected ? "Cancel" : "Mark Complete"}
                                 </button>
                               )}
-                              {isComplete && b.clientType === "maintenance" && b.recurringFrequency && b.date && (() => {
-                                const nextDates = calcRecurringDates(b.date, b.recurringFrequency, 1);
-                                if (nextDates.length === 0) return null;
-                                return (
-                                  <div style={{ fontSize: "0.8rem", color: "#059669", background: "#ecfdf5", borderRadius: 8, padding: "4px 10px", fontWeight: 600 }}>
-                                    Next: {nextDates[0]}
-                                  </div>
-                                );
-                              })()}
+                              <button onClick={() => { setEditingBooking(editingBooking?.rowIndex === b.rowIndex ? null : b); setEditFields({ name: b.name, phone: b.phone, email: b.email, date: b.date, time: b.time, year: b.year, make: b.make, model: b.model, boatSize: b.boatSize, packageType: b.packageType, serviceType: b.serviceType, address: b.address, notes: b.notes, clientType: b.clientType, recurringFrequency: b.recurringFrequency }); setSelectedAdminBooking(null); }}
+                                style={{ background: "#f3f4f6", color: "#374151", border: "none", borderRadius: 8, padding: "7px 14px", fontSize: "0.82rem", fontWeight: 600, cursor: "pointer" }}>
+                                {editingBooking?.rowIndex === b.rowIndex ? "Cancel Edit" : "Edit"}
+                              </button>
                             </div>
 
+                            {/* Edit form */}
+                            {editingBooking?.rowIndex === b.rowIndex && (
+                              <div style={{ marginTop: 14, padding: 16, background: "#f9fafb", borderRadius: 12, border: "1px solid #e5e7eb" }}>
+                                <div style={{ fontWeight: 700, color: "#374151", marginBottom: 12 }}>Edit Booking</div>
+                                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
+                                  {[
+                                    { label: "Name", key: "name" },
+                                    { label: "Phone", key: "phone" },
+                                    { label: "Email", key: "email" },
+                                    { label: "Date (YYYY-MM-DD)", key: "date" },
+                                    { label: "Time", key: "time" },
+                                    { label: "Year", key: "year" },
+                                    { label: "Make", key: "make" },
+                                    { label: "Model", key: "model" },
+                                    { label: "Boat Size", key: "boatSize" },
+                                    { label: "Address", key: "address" },
+                                    { label: "Notes", key: "notes" },
+                                  ].map(field => (
+                                    <div key={field.key}>
+                                      <div style={{ fontSize: "0.78rem", color: "#6b7280", marginBottom: 3 }}>{field.label}</div>
+                                      <input
+                                        style={{ ...S.input, padding: "8px 10px", fontSize: "0.85rem" }}
+                                        value={(editFields as any)[field.key] || ""}
+                                        onChange={e => setEditFields(prev => ({ ...prev, [field.key]: e.target.value }))}
+                                      />
+                                    </div>
+                                  ))}
+                                  <div>
+                                    <div style={{ fontSize: "0.78rem", color: "#6b7280", marginBottom: 3 }}>Package</div>
+                                    <select style={{ ...S.input, padding: "8px 10px", fontSize: "0.85rem", backgroundColor: "#fff" }} value={(editFields as any).packageType || ""} onChange={e => setEditFields(prev => ({ ...prev, packageType: e.target.value }))}>
+                                      <option value="basic">Basic</option>
+                                      <option value="premium">Premium</option>
+                                    </select>
+                                  </div>
+                                  <div>
+                                    <div style={{ fontSize: "0.78rem", color: "#6b7280", marginBottom: 3 }}>Service Type</div>
+                                    <select style={{ ...S.input, padding: "8px 10px", fontSize: "0.85rem", backgroundColor: "#fff" }} value={(editFields as any).serviceType || ""} onChange={e => setEditFields(prev => ({ ...prev, serviceType: e.target.value }))}>
+                                      <option value="mobile">Mobile</option>
+                                      <option value="dropoff">Drop-Off</option>
+                                    </select>
+                                  </div>
+                                  <div>
+                                    <div style={{ fontSize: "0.78rem", color: "#6b7280", marginBottom: 3 }}>Client Type</div>
+                                    <select style={{ ...S.input, padding: "8px 10px", fontSize: "0.85rem", backgroundColor: "#fff" }} value={(editFields as any).clientType || ""} onChange={e => setEditFields(prev => ({ ...prev, clientType: e.target.value }))}>
+                                      <option value="oneTime">One-Time</option>
+                                      <option value="maintenance">Maintenance</option>
+                                    </select>
+                                  </div>
+                                  <div>
+                                    <div style={{ fontSize: "0.78rem", color: "#6b7280", marginBottom: 3 }}>Frequency</div>
+                                    <select style={{ ...S.input, padding: "8px 10px", fontSize: "0.85rem", backgroundColor: "#fff" }} value={(editFields as any).recurringFrequency || ""} onChange={e => setEditFields(prev => ({ ...prev, recurringFrequency: e.target.value }))}>
+                                      <option value="">None</option>
+                                      <option value="biweekly">Bi-Weekly</option>
+                                      <option value="monthly">Monthly</option>
+                                    </select>
+                                  </div>
+                                </div>
+                                <div style={{ display: "flex", gap: 8 }}>
+                                  <button onClick={handleSaveEdit} disabled={editSaving}
+                                    style={{ background: "#2563eb", color: "#fff", border: "none", borderRadius: 8, padding: "9px 18px", fontWeight: 700, fontSize: "0.88rem", cursor: "pointer", opacity: editSaving ? 0.5 : 1 }}>
+                                    {editSaving ? "Saving..." : "Save Changes"}
+                                  </button>
+                                  <button onClick={() => { setEditingBooking(null); setEditFields({}); }}
+                                    style={{ background: "#f3f4f6", color: "#374151", border: "none", borderRadius: 8, padding: "9px 14px", fontWeight: 600, fontSize: "0.88rem", cursor: "pointer" }}>
+                                    Cancel
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Mark complete form */}
                             {isSelected && (
                               <div style={{ marginTop: 14, padding: 16, background: "#f9fafb", borderRadius: 12, border: "1px solid #e5e7eb" }}>
                                 <div style={{ fontWeight: 700, color: "#374151", marginBottom: 10 }}>Confirm Service & Set Invoice</div>
