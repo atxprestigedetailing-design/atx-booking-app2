@@ -654,25 +654,6 @@ export default function App() {
     .filter((b) => !isUpcoming(b.date) || isDone(b))
     .sort((a, b) => b.date.localeCompare(a.date));
 
-  // For maintenance clients: calculate next upcoming dates beyond what's booked
-  // This handles the case where future rows don't exist yet in the sheet
-  const nextMaintenanceDates: { dateLabel: string; freq: string }[] = (() => {
-    if (!isMaintenance) return [];
-    // Find the most recent maintenance booking (completed or not) to get cadence info
-    const allSorted = [...maintenanceBookings].sort((a, b) => b.date.localeCompare(a.date));
-    if (allSorted.length === 0) return [];
-    const ref = allSorted[0];
-    if (!ref.recurringFrequency || !ref.date) return [];
-    // Get all dates already booked (upcoming and not done)
-    const bookedUpcoming = new Set(upcomingMaintenance.map(b => b.date));
-    if (bookedUpcoming.size > 0) return []; // already have upcoming rows, no need to calculate
-    // No upcoming rows exist — calculate next date from the most recent completed booking
-    const nextDates = calcRecurringDates(ref.date, ref.recurringFrequency, 3);
-    return nextDates
-      .filter(() => true)
-      .map(d => ({ dateLabel: d, freq: ref.recurringFrequency }));
-  })();
-
   async function submitChangeRequest() {
     if (!changeTarget || !changeNote.trim()) return;
     setChangeSubmitting(true);
