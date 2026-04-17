@@ -986,7 +986,7 @@ export default function App() {
                                 </div>
                                 {b && (
                                   <>
-                                    <div style={{ fontSize: "0.85rem", color: "#6b7280" }}>{vl && `${vl} · `}{b.packageType === "basic" ? "Basic Detail" : pkg === "premium" ? "Premium Detail" : pkg === "exterior" ? "Exterior Only" : pkg === "interior" ? "Interior Only" : pkg}</div>
+                                    <div style={{ fontSize: "0.85rem", color: "#6b7280" }}>{vl && `${vl} · `}{b.packageType === "basic" ? "Basic Detail" : b.packageType === "premium" ? "Premium Detail" : b.packageType === "exterior" ? "Exterior Only — Basic" : b.packageType === "exteriorPremium" ? "Exterior Only — Premium" : b.packageType === "interior" ? "Interior Only — Basic" : b.packageType === "interiorPremium" ? "Interior Only — Premium" : b.packageType}</div>
                                     {b.serviceType === "mobile" && b.address && <div style={{ fontSize: "0.82rem", color: "#9ca3af" }}>{b.address}</div>}
                                   </>
                                 )}
@@ -1040,7 +1040,7 @@ export default function App() {
                             const squareAmt = (baseAmt * 1.04).toFixed(2);
                             return (
                             <div key={i} style={{ background: "#fff", border: "1px solid #fde047", borderRadius: 16, padding: 18, marginBottom: 14 }}>
-                              <div style={{ fontWeight: 700, color: "#111827", marginBottom: 4 }}>{formatDateLabel(b.date)} — {b.packageType === "basic" ? "Basic Detail" : pkg === "premium" ? "Premium Detail" : pkg === "exterior" ? "Exterior Only" : pkg === "interior" ? "Interior Only" : pkg}</div>
+                              <div style={{ fontWeight: 700, color: "#111827", marginBottom: 4 }}>{formatDateLabel(b.date)} — {b.packageType === "basic" ? "Basic Detail" : b.packageType === "premium" ? "Premium Detail" : b.packageType === "exterior" ? "Exterior Only — Basic" : b.packageType === "exteriorPremium" ? "Exterior Only — Premium" : b.packageType === "interior" ? "Interior Only — Basic" : b.packageType === "interiorPremium" ? "Interior Only — Premium" : b.packageType}</div>
                               <div style={{ fontSize: "0.9rem", color: "#6b7280", marginBottom: 10 }}>
                                 {[b.year, b.make, b.model, b.boatSize].filter(Boolean).join(" ")}
                                 {b.invoiceNote ? ` — ${b.invoiceNote}` : ""}
@@ -1088,7 +1088,7 @@ export default function App() {
                               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                                 <div>
                                   <div style={{ fontWeight: 600, color: "#374151", fontSize: "0.9rem" }}>{formatDateLabel(b.date)}</div>
-                                  <div style={{ fontSize: "0.85rem", color: "#9ca3af" }}>{b.packageType === "basic" ? "Basic Detail" : pkg === "premium" ? "Premium Detail" : pkg === "exterior" ? "Exterior Only" : pkg === "interior" ? "Interior Only" : pkg}</div>
+                                  <div style={{ fontSize: "0.85rem", color: "#9ca3af" }}>{b.packageType === "basic" ? "Basic Detail" : b.packageType === "premium" ? "Premium Detail" : b.packageType === "exterior" ? "Exterior Only — Basic" : b.packageType === "exteriorPremium" ? "Exterior Only — Premium" : b.packageType === "interior" ? "Interior Only — Basic" : b.packageType === "interiorPremium" ? "Interior Only — Premium" : b.packageType}</div>
                                 </div>
                                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                                   <span style={{ fontWeight: 700, color: "#374151" }}>${b.invoiceAmount}</span>
@@ -1232,7 +1232,7 @@ export default function App() {
                               <div>
                                 <div style={{ fontWeight: 700, color: "#111827", fontSize: "0.95rem" }}>{b.name} — {formatDateLabel(b.date)}{b.time ? ` at ${b.time}` : ""}</div>
                                 <div style={{ fontSize: "0.85rem", color: "#6b7280" }}>{b.email} · {b.phone}</div>
-                                <div style={{ fontSize: "0.85rem", color: "#6b7280" }}>{vl} · {b.packageType === "basic" ? "Basic" : "Premium"} · ${b.hourlyRate}/hr</div>
+                                <div style={{ fontSize: "0.85rem", color: "#6b7280" }}>{vl} · {b.packageType === "basic" ? "Basic Detail" : b.packageType === "premium" ? "Premium Detail" : b.packageType === "exterior" ? "Exterior Only — Basic" : b.packageType === "exteriorPremium" ? "Exterior Only — Premium" : b.packageType === "interior" ? "Interior Only — Basic" : b.packageType === "interiorPremium" ? "Interior Only — Premium" : b.packageType} · ${b.hourlyRate}/hr</div>
                                 {b.clientType === "maintenance" && <div style={{ fontSize: "0.8rem", color: "#059669", fontWeight: 600 }}>{b.recurringFrequency === "biweekly" ? "Bi-Weekly" : "Monthly"} Maintenance</div>}
                                 {b.serviceType === "mobile" && b.address && <div style={{ fontSize: "0.8rem", color: "#6b7280" }}>{b.address}</div>}
                                 {b.notes && <div style={{ fontSize: "0.8rem", color: "#9ca3af" }}>Notes: {b.notes}</div>}
