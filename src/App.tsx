@@ -736,11 +736,13 @@ export default function App() {
     <div style={{ display: "flex", justifyContent: "center", marginBottom: 32 }}>
       <div style={{ maxWidth: 760, width: "100%" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 12 }}>
-          <img src={logo} alt="ATX Prestige Detailing logo" style={{ width: 72, height: 72, objectFit: "contain" as const, flexShrink: 0 }} />
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <h1 style={{ fontSize: "clamp(1.5rem, 5vw, 2.8rem)", fontWeight: 800, letterSpacing: "-1px", color: "#111827", margin: 0, lineHeight: 1.05 }}>ATX Prestige Detailing</h1>
-            <p style={{ color: "#6b7280", fontSize: "clamp(0.8rem, 2.5vw, 1rem)", marginTop: 6, marginBottom: 0, lineHeight: 1.4, fontStyle: "italic" }}>Defined by Detail, Driven by Standards, Trusted for Prestige</p>
-          </div>
+          <a href="https://atxprestigedetailing.com" target="_blank" rel="noopener noreferrer" style={{ display: "flex", alignItems: "center", gap: 14, textDecoration: "none", flex: 1, minWidth: 0 }}>
+            <img src={logo} alt="ATX Prestige Detailing logo" style={{ width: 72, height: 72, objectFit: "contain" as const, flexShrink: 0 }} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <h1 style={{ fontSize: "clamp(1.5rem, 5vw, 2.8rem)", fontWeight: 800, letterSpacing: "-1px", color: "#111827", margin: 0, lineHeight: 1.05 }}>ATX Prestige Detailing</h1>
+              <p style={{ color: "#6b7280", fontSize: "clamp(0.8rem, 2.5vw, 1rem)", marginTop: 6, marginBottom: 0, lineHeight: 1.4, fontStyle: "italic" }}>Defined by Detail, Driven by Standards, Trusted for Prestige</p>
+            </div>
+          </a>
         </div>
         <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center" }}>
           {googleUser ? (
@@ -1982,6 +1984,33 @@ export default function App() {
                     <div style={S.summaryHeading}>Notes</div>
                     <div style={{ ...S.summaryValue, fontWeight: 400, color: "#374151", whiteSpace: "pre-wrap" as const }}>{bookingNotes}</div>
                   </div>
+                )}
+              </div>
+
+              {/* Action buttons */}
+              <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" as const, marginTop: 28 }}>
+                <button
+                  onClick={() => setStep(0)}
+                  style={{ ...S.secondary, padding: "12px 22px", fontSize: "0.95rem" }}
+                >
+                  Book Another Service
+                </button>
+                {googleUser ? (
+                  <button
+                    onClick={openMyBookings}
+                    style={{ ...S.primary, padding: "12px 22px", fontSize: "0.95rem" }}
+                  >
+                    View My Bookings
+                  </button>
+                ) : (
+                  <a
+                    href="https://atxprestigedetailing.com"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ ...S.primary, padding: "12px 22px", fontSize: "0.95rem", textDecoration: "none", display: "inline-block" }}
+                  >
+                    Visit Our Website
+                  </a>
                 )}
               </div>
             </>
