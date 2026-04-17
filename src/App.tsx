@@ -1753,38 +1753,39 @@ export default function App() {
               <h2 style={S.title}>Your Information</h2>
               <p style={S.subtitle}>We'll use this to confirm your appointment.</p>
               <div style={S.inputGrid}>
-                {/* ── Calendar Picker ── */}
+                {/* ── Luxury Calendar Picker ── */}
                 <div style={{ marginTop: 20 }}>
-                  <div style={S.sectionLabel}>Appointment Date</div>
-                  <div style={{ background: "#fff", border: "1px solid #d1d5db", borderRadius: 16, padding: "16px", marginTop: 10 }}>
-                    {/* Month nav */}
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+                  <div style={{ background: "#111827", borderRadius: 20, padding: "24px 20px", marginTop: 10 }}>
+
+                    {/* Month navigation */}
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
                       <button
                         onClick={() => { const d = new Date(calYear, calMonth - 1, 1); setCalMonth(d.getMonth()); setCalYear(d.getFullYear()); }}
-                        style={{ background: "none", border: "1px solid #e5e7eb", borderRadius: 8, width: 34, height: 34, cursor: "pointer", color: "#374151", fontSize: "1rem", display: "flex", alignItems: "center", justifyContent: "center" }}
+                        style={{ background: "rgba(255,255,255,0.08)", border: "none", borderRadius: 10, width: 36, height: 36, cursor: "pointer", color: "#fff", fontSize: "1.1rem", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}
                       >‹</button>
-                      <span style={{ fontWeight: 700, fontSize: "0.95rem", color: "#111827" }}>
+                      <span style={{ fontWeight: 800, fontSize: "1rem", color: "#fff", letterSpacing: "0.04em", textTransform: "uppercase" as const }}>
                         {new Date(calYear, calMonth).toLocaleDateString("en-US", { month: "long", year: "numeric" })}
                       </span>
                       <button
                         onClick={() => { const d = new Date(calYear, calMonth + 1, 1); setCalMonth(d.getMonth()); setCalYear(d.getFullYear()); }}
-                        style={{ background: "none", border: "1px solid #e5e7eb", borderRadius: 8, width: 34, height: 34, cursor: "pointer", color: "#374151", fontSize: "1rem", display: "flex", alignItems: "center", justifyContent: "center" }}
+                        style={{ background: "rgba(255,255,255,0.08)", border: "none", borderRadius: 10, width: 36, height: 36, cursor: "pointer", color: "#fff", fontSize: "1.1rem", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}
                       >›</button>
                     </div>
+
                     {/* Day headers */}
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 2, marginBottom: 6 }}>
-                      {["Su","Mo","Tu","We","Th","Fr","Sa"].map(d => (
-                        <div key={d} style={{ textAlign: "center" as const, fontSize: "0.75rem", color: "#9ca3af", fontWeight: 600, padding: "4px 0" }}>{d}</div>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 2, marginBottom: 8 }}>
+                      {["S","M","T","W","T","F","S"].map((d, i) => (
+                        <div key={i} style={{ textAlign: "center" as const, fontSize: "0.72rem", color: "rgba(255,255,255,0.35)", fontWeight: 700, padding: "3px 0", letterSpacing: "0.05em" }}>{d}</div>
                       ))}
                     </div>
+
                     {/* Day grid */}
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 3 }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4 }}>
                       {(() => {
                         const firstDay = new Date(calYear, calMonth, 1).getDay();
                         const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
                         const today = new Date(); today.setHours(0,0,0,0);
                         const cells = [];
-                        // Empty cells before first day
                         for (let i = 0; i < firstDay; i++) {
                           cells.push(<div key={`e${i}`} />);
                         }
@@ -1799,15 +1800,23 @@ export default function App() {
                               disabled={!isAvail || isPast}
                               onClick={() => { setSelectedDate(dateStr); setSelectedTime(""); }}
                               style={{
-                                height: 36,
-                                borderRadius: 8,
-                                border: isSelected ? "none" : isAvail && !isPast ? "1px solid #e5e7eb" : "none",
-                                background: isSelected ? "#111827" : isAvail && !isPast ? "#f9fafb" : "transparent",
-                                color: isSelected ? "#fff" : isAvail && !isPast ? "#111827" : "#d1d5db",
-                                fontSize: "0.85rem",
-                                fontWeight: isAvail && !isPast ? 600 : 400,
+                                height: 38,
+                                borderRadius: 10,
+                                border: "none",
+                                background: isSelected
+                                  ? "#ffffff"
+                                  : isAvail && !isPast
+                                  ? "rgba(255,255,255,0.1)"
+                                  : "transparent",
+                                color: isSelected
+                                  ? "#111827"
+                                  : isAvail && !isPast
+                                  ? "#ffffff"
+                                  : "rgba(255,255,255,0.18)",
+                                fontSize: "0.88rem",
+                                fontWeight: isSelected ? 800 : isAvail && !isPast ? 600 : 400,
                                 cursor: isAvail && !isPast ? "pointer" : "default",
-                                opacity: isPast ? 0.3 : 1,
+                                transition: "all 0.15s ease",
                               }}
                             >{d}</button>
                           );
@@ -1815,31 +1824,42 @@ export default function App() {
                         return cells;
                       })()}
                     </div>
+
+                    {/* Selected date label */}
+                    {selectedDate && (
+                      <div style={{ marginTop: 16, paddingTop: 16, borderTop: "1px solid rgba(255,255,255,0.1)", display: "flex", alignItems: "center", gap: 8 }}>
+                        <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#4ade80", flexShrink: 0 }} />
+                        <span style={{ color: "rgba(255,255,255,0.7)", fontSize: "0.85rem" }}>
+                          Selected: <span style={{ color: "#fff", fontWeight: 700 }}>{formatDateLabel(selectedDate)}</span>
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
 
                 {/* Time slot pills */}
                 {selectedDate && (
                   <div style={{ marginTop: 16 }}>
-                    <div style={S.sectionLabel}>Appointment Time</div>
+                    <div style={{ fontSize: "0.82rem", fontWeight: 700, color: "#6b7280", textTransform: "uppercase" as const, letterSpacing: "0.06em", marginBottom: 10 }}>Select a Time</div>
                     {availableSlots.length === 0 ? (
-                      <div style={{ marginTop: 10, color: "#b91c1c", fontSize: "0.95rem" }}>No available times for this date.</div>
+                      <div style={{ color: "#b91c1c", fontSize: "0.95rem", padding: "12px 0" }}>No available times for this date.</div>
                     ) : (
-                      <div style={{ display: "flex", flexWrap: "wrap" as const, gap: 10, marginTop: 10 }}>
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(110px, 1fr))", gap: 10 }}>
                         {availableSlots.map((slot, i) => (
                           <button
                             key={i}
                             onClick={() => setSelectedTime(slot.time)}
                             style={{
-                              padding: "10px 20px",
-                              borderRadius: 999,
-                              border: selectedTime === slot.time ? "none" : "1px solid #d1d5db",
+                              padding: "13px 8px",
+                              borderRadius: 12,
+                              border: selectedTime === slot.time ? "2px solid #111827" : "1.5px solid #e5e7eb",
                               background: selectedTime === slot.time ? "#111827" : "#fff",
                               color: selectedTime === slot.time ? "#fff" : "#374151",
                               fontSize: "0.9rem",
-                              fontWeight: 600,
+                              fontWeight: 700,
                               cursor: "pointer",
-                              boxShadow: selectedTime === slot.time ? "0 2px 8px rgba(17,24,39,0.2)" : "none",
+                              textAlign: "center" as const,
+                              letterSpacing: "0.01em",
                             }}
                           >{slot.time}</button>
                         ))}
