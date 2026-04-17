@@ -1750,14 +1750,15 @@ export default function App() {
           {/* STEP 6 */}
           {step === 6 && (
             <>
-              <h2 style={S.title}>Your Information</h2>
-              <p style={S.subtitle}>We'll use this to confirm your appointment.</p>
-              <div style={S.inputGrid}>
-                {/* ── Luxury Calendar Picker ── */}
-                <div style={{ marginTop: 20 }}>
-                  <div style={{ background: "#111827", borderRadius: 20, padding: "24px 20px", marginTop: 10 }}>
+              <h2 style={S.title}>Book Your Appointment</h2>
+              <p style={S.subtitle}>Select a date, time, and fill in your details.</p>
 
-                    {/* Month navigation */}
+              {/* ── Two-column layout on wider screens ── */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24, alignItems: "start" }}>
+
+                {/* LEFT: Calendar */}
+                <div style={{ gridColumn: "1 / -1" }}>
+                  <div style={{ background: "#111827", borderRadius: 20, padding: "24px 20px" }}>
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
                       <button
                         onClick={() => { const d = new Date(calYear, calMonth - 1, 1); setCalMonth(d.getMonth()); setCalYear(d.getFullYear()); }}
@@ -1771,96 +1772,63 @@ export default function App() {
                         style={{ background: "rgba(255,255,255,0.08)", border: "none", borderRadius: 10, width: 36, height: 36, cursor: "pointer", color: "#fff", fontSize: "1.1rem", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}
                       >›</button>
                     </div>
-
-                    {/* Day headers */}
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 2, marginBottom: 8 }}>
                       {["S","M","T","W","T","F","S"].map((d, i) => (
                         <div key={i} style={{ textAlign: "center" as const, fontSize: "0.72rem", color: "rgba(255,255,255,0.35)", fontWeight: 700, padding: "3px 0", letterSpacing: "0.05em" }}>{d}</div>
                       ))}
                     </div>
-
-                    {/* Day grid */}
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4 }}>
                       {(() => {
                         const firstDay = new Date(calYear, calMonth, 1).getDay();
                         const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
                         const today = new Date(); today.setHours(0,0,0,0);
                         const cells = [];
-                        for (let i = 0; i < firstDay; i++) {
-                          cells.push(<div key={`e${i}`} />);
-                        }
+                        for (let i = 0; i < firstDay; i++) cells.push(<div key={`e${i}`} />);
                         for (let d = 1; d <= daysInMonth; d++) {
                           const dateStr = `${calYear}-${String(calMonth + 1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
                           const isAvail = availableDates.includes(dateStr);
                           const isPast = new Date(calYear, calMonth, d) < today;
                           const isSelected = selectedDate === dateStr;
                           cells.push(
-                            <button
-                              key={d}
-                              disabled={!isAvail || isPast}
+                            <button key={d} disabled={!isAvail || isPast}
                               onClick={() => { setSelectedDate(dateStr); setSelectedTime(""); }}
-                              style={{
-                                height: 38,
-                                borderRadius: 10,
-                                border: "none",
-                                background: isSelected
-                                  ? "#ffffff"
-                                  : isAvail && !isPast
-                                  ? "rgba(255,255,255,0.1)"
-                                  : "transparent",
-                                color: isSelected
-                                  ? "#111827"
-                                  : isAvail && !isPast
-                                  ? "#ffffff"
-                                  : "rgba(255,255,255,0.18)",
-                                fontSize: "0.88rem",
-                                fontWeight: isSelected ? 800 : isAvail && !isPast ? 600 : 400,
-                                cursor: isAvail && !isPast ? "pointer" : "default",
-                                transition: "all 0.15s ease",
-                              }}
+                              style={{ height: 38, borderRadius: 10, border: "none",
+                                background: isSelected ? "#ffffff" : isAvail && !isPast ? "rgba(255,255,255,0.1)" : "transparent",
+                                color: isSelected ? "#111827" : isAvail && !isPast ? "#ffffff" : "rgba(255,255,255,0.18)",
+                                fontSize: "0.88rem", fontWeight: isSelected ? 800 : isAvail && !isPast ? 600 : 400,
+                                cursor: isAvail && !isPast ? "pointer" : "default" }}
                             >{d}</button>
                           );
                         }
                         return cells;
                       })()}
                     </div>
-
-                    {/* Selected date label */}
                     {selectedDate && (
                       <div style={{ marginTop: 16, paddingTop: 16, borderTop: "1px solid rgba(255,255,255,0.1)", display: "flex", alignItems: "center", gap: 8 }}>
                         <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#4ade80", flexShrink: 0 }} />
                         <span style={{ color: "rgba(255,255,255,0.7)", fontSize: "0.85rem" }}>
-                          Selected: <span style={{ color: "#fff", fontWeight: 700 }}>{formatDateLabel(selectedDate)}</span>
+                          <span style={{ color: "#fff", fontWeight: 700 }}>{formatDateLabel(selectedDate)}</span>
                         </span>
                       </div>
                     )}
                   </div>
                 </div>
 
-                {/* Time slot pills */}
+                {/* Time slots — full width, only shown after date picked */}
                 {selectedDate && (
-                  <div style={{ marginTop: 16 }}>
-                    <div style={{ fontSize: "0.82rem", fontWeight: 700, color: "#6b7280", textTransform: "uppercase" as const, letterSpacing: "0.06em", marginBottom: 10 }}>Select a Time</div>
+                  <div style={{ gridColumn: "1 / -1" }}>
+                    <div style={{ fontSize: "0.78rem", fontWeight: 700, color: "#9ca3af", textTransform: "uppercase" as const, letterSpacing: "0.08em", marginBottom: 10 }}>Available Times</div>
                     {availableSlots.length === 0 ? (
-                      <div style={{ color: "#b91c1c", fontSize: "0.95rem", padding: "12px 0" }}>No available times for this date.</div>
+                      <div style={{ color: "#b91c1c", fontSize: "0.9rem" }}>No available times for this date.</div>
                     ) : (
                       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(110px, 1fr))", gap: 10 }}>
                         {availableSlots.map((slot, i) => (
-                          <button
-                            key={i}
-                            onClick={() => setSelectedTime(slot.time)}
-                            style={{
-                              padding: "13px 8px",
-                              borderRadius: 12,
+                          <button key={i} onClick={() => setSelectedTime(slot.time)}
+                            style={{ padding: "13px 8px", borderRadius: 12,
                               border: selectedTime === slot.time ? "2px solid #111827" : "1.5px solid #e5e7eb",
                               background: selectedTime === slot.time ? "#111827" : "#fff",
                               color: selectedTime === slot.time ? "#fff" : "#374151",
-                              fontSize: "0.9rem",
-                              fontWeight: 700,
-                              cursor: "pointer",
-                              textAlign: "center" as const,
-                              letterSpacing: "0.01em",
-                            }}
+                              fontSize: "0.9rem", fontWeight: 700, cursor: "pointer", textAlign: "center" as const }}
                           >{slot.time}</button>
                         ))}
                       </div>
@@ -1868,86 +1836,84 @@ export default function App() {
                   </div>
                 )}
 
-                {/* Recurring schedule preview — maintenance only */}
-                {clientType === "maintenance" && selectedDate && frequency && (
-                  <div style={{ background: "#ecfdf5", border: "1px solid #6ee7b7", borderRadius: 14, padding: "14px 16px", marginTop: 4 }}>
-                    <div style={{ fontWeight: 700, color: "#065f46", marginBottom: 8, fontSize: "0.95rem" }}>
-                      Your Recurring Schedule
-                    </div>
-                    <div style={{ fontSize: "0.88rem", color: "#047857", marginBottom: 8 }}>
-                      {getCadenceLabel(selectedDate, frequency)} starting {formatDateLabel(selectedDate)}
-                    </div>
-                    <div style={{ display: "grid", gap: 4 }}>
-                      {calcRecurringDates(selectedDate, frequency, 6).map((d, i) => (
-                        <div key={i} style={{ fontSize: "0.88rem", color: "#065f46" }}>
-                          {i + 2}. {d}
-                        </div>
-                      ))}
-                    </div>
-                    <div style={{ fontSize: "0.82rem", color: "#6b7280", marginTop: 8 }}>
-                      Showing your next 6 scheduled dates. These slots will be held for you.
-                    </div>
+                {/* Divider */}
+                {selectedDate && selectedTime && (
+                  <div style={{ gridColumn: "1 / -1", borderTop: "1px solid #e5e7eb", paddingTop: 8 }}>
+                    <div style={{ fontSize: "0.78rem", fontWeight: 700, color: "#9ca3af", textTransform: "uppercase" as const, letterSpacing: "0.08em" }}>Your Details</div>
                   </div>
                 )}
 
-                <input style={S.input} placeholder="Full name" value={name} onChange={(e) => setName(e.target.value)} />
-                <input style={S.input} placeholder="Phone number" value={phone} type="tel" inputMode="numeric"
-                  onChange={(e) => {
-                    const raw = e.target.value.replace(/\D/g, "").slice(0, 10);
-                    const fmt = raw.length > 6 ? `(${raw.slice(0,3)}) ${raw.slice(3,6)}-${raw.slice(6)}` : raw.length > 3 ? `(${raw.slice(0,3)}) ${raw.slice(3)}` : raw;
-                    setPhone(fmt);
-                  }} />
-                <input style={S.input} placeholder="Email address" value={email} onChange={(e) => setEmail(e.target.value)} />
-              </div>
+                {/* FORM FIELDS — only shown after time selected */}
+                {selectedDate && selectedTime && (
+                  <>
+                    {/* Recurring schedule for maintenance */}
+                    {clientType === "maintenance" && frequency && (
+                      <div style={{ gridColumn: "1 / -1", background: "#ecfdf5", border: "1px solid #6ee7b7", borderRadius: 14, padding: "14px 16px" }}>
+                        <div style={{ fontWeight: 700, color: "#065f46", marginBottom: 6, fontSize: "0.95rem" }}>Your Recurring Schedule</div>
+                        <div style={{ fontSize: "0.85rem", color: "#047857", marginBottom: 8 }}>{getCadenceLabel(selectedDate, frequency)} starting {formatDateLabel(selectedDate)}</div>
+                        <div style={{ display: "grid", gap: 3 }}>
+                          {calcRecurringDates(selectedDate, frequency, 6).map((d, i) => (
+                            <div key={i} style={{ fontSize: "0.85rem", color: "#065f46" }}>{i + 2}. {d}</div>
+                          ))}
+                        </div>
+                        <div style={{ fontSize: "0.78rem", color: "#6b7280", marginTop: 8 }}>Showing your next 6 scheduled dates. These slots will be held for you.</div>
+                      </div>
+                    )}
 
-              <div style={{ marginTop: 24 }}>
-                <div style={S.sectionLabel}>{vehicle === "boat" ? "Boat Details" : "Vehicle Details"}</div>
-                {vehicle === "boat" ? (
-                  <div style={{ display: "flex", gap: 12, marginTop: 10, flexWrap: "wrap" as const }}>
-                    <input style={{ ...S.input, flex: 1, minWidth: 120 }} placeholder="Size (e.g. 24 ft)" value={boatSize} onChange={(e) => setBoatSize(e.target.value)} />
-                    <input style={{ ...S.input, flex: 2, minWidth: 180 }} placeholder="Make (e.g. Sea Ray)" value={boatMake} onChange={(e) => setBoatMake(e.target.value)} />
-                    <input style={{ ...S.input, flex: 2, minWidth: 180 }} placeholder="Model (e.g. Sundancer 320)" value={boatModel} onChange={(e) => setBoatModel(e.target.value)} />
-                  </div>
-                ) : (
-                  <div style={{ display: "flex", gap: 12, marginTop: 10, flexWrap: "wrap" as const }}>
-                    {/* Year — free text with suggestions */}
-                    <input
-                      style={{ ...S.input, flex: 1, minWidth: 120 }}
-                      placeholder="Year"
-                      value={year}
-                      onChange={(e) => { setYear(e.target.value); setModel(""); setModelOptions([]); }}
-                      list="year-options"
-                    />
-                    <datalist id="year-options">
-                      {yearOptions.map((yr) => <option key={yr} value={yr} />)}
-                    </datalist>
+                    {/* Name */}
+                    <div style={{ gridColumn: "1 / -1" }}>
+                      <label style={{ display: "block", fontSize: "0.78rem", fontWeight: 700, color: "#9ca3af", textTransform: "uppercase" as const, letterSpacing: "0.06em", marginBottom: 6 }}>Full Name</label>
+                      <input style={{ ...S.input }} placeholder="Your full name" value={name} onChange={(e) => setName(e.target.value)} />
+                    </div>
 
-                    {/* Make — free text with API suggestions */}
-                    <input
-                      style={{ ...S.input, flex: 2, minWidth: 180 }}
-                      placeholder={loadingMakes ? "Loading..." : "Make"}
-                      value={make}
-                      onChange={(e) => { setMake(e.target.value); setModel(""); setModelOptions([]); }}
-                      list="make-options"
-                      autoComplete="off"
-                    />
-                    <datalist id="make-options">
-                      {makeOptions.map((mk) => <option key={mk} value={mk} />)}
-                    </datalist>
+                    {/* Phone + Email side by side */}
+                    <div>
+                      <label style={{ display: "block", fontSize: "0.78rem", fontWeight: 700, color: "#9ca3af", textTransform: "uppercase" as const, letterSpacing: "0.06em", marginBottom: 6 }}>Phone</label>
+                      <input style={S.input} placeholder="(512) 000-0000" value={phone} type="tel" inputMode="numeric"
+                        onChange={(e) => {
+                          const raw = e.target.value.replace(/\D/g, "").slice(0, 10);
+                          const fmt = raw.length > 6 ? `(${raw.slice(0,3)}) ${raw.slice(3,6)}-${raw.slice(6)}` : raw.length > 3 ? `(${raw.slice(0,3)}) ${raw.slice(3)}` : raw;
+                          setPhone(fmt);
+                        }} />
+                    </div>
+                    <div>
+                      <label style={{ display: "block", fontSize: "0.78rem", fontWeight: 700, color: "#9ca3af", textTransform: "uppercase" as const, letterSpacing: "0.06em", marginBottom: 6 }}>Email</label>
+                      <input style={S.input} placeholder="your@email.com" value={email} onChange={(e) => setEmail(e.target.value)} />
+                    </div>
 
-                    {/* Model — free text with API suggestions */}
-                    <input
-                      style={{ ...S.input, flex: 2, minWidth: 180 }}
-                      placeholder={!year || !make ? "Enter year and make first" : loadingModels ? "Loading..." : "Model"}
-                      value={model}
-                      onChange={(e) => setModel(e.target.value)}
-                      list="model-options"
-                      autoComplete="off"
-                    />
-                    <datalist id="model-options">
-                      {modelOptions.map((mdl) => <option key={mdl} value={mdl} />)}
-                    </datalist>
-                  </div>
+                    {/* Vehicle details */}
+                    <div style={{ gridColumn: "1 / -1" }}>
+                      <label style={{ display: "block", fontSize: "0.78rem", fontWeight: 700, color: "#9ca3af", textTransform: "uppercase" as const, letterSpacing: "0.06em", marginBottom: 10 }}>{vehicle === "boat" ? "Boat Details" : "Vehicle Details"}</label>
+                      {vehicle === "boat" ? (
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
+                          <input style={S.input} placeholder="Size (e.g. 24 ft)" value={boatSize} onChange={(e) => setBoatSize(e.target.value)} />
+                          <input style={S.input} placeholder="Make (e.g. Sea Ray)" value={boatMake} onChange={(e) => setBoatMake(e.target.value)} />
+                          <input style={S.input} placeholder="Model" value={boatModel} onChange={(e) => setBoatModel(e.target.value)} />
+                        </div>
+                      ) : (
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
+                          <div>
+                            <input style={S.input} placeholder="Year" value={year}
+                              onChange={(e) => { setYear(e.target.value); setModel(""); setModelOptions([]); }}
+                              list="year-options" />
+                            <datalist id="year-options">{yearOptions.map((yr) => <option key={yr} value={yr} />)}</datalist>
+                          </div>
+                          <div>
+                            <input style={S.input} placeholder={loadingMakes ? "Loading..." : "Make"} value={make}
+                              onChange={(e) => { setMake(e.target.value); setModel(""); setModelOptions([]); }}
+                              list="make-options" autoComplete="off" />
+                            <datalist id="make-options">{makeOptions.map((mk) => <option key={mk} value={mk} />)}</datalist>
+                          </div>
+                          <div>
+                            <input style={S.input} placeholder={!year || !make ? "Model" : loadingModels ? "Loading..." : "Model"} value={model}
+                              onChange={(e) => setModel(e.target.value)}
+                              list="model-options" autoComplete="off" />
+                            <datalist id="model-options">{modelOptions.map((mdl) => <option key={mdl} value={mdl} />)}</datalist>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </>
                 )}
               </div>
 
