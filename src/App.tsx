@@ -1118,6 +1118,26 @@ export default function App() {
       if (adminFilter === "past") return !isUpcoming(b.date) || b.status === "Completed";
       if (adminFilter === "maintenance") return b.clientType === "maintenance";
       return true;
+    }).sort((a, b) => {
+      // "All" tab: completed first (sorted newest → oldest), then upcoming (oldest → newest)
+      if (adminFilter === "all") {
+        const aComplete = a.status === "Completed";
+        const bComplete = b.status === "Completed";
+        if (aComplete && !bComplete) return -1;
+        if (!aComplete && bComplete) return 1;
+        if (aComplete && bComplete) return b.date.localeCompare(a.date); // completed: newest first
+        return a.date.localeCompare(b.date); // upcoming: soonest first
+      }
+      // "Upcoming" tab: soonest first
+      if (adminFilter === "upcoming") return a.date.localeCompare(b.date);
+      // "Past" tab: most recent first
+      if (adminFilter === "past") return b.date.localeCompare(a.date);
+      // "Maintenance" tab: upcoming first, then by date
+      const aUp = isUpcoming(a.date) && a.status !== "Completed";
+      const bUp = isUpcoming(b.date) && b.status !== "Completed";
+      if (aUp && !bUp) return -1;
+      if (!aUp && bUp) return 1;
+      return aUp ? a.date.localeCompare(b.date) : b.date.localeCompare(a.date);
     });
 
     const pendingInvoices = adminBookings.filter(b => b.invoiceStatus === "pending");
