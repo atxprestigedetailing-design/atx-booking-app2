@@ -11,7 +11,7 @@ const GOOGLE_CLIENT_ID =
   "447699234633-ivo2e1c2q843scj32k5323o2rkq6h7dp.apps.googleusercontent.com";
 
 const SCRIPT_URL =
-  "https://script.google.com/macros/s/AKfycbww3QrFnc0u7UKUSAV2KXnRGFLoBLTzR2B9_pyxv4Rh0OPspzxJ6KxzPVKWzHeRIyrXrA/exec";
+  "https://script.google.com/macros/s/AKfycbzpHRQL1bEdq-bJ0M22V1vDWA02CUVUKs5BspuLI78VESg-JVPrAokj1DgLWyI9ehwR/exec";
 
 const TOTAL_STEPS = 9;
 const ADMIN_EMAIL = "atxprestigedetailing@gmail.com";
@@ -26,7 +26,7 @@ type AvailabilitySlot = {
 };
 
 type VehicleType = "truckSuv" | "sedan" | "coupe" | "boat" | "";
-type PackageType = "basic" | "premium" | "";
+type PackageType = "basic" | "premium" | "exterior" | "interior" | "";
 type ServiceType = "mobile" | "dropoff" | "";
 type ClientType = "oneTime" | "maintenance" | "";
 type FrequencyType = "biweekly" | "monthly" | "";
@@ -241,7 +241,7 @@ function BookingCard({ booking, upcoming, onRequestChange }: {
       </div>
       <div style={{ fontSize: "0.92rem", color: "#6b7280", lineHeight: 1.6 }}>
         {vehicleLabel && <div>{vehicleLabel}</div>}
-        <div>{booking.packageType === "basic" ? "Basic Detail" : booking.packageType === "premium" ? "Premium Detail" : booking.packageType}</div>
+        <div>{booking.packageType === "basic" ? "Basic Detail" : booking.packageType === "premium" ? "Premium Detail" : booking.packageType === "exterior" ? "Exterior Only" : booking.packageType === "interior" ? "Interior Only" : booking.packageType}</div>
         {booking.serviceType && (
           <div>{booking.serviceType === "mobile" ? `Mobile Service${booking.address ? ` - ${booking.address}` : ""}` : "Drop-Off Service"}</div>
         )}
@@ -632,6 +632,7 @@ export default function App() {
 
   const packageHours = useMemo(() => {
     if (!vehicle || !pkg) return "Select vehicle first";
+    if (pkg === "exterior" || pkg === "interior") return "2 hours avg";
     if (vehicle === "boat") return pkg === "premium" ? "5-8 hours avg" : "3-6 hours avg";
     if (clientType === "maintenance") return "2 hours";
     if (vehicle === "truckSuv") return "3-5 hours avg";
@@ -984,7 +985,7 @@ export default function App() {
                                 </div>
                                 {b && (
                                   <>
-                                    <div style={{ fontSize: "0.85rem", color: "#6b7280" }}>{vl && `${vl} · `}{b.packageType === "basic" ? "Basic Detail" : "Premium Detail"}</div>
+                                    <div style={{ fontSize: "0.85rem", color: "#6b7280" }}>{vl && `${vl} · `}{b.packageType === "basic" ? "Basic Detail" : pkg === "premium" ? "Premium Detail" : pkg === "exterior" ? "Exterior Only" : pkg === "interior" ? "Interior Only" : pkg}</div>
                                     {b.serviceType === "mobile" && b.address && <div style={{ fontSize: "0.82rem", color: "#9ca3af" }}>{b.address}</div>}
                                   </>
                                 )}
@@ -1038,7 +1039,7 @@ export default function App() {
                             const squareAmt = (baseAmt * 1.04).toFixed(2);
                             return (
                             <div key={i} style={{ background: "#fff", border: "1px solid #fde047", borderRadius: 16, padding: 18, marginBottom: 14 }}>
-                              <div style={{ fontWeight: 700, color: "#111827", marginBottom: 4 }}>{formatDateLabel(b.date)} — {b.packageType === "basic" ? "Basic Detail" : "Premium Detail"}</div>
+                              <div style={{ fontWeight: 700, color: "#111827", marginBottom: 4 }}>{formatDateLabel(b.date)} — {b.packageType === "basic" ? "Basic Detail" : pkg === "premium" ? "Premium Detail" : pkg === "exterior" ? "Exterior Only" : pkg === "interior" ? "Interior Only" : pkg}</div>
                               <div style={{ fontSize: "0.9rem", color: "#6b7280", marginBottom: 10 }}>
                                 {[b.year, b.make, b.model, b.boatSize].filter(Boolean).join(" ")}
                                 {b.invoiceNote ? ` — ${b.invoiceNote}` : ""}
@@ -1086,7 +1087,7 @@ export default function App() {
                               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                                 <div>
                                   <div style={{ fontWeight: 600, color: "#374151", fontSize: "0.9rem" }}>{formatDateLabel(b.date)}</div>
-                                  <div style={{ fontSize: "0.85rem", color: "#9ca3af" }}>{b.packageType === "basic" ? "Basic Detail" : "Premium Detail"}</div>
+                                  <div style={{ fontSize: "0.85rem", color: "#9ca3af" }}>{b.packageType === "basic" ? "Basic Detail" : pkg === "premium" ? "Premium Detail" : pkg === "exterior" ? "Exterior Only" : pkg === "interior" ? "Interior Only" : pkg}</div>
                                 </div>
                                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                                   <span style={{ fontWeight: 700, color: "#374151" }}>${b.invoiceAmount}</span>
@@ -1654,20 +1655,23 @@ export default function App() {
               <h2 style={S.title}>Detail Package</h2>
               <p style={S.subtitle}>Choose the level of service for this appointment.</p>
               <div style={S.optionGrid}>
-                {(["basic", "premium"] as PackageType[]).map((packageType) => {
-                  const label = packageType === "basic" ? "Basic Detail" : "Premium Detail";
-                  const rateText = selectedVehicle
-                    ? `${formatCurrency(packageType === "basic" ? selectedVehicle.basicRate : selectedVehicle.premiumRate)}/hr`
-                    : "Select vehicle first";
-                  const timeText = !vehicle ? "Time shown after vehicle selection"
-                    : clientType === "maintenance" ? "2 hours"
-                    : vehicle === "boat" ? (packageType === "premium" ? "5-8 hours avg" : "3-6 hours avg")
-                    : packageType === "premium" ? "3-5 hours avg"
-                    : vehicle === "truckSuv" ? "3-5 hours avg" : "3-4 hours avg";
+                {([
+                  { id: "basic",    label: "Basic Detail",    desc: "Full interior + exterior detail.",            time: !vehicle ? "" : clientType === "maintenance" ? "2 hours" : vehicle === "boat" ? "3-6 hours avg" : vehicle === "truckSuv" ? "3-5 hours avg" : "3-4 hours avg" },
+                  { id: "premium",  label: "Premium Detail",  desc: "Deep detail with premium products.",          time: !vehicle ? "" : vehicle === "boat" ? "5-8 hours avg" : "3-5 hours avg" },
+                  ...(vehicle !== "boat" ? [
+                    { id: "exterior" as PackageType, label: "Exterior Only", desc: "Wash, clay bar, polish & protect.",      time: "2 hours avg" },
+                    { id: "interior" as PackageType, label: "Interior Only", desc: "Vacuum, steam, wipe-down & condition.",  time: "2 hours avg" },
+                  ] : []),
+                ] as { id: PackageType; label: string; desc: string; time: string }[]).map((option) => {
+                  const rate = selectedVehicle
+                    ? (option.id === "premium" ? selectedVehicle.premiumRate : selectedVehicle.basicRate)
+                    : 0;
+                  const rateText = selectedVehicle ? `${formatCurrency(rate)}/hr` : "Select vehicle first";
                   return (
-                    <button key={packageType} style={{ ...S.optionCard, ...(pkg === packageType ? S.selectedCard : {}) }} onClick={() => setPkg(packageType)}>
-                      <div style={S.optionTitle}>{label}</div>
-                      <div style={S.optionMeta}>{rateText}<br />{timeText}</div>
+                    <button key={option.id} style={{ ...S.optionCard, ...(pkg === option.id ? S.selectedCard : {}) }} onClick={() => setPkg(option.id)}>
+                      <div style={S.optionTitle}>{option.label}</div>
+                      <div style={S.optionMeta}>{rateText}<br />{option.time}</div>
+                      <div style={{ fontSize: "0.82rem", color: "#9ca3af", marginTop: 6 }}>{option.desc}</div>
                     </button>
                   );
                 })}
@@ -1959,7 +1963,7 @@ export default function App() {
                     </div>
                   </div>
                 )}
-                <div style={S.summaryCard}><div style={S.summaryHeading}>Package</div><div style={S.summaryValue}>{selectedVehicle?.label || "N/A"}<br />{pkg === "basic" ? "Basic Detail" : pkg === "premium" ? "Premium Detail" : "N/A"}<br />{estimateText || "N/A"}</div></div>
+                <div style={S.summaryCard}><div style={S.summaryHeading}>Package</div><div style={S.summaryValue}>{selectedVehicle?.label || "N/A"}<br />{pkg === "basic" ? "Basic Detail" : pkg === "premium" ? "Premium Detail" : pkg === "exterior" ? "Exterior Only" : pkg === "interior" ? "Interior Only" : "N/A"}<br />{estimateText || "N/A"}</div></div>
                 <div style={S.summaryCard}><div style={S.summaryHeading}>Location</div><div style={S.summaryValue}>{serviceType === "mobile" ? "Mobile Service" : serviceType === "dropoff" ? "Drop-Off Service" : "N/A"}{serviceType === "mobile" && address && <><br />{address}</>}</div></div>
                 <div style={S.summaryCard}><div style={S.summaryHeading}>{vehicle === "boat" ? "Boat" : "Vehicle"}</div><div style={S.summaryValue}>{vehicleSummary}<br />{selectedVehicle?.label || "N/A"}</div></div>
                 <div style={S.summaryCard}><div style={S.summaryHeading}>Add-Ons</div><div style={S.summaryValue}>{addOns.length ? addOns.join(", ") : "None"}</div></div>
@@ -2052,7 +2056,7 @@ export default function App() {
                     </div>
                   </div>
                 )}
-                <div style={S.summaryCard}><div style={S.summaryHeading}>Package</div><div style={S.summaryValue}>{selectedVehicle?.label || "N/A"}<br />{pkg === "basic" ? "Basic Detail" : pkg === "premium" ? "Premium Detail" : "N/A"}<br />{estimateText || "N/A"}</div></div>
+                <div style={S.summaryCard}><div style={S.summaryHeading}>Package</div><div style={S.summaryValue}>{selectedVehicle?.label || "N/A"}<br />{pkg === "basic" ? "Basic Detail" : pkg === "premium" ? "Premium Detail" : pkg === "exterior" ? "Exterior Only" : pkg === "interior" ? "Interior Only" : "N/A"}<br />{estimateText || "N/A"}</div></div>
                 <div style={S.summaryCard}><div style={S.summaryHeading}>Location</div><div style={S.summaryValue}>{serviceType === "mobile" ? "Mobile Service" : serviceType === "dropoff" ? "Drop-Off Service" : "N/A"}<br />{address || "No address provided"}</div></div>
                 <div style={S.summaryCard}><div style={S.summaryHeading}>{vehicle === "boat" ? "Boat" : "Vehicle"}</div><div style={S.summaryValue}>{vehicleSummary}<br />{selectedVehicle?.label || "N/A"}</div></div>
                 <div style={S.summaryCard}><div style={S.summaryHeading}>Add-Ons</div><div style={S.summaryValue}>{addOns.length ? addOns.join(", ") : "None"}</div></div>
