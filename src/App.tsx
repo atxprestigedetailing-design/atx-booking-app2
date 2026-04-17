@@ -11,7 +11,7 @@ const GOOGLE_CLIENT_ID =
   "447699234633-ivo2e1c2q843scj32k5323o2rkq6h7dp.apps.googleusercontent.com";
 
 const SCRIPT_URL =
-  "https://script.google.com/macros/s/AKfycbzpHRQL1bEdq-bJ0M22V1vDWA02CUVUKs5BspuLI78VESg-JVPrAokj1DgLWyI9ehwR/exec";
+  "https://script.google.com/macros/s/AKfycbyDDJvKtCtAjUT2NSXZmysS0ulyH4kkfDx7X57TK38dWxgnbujd_-MHKTJ0exV4O7FyZg/exec";
 
 const TOTAL_STEPS = 9;
 const ADMIN_EMAIL = "atxprestigedetailing@gmail.com";
@@ -26,7 +26,7 @@ type AvailabilitySlot = {
 };
 
 type VehicleType = "truckSuv" | "sedan" | "coupe" | "boat" | "";
-type PackageType = "basic" | "premium" | "exterior" | "interior" | "";
+type PackageType = "basic" | "premium" | "exterior" | "interior" | "exteriorPremium" | "interiorPremium" | "";
 type ServiceType = "mobile" | "dropoff" | "";
 type ClientType = "oneTime" | "maintenance" | "";
 type FrequencyType = "biweekly" | "monthly" | "";
@@ -241,7 +241,7 @@ function BookingCard({ booking, upcoming, onRequestChange }: {
       </div>
       <div style={{ fontSize: "0.92rem", color: "#6b7280", lineHeight: 1.6 }}>
         {vehicleLabel && <div>{vehicleLabel}</div>}
-        <div>{booking.packageType === "basic" ? "Basic Detail" : booking.packageType === "premium" ? "Premium Detail" : booking.packageType === "exterior" ? "Exterior Only" : booking.packageType === "interior" ? "Interior Only" : booking.packageType}</div>
+        <div>{booking.packageType === "basic" ? "Basic Detail" : booking.packageType === "premium" ? "Premium Detail" : booking.packageType === "exterior" ? "Exterior Only — Basic" : booking.packageType === "interior" ? "Interior Only — Basic" : booking.packageType === "exteriorPremium" ? "Exterior Only — Premium" : booking.packageType === "interiorPremium" ? "Interior Only — Premium" : booking.packageType}</div>
         {booking.serviceType && (
           <div>{booking.serviceType === "mobile" ? `Mobile Service${booking.address ? ` - ${booking.address}` : ""}` : "Drop-Off Service"}</div>
         )}
@@ -627,13 +627,13 @@ export default function App() {
 
   const hourlyRate = useMemo(() => {
     if (!selectedVehicle || !pkg) return 0;
-    if (pkg === "premium") return selectedVehicle.premiumRate;
-    return selectedVehicle.basicRate; // basic, exterior, interior all use basicRate
+    if (pkg === "premium" || pkg === "exteriorPremium" || pkg === "interiorPremium") return selectedVehicle.premiumRate;
+    return selectedVehicle.basicRate;
   }, [selectedVehicle, pkg]);
 
   const packageHours = useMemo(() => {
     if (!vehicle || !pkg) return "Select vehicle first";
-    if (pkg === "exterior" || pkg === "interior") return "2 hours avg";
+    if (pkg === "exterior" || pkg === "interior" || pkg === "exteriorPremium" || pkg === "interiorPremium") return "2 hours avg";
     if (vehicle === "boat") return pkg === "premium" ? "5-8 hours avg" : "3-6 hours avg";
     if (clientType === "maintenance") return "2 hours";
     if (vehicle === "truckSuv") return "3-5 hours avg";
@@ -1964,7 +1964,7 @@ export default function App() {
                     </div>
                   </div>
                 )}
-                <div style={S.summaryCard}><div style={S.summaryHeading}>Package</div><div style={S.summaryValue}>{selectedVehicle?.label || "N/A"}<br />{pkg === "basic" ? "Basic Detail" : pkg === "premium" ? "Premium Detail" : pkg === "exterior" ? "Exterior Only" : pkg === "interior" ? "Interior Only" : "N/A"}<br />{estimateText || "N/A"}</div></div>
+                <div style={S.summaryCard}><div style={S.summaryHeading}>Package</div><div style={S.summaryValue}>{selectedVehicle?.label || "N/A"}<br />{pkg === "basic" ? "Basic Detail" : pkg === "premium" ? "Premium Detail" : pkg === "exterior" ? "Exterior Only — Basic" : pkg === "interior" ? "Interior Only — Basic" : pkg === "exteriorPremium" ? "Exterior Only — Premium" : pkg === "interiorPremium" ? "Interior Only — Premium" : "N/A"}<br />{estimateText || "N/A"}</div></div>
                 <div style={S.summaryCard}><div style={S.summaryHeading}>Location</div><div style={S.summaryValue}>{serviceType === "mobile" ? "Mobile Service" : serviceType === "dropoff" ? "Drop-Off Service" : "N/A"}{serviceType === "mobile" && address && <><br />{address}</>}</div></div>
                 <div style={S.summaryCard}><div style={S.summaryHeading}>{vehicle === "boat" ? "Boat" : "Vehicle"}</div><div style={S.summaryValue}>{vehicleSummary}<br />{selectedVehicle?.label || "N/A"}</div></div>
                 <div style={S.summaryCard}><div style={S.summaryHeading}>Add-Ons</div><div style={S.summaryValue}>{addOns.length ? addOns.join(", ") : "None"}</div></div>
@@ -2057,7 +2057,7 @@ export default function App() {
                     </div>
                   </div>
                 )}
-                <div style={S.summaryCard}><div style={S.summaryHeading}>Package</div><div style={S.summaryValue}>{selectedVehicle?.label || "N/A"}<br />{pkg === "basic" ? "Basic Detail" : pkg === "premium" ? "Premium Detail" : pkg === "exterior" ? "Exterior Only" : pkg === "interior" ? "Interior Only" : "N/A"}<br />{estimateText || "N/A"}</div></div>
+                <div style={S.summaryCard}><div style={S.summaryHeading}>Package</div><div style={S.summaryValue}>{selectedVehicle?.label || "N/A"}<br />{pkg === "basic" ? "Basic Detail" : pkg === "premium" ? "Premium Detail" : pkg === "exterior" ? "Exterior Only — Basic" : pkg === "interior" ? "Interior Only — Basic" : pkg === "exteriorPremium" ? "Exterior Only — Premium" : pkg === "interiorPremium" ? "Interior Only — Premium" : "N/A"}<br />{estimateText || "N/A"}</div></div>
                 <div style={S.summaryCard}><div style={S.summaryHeading}>Location</div><div style={S.summaryValue}>{serviceType === "mobile" ? "Mobile Service" : serviceType === "dropoff" ? "Drop-Off Service" : "N/A"}<br />{address || "No address provided"}</div></div>
                 <div style={S.summaryCard}><div style={S.summaryHeading}>{vehicle === "boat" ? "Boat" : "Vehicle"}</div><div style={S.summaryValue}>{vehicleSummary}<br />{selectedVehicle?.label || "N/A"}</div></div>
                 <div style={S.summaryCard}><div style={S.summaryHeading}>Add-Ons</div><div style={S.summaryValue}>{addOns.length ? addOns.join(", ") : "None"}</div></div>
