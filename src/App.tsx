@@ -627,7 +627,8 @@ export default function App() {
 
   const hourlyRate = useMemo(() => {
     if (!selectedVehicle || !pkg) return 0;
-    return pkg === "basic" ? selectedVehicle.basicRate : selectedVehicle.premiumRate;
+    if (pkg === "premium") return selectedVehicle.premiumRate;
+    return selectedVehicle.basicRate; // basic, exterior, interior all use basicRate
   }, [selectedVehicle, pkg]);
 
   const packageHours = useMemo(() => {
