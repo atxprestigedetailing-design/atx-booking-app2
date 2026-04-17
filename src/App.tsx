@@ -1655,30 +1655,59 @@ export default function App() {
             <>
               <h2 style={S.title}>Detail Package</h2>
               <p style={S.subtitle}>Choose the level of service for this appointment.</p>
-              <div style={S.optionGrid}>
+              {/* ── Full Detail packages ── */}
+              <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "#9ca3af", textTransform: "uppercase" as const, letterSpacing: "0.08em", marginBottom: 10 }}>Full Detail</div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12, marginBottom: 24 }}>
                 {([
-                  { id: "premium",         label: "Premium Detail",          desc: "Full interior + exterior, premium products.",        time: !vehicle ? "" : vehicle === "boat" ? "5-8 hours avg" : "3-5 hours avg",  isPremium: true  },
-                  { id: "basic",           label: "Basic Detail",            desc: "Full interior + exterior, standard products.",       time: !vehicle ? "" : clientType === "maintenance" ? "2 hours" : vehicle === "boat" ? "3-6 hours avg" : vehicle === "truckSuv" ? "3-5 hours avg" : "3-4 hours avg", isPremium: false },
-                  ...(vehicle !== "boat" ? [
-                    { id: "exteriorPremium" as PackageType, label: "Exterior Only — Premium", desc: "Exterior only, premium products.",   time: "2 hours avg", isPremium: true  },
-                    { id: "exterior"        as PackageType, label: "Exterior Only — Basic",   desc: "Exterior only, standard products.",  time: "2 hours avg", isPremium: false },
-                    { id: "interiorPremium" as PackageType, label: "Interior Only — Premium", desc: "Interior only, premium products.",   time: "2 hours avg", isPremium: true  },
-                    { id: "interior"        as PackageType, label: "Interior Only — Basic",   desc: "Interior only, standard products.",  time: "2 hours avg", isPremium: false },
-                  ] : []),
-                ] as { id: PackageType; label: string; desc: string; time: string; isPremium: boolean }[]).map((option) => {
-                  const rate = selectedVehicle
-                    ? (option.isPremium ? selectedVehicle.premiumRate : selectedVehicle.basicRate)
-                    : 0;
-                  const rateText = selectedVehicle ? `${formatCurrency(rate)}/hr` : "Select vehicle first";
+                  { id: "premium" as PackageType, label: "Premium Detail", badge: "PREMIUM", desc: "Interior + exterior with premium products & techniques.", time: !vehicle ? "" : vehicle === "boat" ? "5-8 hours avg" : "3-5 hours avg", isPremium: true },
+                  { id: "basic"   as PackageType, label: "Basic Detail",   badge: "BASIC",   desc: "Full interior + exterior, standard products.",            time: !vehicle ? "" : clientType === "maintenance" ? "2 hours" : vehicle === "boat" ? "3-6 hours avg" : vehicle === "truckSuv" ? "3-5 hours avg" : "3-4 hours avg", isPremium: false },
+                ]).map((option) => {
+                  const rate = selectedVehicle ? (option.isPremium ? selectedVehicle.premiumRate : selectedVehicle.basicRate) : 0;
+                  const isSelected = pkg === option.id;
                   return (
-                    <button key={option.id} style={{ ...S.optionCard, ...(pkg === option.id ? S.selectedCard : {}) }} onClick={() => setPkg(option.id)}>
-                      <div style={S.optionTitle}>{option.label}</div>
-                      <div style={S.optionMeta}>{rateText}<br />{option.time}</div>
-                      <div style={{ fontSize: "0.82rem", color: "#9ca3af", marginTop: 6 }}>{option.desc}</div>
+                    <button key={option.id} onClick={() => setPkg(option.id)}
+                      style={{ ...S.optionCard, ...(isSelected ? S.selectedCard : {}), position: "relative" as const }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
+                        <div style={S.optionTitle}>{option.label}</div>
+                        <span style={{ background: option.isPremium ? "#111827" : "#f3f4f6", color: option.isPremium ? "#fff" : "#6b7280", fontSize: "0.65rem", fontWeight: 800, borderRadius: 6, padding: "2px 7px", letterSpacing: "0.06em", flexShrink: 0 }}>{option.badge}</span>
+                      </div>
+                      <div style={{ fontSize: "1.1rem", fontWeight: 800, color: "#111827", marginBottom: 4 }}>{selectedVehicle ? `${formatCurrency(rate)}/hr` : "—"}</div>
+                      <div style={{ fontSize: "0.85rem", color: "#6b7280", marginBottom: 6 }}>{option.time}</div>
+                      <div style={{ fontSize: "0.8rem", color: "#9ca3af", lineHeight: 1.4 }}>{option.desc}</div>
                     </button>
                   );
                 })}
               </div>
+
+              {/* ── Partial packages (non-boat only) ── */}
+              {vehicle !== "boat" && (
+                <>
+                  <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "#9ca3af", textTransform: "uppercase" as const, letterSpacing: "0.08em", marginBottom: 10 }}>Partial Detail</div>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
+                    {([
+                      { id: "exteriorPremium" as PackageType, label: "Exterior Only", badge: "PREMIUM", desc: "Exterior only, premium products.", isPremium: true  },
+                      { id: "exterior"        as PackageType, label: "Exterior Only", badge: "BASIC",   desc: "Exterior only, standard products.", isPremium: false },
+                      { id: "interiorPremium" as PackageType, label: "Interior Only", badge: "PREMIUM", desc: "Interior only, premium products.", isPremium: true  },
+                      { id: "interior"        as PackageType, label: "Interior Only", badge: "BASIC",   desc: "Interior only, standard products.", isPremium: false },
+                    ]).map((option) => {
+                      const rate = selectedVehicle ? (option.isPremium ? selectedVehicle.premiumRate : selectedVehicle.basicRate) : 0;
+                      const isSelected = pkg === option.id;
+                      return (
+                        <button key={option.id} onClick={() => setPkg(option.id)}
+                          style={{ ...S.optionCard, ...(isSelected ? S.selectedCard : {}) }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 }}>
+                            <div style={{ ...S.optionTitle, fontSize: "0.95rem" }}>{option.label}</div>
+                            <span style={{ background: option.isPremium ? "#111827" : "#f3f4f6", color: option.isPremium ? "#fff" : "#6b7280", fontSize: "0.65rem", fontWeight: 800, borderRadius: 6, padding: "2px 7px", letterSpacing: "0.06em", flexShrink: 0 }}>{option.badge}</span>
+                          </div>
+                          <div style={{ fontSize: "1rem", fontWeight: 800, color: "#111827", marginBottom: 4 }}>{selectedVehicle ? `${formatCurrency(rate)}/hr` : "—"}</div>
+                          <div style={{ fontSize: "0.8rem", color: "#6b7280", marginBottom: 4 }}>2 hours avg</div>
+                          <div style={{ fontSize: "0.78rem", color: "#9ca3af", lineHeight: 1.4 }}>{option.desc}</div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
               <div style={{ marginTop: 8, fontSize: "0.9rem", color: "#6b7280" }}>
                 Time estimates are based on average conditions and may vary at the time of service.
               </div>
