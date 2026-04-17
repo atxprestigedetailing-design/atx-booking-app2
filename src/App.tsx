@@ -11,7 +11,7 @@ const GOOGLE_CLIENT_ID =
   "447699234633-ivo2e1c2q843scj32k5323o2rkq6h7dp.apps.googleusercontent.com";
 
 const SCRIPT_URL =
-  "https://script.google.com/macros/s/AKfycbyDDJvKtCtAjUT2NSXZmysS0ulyH4kkfDx7X57TK38dWxgnbujd_-MHKTJ0exV4O7FyZg/exec";
+  "https://script.google.com/macros/s/AKfycbxJJZn3bqoCDAMoDPu2wDqQSZa_16ASpoeUQxwm9Di1g_c3ovAcHpi9vK-W5N7XwEYr4w/exec";
 
 const TOTAL_STEPS = 9;
 const ADMIN_EMAIL = "atxprestigedetailing@gmail.com";
@@ -1022,16 +1022,19 @@ export default function App() {
 
                       {outstanding.length > 0 && (
                         <>
-                          <div style={{ background: "#fefce8", border: "1px solid #fde047", borderRadius: 14, padding: "14px 18px", marginBottom: 20 }}>
-                            <div style={{ fontWeight: 700, color: "#713f12", fontSize: "1rem", marginBottom: 8 }}>Total Balance Due</div>
-                            <div style={{ display: "flex", gap: 20, flexWrap: "wrap" as const }}>
-                              <div>
-                                <div style={{ fontSize: "0.78rem", color: "#92400e" }}>Venmo / Cash App</div>
-                                <div style={{ fontSize: "1.6rem", fontWeight: 800, color: "#92400e" }}>${totalOwed.toFixed(2)}</div>
+                          <div style={{ background: "#fefce8", border: "1px solid #fde047", borderRadius: 14, padding: "16px 18px", marginBottom: 20, textAlign: "center" as const }}>
+                            <div style={{ fontWeight: 700, color: "#713f12", fontSize: "1rem", marginBottom: 12 }}>Total Balance Due</div>
+                            <div style={{ display: "flex", gap: 0, justifyContent: "center" }}>
+                              <div style={{ flex: 1, textAlign: "center" as const, padding: "0 12px" }}>
+                                <div style={{ fontSize: "0.75rem", color: "#92400e", marginBottom: 4 }}>Venmo / Cash App</div>
+                                <div style={{ fontSize: "1.8rem", fontWeight: 900, color: "#92400e", letterSpacing: "-0.5px" }}>${totalOwed.toFixed(2)}</div>
+                                <div style={{ fontSize: "0.7rem", color: "#b45309", marginTop: 2 }}>No fee</div>
                               </div>
-                              <div>
-                                <div style={{ fontSize: "0.78rem", color: "#92400e" }}>Square / Card (+ 4%)</div>
-                                <div style={{ fontSize: "1.6rem", fontWeight: 800, color: "#92400e" }}>${(totalOwed * 1.04).toFixed(2)}</div>
+                              <div style={{ width: 1, background: "#fde047", alignSelf: "stretch" }} />
+                              <div style={{ flex: 1, textAlign: "center" as const, padding: "0 12px" }}>
+                                <div style={{ fontSize: "0.75rem", color: "#92400e", marginBottom: 4 }}>Square / Card (+4%)</div>
+                                <div style={{ fontSize: "1.8rem", fontWeight: 900, color: "#92400e", letterSpacing: "-0.5px" }}>${(totalOwed * 1.04).toFixed(2)}</div>
+                                <div style={{ fontSize: "0.7rem", color: "#b45309", marginTop: 2 }}>Includes fee</div>
                               </div>
                             </div>
                           </div>
@@ -1047,18 +1050,18 @@ export default function App() {
                                 {b.invoiceNote ? ` — ${b.invoiceNote}` : ""}
                               </div>
                               {/* Amount due box showing both prices + copy button */}
-                              <div style={{ background: "#fefce8", border: "1px solid #fde047", borderRadius: 12, padding: "12px 16px", marginBottom: 14 }}>
-                                <div style={{ display: "flex", gap: 16, flexWrap: "wrap" as const, alignItems: "center", marginBottom: 12 }}>
-                                  <div style={{ textAlign: "center" as const }}>
-                                    <div style={{ fontSize: "0.75rem", color: "#92400e", marginBottom: 2 }}>Venmo / Cash App</div>
-                                    <div style={{ fontSize: "1.4rem", fontWeight: 800, color: "#92400e" }}>${baseAmt.toFixed(2)}</div>
-                                    <div style={{ fontSize: "0.7rem", color: "#9ca3af" }}>No fee</div>
+                              <div style={{ background: "#fefce8", border: "1px solid #fde047", borderRadius: 12, padding: "14px 16px", marginBottom: 14 }}>
+                                <div style={{ display: "flex", gap: 0, marginBottom: 12 }}>
+                                  <div style={{ flex: 1, textAlign: "center" as const, padding: "0 8px" }}>
+                                    <div style={{ fontSize: "0.72rem", color: "#92400e", marginBottom: 3 }}>Venmo / Cash App</div>
+                                    <div style={{ fontSize: "1.5rem", fontWeight: 900, color: "#92400e", letterSpacing: "-0.5px" }}>${baseAmt.toFixed(2)}</div>
+                                    <div style={{ fontSize: "0.68rem", color: "#b45309", marginTop: 2 }}>No fee</div>
                                   </div>
-                                  <div style={{ color: "#d1d5db", fontSize: "1.2rem" }}>|</div>
-                                  <div style={{ textAlign: "center" as const }}>
-                                    <div style={{ fontSize: "0.75rem", color: "#92400e", marginBottom: 2 }}>Square (Card)</div>
-                                    <div style={{ fontSize: "1.4rem", fontWeight: 800, color: "#92400e" }}>${squareAmt}</div>
-                                    <div style={{ fontSize: "0.7rem", color: "#9ca3af" }}>Includes 4% fee</div>
+                                  <div style={{ width: 1, background: "#fde047", alignSelf: "stretch" }} />
+                                  <div style={{ flex: 1, textAlign: "center" as const, padding: "0 8px" }}>
+                                    <div style={{ fontSize: "0.72rem", color: "#92400e", marginBottom: 3 }}>Square (Card)</div>
+                                    <div style={{ fontSize: "1.5rem", fontWeight: 900, color: "#92400e", letterSpacing: "-0.5px" }}>${squareAmt}</div>
+                                    <div style={{ fontSize: "0.68rem", color: "#b45309", marginTop: 2 }}>+4% fee</div>
                                   </div>
                                 </div>
                                 {/* Copy amount button */}
