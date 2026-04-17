@@ -316,6 +316,8 @@ export default function App() {
   const [availableSlots, setAvailableSlots]             = useState<AvailabilitySlot[]>([]);
   const [allAvailableSlots, setAllAvailableSlots]       = useState<AvailabilitySlot[]>([]);
   const [availableDates, setAvailableDates]             = useState<string[]>([]);
+  const [calMonth, setCalMonth]                         = useState(() => new Date().getMonth());
+  const [calYear, setCalYear]                           = useState(() => new Date().getFullYear());
   const [selectedTime, setSelectedTime]                 = useState("");
   const [address, setAddress]                           = useState("");
   const [street, setStreet]                             = useState("");
@@ -599,7 +601,20 @@ export default function App() {
   useEffect(() => {
     fetchAllAvailability().then((slots) => {
       setAllAvailableSlots(slots);
-      setAvailableDates([...new Set(slots.map((s) => s.date))]);
+      const dates = [...new Set(slots.map((s) => s.date))];
+      setAvailableDates(dates);
+      // Auto-advance calendar to first available month
+      if (dates.length > 0) {
+        const sorted = [...dates].sort();
+        const [y, m] = sorted[0].split("-").map(Number);
+        const today = new Date();
+        const firstAvailMonth = new Date(y, m - 1);
+        const thisMonth = new Date(today.getFullYear(), today.getMonth());
+        if (firstAvailMonth > thisMonth) {
+          setCalMonth(m - 1);
+          setCalYear(y);
+        }
+      }
     }).catch(console.error);
   }, []);
 
@@ -1738,24 +1753,100 @@ export default function App() {
               <h2 style={S.title}>Your Information</h2>
               <p style={S.subtitle}>We'll use this to confirm your appointment.</p>
               <div style={S.inputGrid}>
+                {/* ── Calendar Picker ── */}
                 <div style={{ marginTop: 20 }}>
                   <div style={S.sectionLabel}>Appointment Date</div>
-                  <select style={{ ...S.input, backgroundColor: "#fff", color: "#111827", cursor: "pointer" }} value={selectedDate}
-                    onChange={(e) => { setSelectedDate(e.target.value); setSelectedTime(""); }}>
-                    <option value="">Select a date</option>
-                    {availableDates.map((date, i) => <option key={i} value={date}>{formatDateLabel(date)}</option>)}
-                  </select>
+                  <div style={{ background: "#fff", border: "1px solid #d1d5db", borderRadius: 16, padding: "16px", marginTop: 10 }}>
+                    {/* Month nav */}
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+                      <button
+                        onClick={() => { const d = new Date(calYear, calMonth - 1, 1); setCalMonth(d.getMonth()); setCalYear(d.getFullYear()); }}
+                        style={{ background: "none", border: "1px solid #e5e7eb", borderRadius: 8, width: 34, height: 34, cursor: "pointer", color: "#374151", fontSize: "1rem", display: "flex", alignItems: "center", justifyContent: "center" }}
+                      >‹</button>
+                      <span style={{ fontWeight: 700, fontSize: "0.95rem", color: "#111827" }}>
+                        {new Date(calYear, calMonth).toLocaleDateString("en-US", { month: "long", year: "numeric" })}
+                      </span>
+                      <button
+                        onClick={() => { const d = new Date(calYear, calMonth + 1, 1); setCalMonth(d.getMonth()); setCalYear(d.getFullYear()); }}
+                        style={{ background: "none", border: "1px solid #e5e7eb", borderRadius: 8, width: 34, height: 34, cursor: "pointer", color: "#374151", fontSize: "1rem", display: "flex", alignItems: "center", justifyContent: "center" }}
+                      >›</button>
+                    </div>
+                    {/* Day headers */}
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 2, marginBottom: 6 }}>
+                      {["Su","Mo","Tu","We","Th","Fr","Sa"].map(d => (
+                        <div key={d} style={{ textAlign: "center" as const, fontSize: "0.75rem", color: "#9ca3af", fontWeight: 600, padding: "4px 0" }}>{d}</div>
+                      ))}
+                    </div>
+                    {/* Day grid */}
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 3 }}>
+                      {(() => {
+                        const firstDay = new Date(calYear, calMonth, 1).getDay();
+                        const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
+                        const today = new Date(); today.setHours(0,0,0,0);
+                        const cells = [];
+                        // Empty cells before first day
+                        for (let i = 0; i < firstDay; i++) {
+                          cells.push(<div key={`e${i}`} />);
+                        }
+                        for (let d = 1; d <= daysInMonth; d++) {
+                          const dateStr = `${calYear}-${String(calMonth + 1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
+                          const isAvail = availableDates.includes(dateStr);
+                          const isPast = new Date(calYear, calMonth, d) < today;
+                          const isSelected = selectedDate === dateStr;
+                          cells.push(
+                            <button
+                              key={d}
+                              disabled={!isAvail || isPast}
+                              onClick={() => { setSelectedDate(dateStr); setSelectedTime(""); }}
+                              style={{
+                                height: 36,
+                                borderRadius: 8,
+                                border: isSelected ? "none" : isAvail && !isPast ? "1px solid #e5e7eb" : "none",
+                                background: isSelected ? "#111827" : isAvail && !isPast ? "#f9fafb" : "transparent",
+                                color: isSelected ? "#fff" : isAvail && !isPast ? "#111827" : "#d1d5db",
+                                fontSize: "0.85rem",
+                                fontWeight: isAvail && !isPast ? 600 : 400,
+                                cursor: isAvail && !isPast ? "pointer" : "default",
+                                opacity: isPast ? 0.3 : 1,
+                              }}
+                            >{d}</button>
+                          );
+                        }
+                        return cells;
+                      })()}
+                    </div>
+                  </div>
                 </div>
-                <div style={{ marginTop: 20 }}>
-                  <div style={S.sectionLabel}>Appointment Time</div>
-                  <select style={{ ...S.input, backgroundColor: "#fff", color: "#111827", cursor: "pointer" }} value={selectedTime} onChange={(e) => setSelectedTime(e.target.value)}>
-                    <option value="">Select a time</option>
-                    {availableSlots.map((slot, i) => <option key={i} value={slot.time}>{slot.time}</option>)}
-                  </select>
-                  {selectedDate && availableSlots.length === 0 && (
-                    <div style={{ marginTop: 8, color: "#b91c1c", fontSize: "0.95rem" }}>No available times for this date.</div>
-                  )}
-                </div>
+
+                {/* Time slot pills */}
+                {selectedDate && (
+                  <div style={{ marginTop: 16 }}>
+                    <div style={S.sectionLabel}>Appointment Time</div>
+                    {availableSlots.length === 0 ? (
+                      <div style={{ marginTop: 10, color: "#b91c1c", fontSize: "0.95rem" }}>No available times for this date.</div>
+                    ) : (
+                      <div style={{ display: "flex", flexWrap: "wrap" as const, gap: 10, marginTop: 10 }}>
+                        {availableSlots.map((slot, i) => (
+                          <button
+                            key={i}
+                            onClick={() => setSelectedTime(slot.time)}
+                            style={{
+                              padding: "10px 20px",
+                              borderRadius: 999,
+                              border: selectedTime === slot.time ? "none" : "1px solid #d1d5db",
+                              background: selectedTime === slot.time ? "#111827" : "#fff",
+                              color: selectedTime === slot.time ? "#fff" : "#374151",
+                              fontSize: "0.9rem",
+                              fontWeight: 600,
+                              cursor: "pointer",
+                              boxShadow: selectedTime === slot.time ? "0 2px 8px rgba(17,24,39,0.2)" : "none",
+                            }}
+                          >{slot.time}</button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Recurring schedule preview — maintenance only */}
                 {clientType === "maintenance" && selectedDate && frequency && (
