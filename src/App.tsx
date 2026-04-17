@@ -728,21 +728,21 @@ export default function App() {
     selectedGreen:  { border: "2px solid #059669", background: "#ecfdf5", boxShadow: "0 0 0 2px rgba(5,150,105,0.1)" },
     optionTitle:    { fontWeight: 700, fontSize: "1.05rem", marginBottom: 8, color: "#111827" },
     optionMeta:     { color: "#6b7280", fontSize: "0.95rem", lineHeight: 1.45 },
-    estimateBox:    { background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: 16, padding: 16, textAlign: "center" as const, marginTop: 6 } as const,
+    estimateBox:    { background: "#f5f4f2", border: "1px solid #ece9e4", borderRadius: 16, padding: 16, textAlign: "center" as const, marginTop: 6 } as const,
     estimateLabel:  { color: "#6b7280", fontSize: "0.95rem", marginBottom: 6 },
     estimateValue:  { fontSize: "1.05rem", fontWeight: 800, color: "#111827", lineHeight: 1.5 },
-    noteBox:        { marginTop: 14, background: "#f3f4f6", border: "1px solid #e5e7eb", borderRadius: 16, padding: 14, color: "#374151", textAlign: "center" as const, lineHeight: 1.45 } as const,
+    noteBox:        { marginTop: 14, background: "#f5f4f2", border: "1px solid #ece9e4", borderRadius: 16, padding: 14, color: "#374151", textAlign: "center" as const, lineHeight: 1.45 } as const,
     addOnGrid:      { display: "grid", gap: 12, marginBottom: 18 } as const,
-    addOnRow:       { display: "flex", alignItems: "center", gap: 14, padding: 16, borderRadius: 16, border: "1px solid #e5e7eb", background: "#fff", cursor: "pointer", justifyContent: "space-between", flexWrap: "wrap" as const },
+    addOnRow:       { display: "flex", alignItems: "center", gap: 14, padding: 16, borderRadius: 16, border: "1.5px solid #ece9e4", background: "#fff", cursor: "pointer", justifyContent: "space-between", flexWrap: "wrap" as const },
     checkWrap:      { display: "flex", alignItems: "center", gap: 12, flex: 1, minWidth: 220 },
-    checkbox:       { width: 18, height: 18, accentColor: "#111827" },
+    checkbox:       { width: 18, height: 18, accentColor: "#0f0f0f" },
     addOnPrice:     { color: "#374151", fontWeight: 700 },
     inputGrid:      { display: "grid", gap: 14, maxWidth: 560, margin: "0 auto" } as const,
     input:          { width: "100%", boxSizing: "border-box" as const, background: "#fff", color: "#111827", border: "1px solid #d1d5db", borderRadius: 14, padding: "14px 16px", fontSize: "1rem", outline: "none" },
     buttonRow:      { display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" as const, marginTop: 24 },
     rightButtons:   { display: "flex", gap: 12, marginLeft: "auto" } as const,
     summaryGrid:    { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14, marginTop: 22 } as const,
-    summaryCard:    { background: "#fff", border: "1px solid #e5e7eb", borderRadius: 16, padding: 16 },
+    summaryCard:    { background: "#fafaf9", border: "1px solid #ece9e4", borderRadius: 16, padding: 16 },
     sectionLabel:   { fontSize: "0.95rem", fontWeight: 700, color: "#374151", marginTop: 6, marginBottom: -4, textAlign: "left" as const },
     summaryHeading: { fontSize: "0.92rem", color: "#6b7280", marginBottom: 8, textTransform: "uppercase" as const, letterSpacing: "0.04em" },
     summaryValue:   { fontSize: "1rem", fontWeight: 700, lineHeight: 1.5, color: "#111827", wordBreak: "break-word" as const },
@@ -809,8 +809,8 @@ export default function App() {
         <span>Booking</span>
         <span>Step {step} of {TOTAL_STEPS - 1}</span>
       </div>
-      <div style={{ height: 8, background: "#e5e7eb", borderRadius: 999, overflow: "hidden", border: "1px solid #d1d5db" }}>
-        <div style={{ height: "100%", width: `${(step / (TOTAL_STEPS - 1)) * 100}%`, background: "linear-gradient(90deg,#6b7280,#9ca3af)", borderRadius: 999, transition: "width 0.25s ease" }} />
+      <div style={{ height: 3, background: "#ece9e4", borderRadius: 999, overflow: "hidden" }}>
+        <div style={{ height: "100%", width: `${(step / (TOTAL_STEPS - 1)) * 100}%`, background: "#0f0f0f", borderRadius: 999, transition: "width 0.4s cubic-bezier(0.4,0,0.2,1)" }} />
       </div>
     </div>
   );
@@ -1608,19 +1608,27 @@ export default function App() {
           {/* STEP 0 */}
           {step === 0 && (
             <>
-              <h2 style={S.title}>Book a Detail Service</h2>
-              <p style={S.subtitle}>Serving Lago Vista, Cedar Park, and Leander areas.</p>
-              <div style={{ display: "flex", justifyContent: "center", gap: 12, padding: "10px 0 2px", flexWrap: "wrap" as const }}>
-                <button style={S.primary} onClick={() => setStep(1)}>Book a Service</button>
-                {googleUser && (
-                  <button style={S.secondary} onClick={openMyBookings}>My Bookings</button>
+              <div style={{ textAlign: "center" as const, padding: "8px 0 20px" }}>
+                <div style={{ fontSize: "0.72rem", fontWeight: 700, letterSpacing: "0.14em", color: "#ccc", textTransform: "uppercase" as const, marginBottom: 10 }}>Premium Auto & Marine</div>
+                <h2 style={{ ...S.title, fontSize: "clamp(2rem, 6vw, 3.2rem)", marginBottom: 10 }}>Detailing, Elevated.</h2>
+                <p style={{ ...S.subtitle, marginBottom: 24 }}>Serving Lago Vista, Cedar Park, and Leander areas.</p>
+                <div style={{ display: "flex", justifyContent: "center", gap: 12, flexWrap: "wrap" as const, marginBottom: 24 }}>
+                  <button style={S.primary} onClick={() => setStep(1)}>Book a Service</button>
+                  {googleUser && (
+                    <button style={S.secondary} onClick={openMyBookings}>My Bookings</button>
+                  )}
+                </div>
+                {!googleUser && (
+                  <p style={{ textAlign: "center" as const, color: "#bbb", fontSize: "0.85rem", marginBottom: 20 }}>
+                    Sign in with Google to view your past and upcoming appointments.
+                  </p>
                 )}
               </div>
-              {!googleUser && (
-                <p style={{ textAlign: "center", color: "#9ca3af", fontSize: "0.88rem", marginTop: 18 }}>
-                  Sign in with Google to view your past and upcoming appointments.
-                </p>
-              )}
+              <div style={{ borderTop: "1px solid #f0ede8", paddingTop: 16, display: "flex", gap: 8, flexWrap: "wrap" as const, justifyContent: "center" }}>
+                {["Auto Detail", "Marine Detail", "Maintenance Plans", "Mobile Service"].map(tag => (
+                  <span key={tag} style={{ background: "#f5f4f2", borderRadius: 999, padding: "5px 14px", fontSize: "0.82rem", color: "#666", fontWeight: 500, border: "1px solid #ece9e4" }}>{tag}</span>
+                ))}
+              </div>
             </>
           )}
 
@@ -2122,6 +2130,11 @@ export default function App() {
           {step === 8 && (
             <>
               <div style={S.successWrap}>
+                <div style={{ width: 56, height: 56, background: "#0f0f0f", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 18px" }}>
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                    <polyline points="4,12 9,17 20,6" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </div>
                 <h2 style={S.title}>Booking Submitted</h2>
                 <p style={S.successText}>
                   Your booking request has been received. Someone will be in touch shortly to confirm your appointment.
