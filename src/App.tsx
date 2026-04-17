@@ -1657,15 +1657,17 @@ export default function App() {
               <p style={S.subtitle}>Choose the level of service for this appointment.</p>
               <div style={S.optionGrid}>
                 {([
-                  { id: "basic",    label: "Basic Detail",    desc: "Full interior + exterior detail.",            time: !vehicle ? "" : clientType === "maintenance" ? "2 hours" : vehicle === "boat" ? "3-6 hours avg" : vehicle === "truckSuv" ? "3-5 hours avg" : "3-4 hours avg" },
-                  { id: "premium",  label: "Premium Detail",  desc: "Deep detail with premium products.",          time: !vehicle ? "" : vehicle === "boat" ? "5-8 hours avg" : "3-5 hours avg" },
+                  { id: "premium",         label: "Premium Detail",          desc: "Full interior + exterior, premium products.",        time: !vehicle ? "" : vehicle === "boat" ? "5-8 hours avg" : "3-5 hours avg",  isPremium: true  },
+                  { id: "basic",           label: "Basic Detail",            desc: "Full interior + exterior, standard products.",       time: !vehicle ? "" : clientType === "maintenance" ? "2 hours" : vehicle === "boat" ? "3-6 hours avg" : vehicle === "truckSuv" ? "3-5 hours avg" : "3-4 hours avg", isPremium: false },
                   ...(vehicle !== "boat" ? [
-                    { id: "exterior" as PackageType, label: "Exterior Only", desc: "Wash, clay bar, polish & protect.",      time: "2 hours avg" },
-                    { id: "interior" as PackageType, label: "Interior Only", desc: "Vacuum, steam, wipe-down & condition.",  time: "2 hours avg" },
+                    { id: "exteriorPremium" as PackageType, label: "Exterior Only — Premium", desc: "Exterior only, premium products.",   time: "2 hours avg", isPremium: true  },
+                    { id: "exterior"        as PackageType, label: "Exterior Only — Basic",   desc: "Exterior only, standard products.",  time: "2 hours avg", isPremium: false },
+                    { id: "interiorPremium" as PackageType, label: "Interior Only — Premium", desc: "Interior only, premium products.",   time: "2 hours avg", isPremium: true  },
+                    { id: "interior"        as PackageType, label: "Interior Only — Basic",   desc: "Interior only, standard products.",  time: "2 hours avg", isPremium: false },
                   ] : []),
-                ] as { id: PackageType; label: string; desc: string; time: string }[]).map((option) => {
+                ] as { id: PackageType; label: string; desc: string; time: string; isPremium: boolean }[]).map((option) => {
                   const rate = selectedVehicle
-                    ? (option.id === "premium" ? selectedVehicle.premiumRate : selectedVehicle.basicRate)
+                    ? (option.isPremium ? selectedVehicle.premiumRate : selectedVehicle.basicRate)
                     : 0;
                   const rateText = selectedVehicle ? `${formatCurrency(rate)}/hr` : "Select vehicle first";
                   return (
