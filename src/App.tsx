@@ -1754,7 +1754,7 @@ export default function App() {
               <p style={S.subtitle}>Select a date, time, and fill in your details.</p>
 
               {/* ── Two-column layout on wider screens ── */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24, alignItems: "start" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 20, alignItems: "start" }}>
 
                 {/* LEFT: Calendar */}
                 <div style={{ gridColumn: "1 / -1" }}>
@@ -1821,7 +1821,7 @@ export default function App() {
                     {availableSlots.length === 0 ? (
                       <div style={{ color: "#b91c1c", fontSize: "0.9rem" }}>No available times for this date.</div>
                     ) : (
-                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(110px, 1fr))", gap: 10 }}>
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(100px, 1fr))", gap: 10 }}>
                         {availableSlots.map((slot, i) => (
                           <button key={i} onClick={() => setSelectedTime(slot.time)}
                             style={{ padding: "13px 8px", borderRadius: 12,
@@ -1866,7 +1866,8 @@ export default function App() {
                       <input style={{ ...S.input }} placeholder="Your full name" value={name} onChange={(e) => setName(e.target.value)} />
                     </div>
 
-                    {/* Phone + Email side by side */}
+                    {/* Phone + Email — side by side on desktop, stacked on mobile */}
+                    <div style={{ gridColumn: "1 / -1", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
                     <div>
                       <label style={{ display: "block", fontSize: "0.78rem", fontWeight: 700, color: "#9ca3af", textTransform: "uppercase" as const, letterSpacing: "0.06em", marginBottom: 6 }}>Phone</label>
                       <input style={S.input} placeholder="(512) 000-0000" value={phone} type="tel" inputMode="numeric"
@@ -1880,18 +1881,19 @@ export default function App() {
                       <label style={{ display: "block", fontSize: "0.78rem", fontWeight: 700, color: "#9ca3af", textTransform: "uppercase" as const, letterSpacing: "0.06em", marginBottom: 6 }}>Email</label>
                       <input style={S.input} placeholder="your@email.com" value={email} onChange={(e) => setEmail(e.target.value)} />
                     </div>
+                    </div>{/* end phone/email grid */}
 
                     {/* Vehicle details */}
                     <div style={{ gridColumn: "1 / -1" }}>
                       <label style={{ display: "block", fontSize: "0.78rem", fontWeight: 700, color: "#9ca3af", textTransform: "uppercase" as const, letterSpacing: "0.06em", marginBottom: 10 }}>{vehicle === "boat" ? "Boat Details" : "Vehicle Details"}</label>
                       {vehicle === "boat" ? (
-                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 12 }}>
                           <input style={S.input} placeholder="Size (e.g. 24 ft)" value={boatSize} onChange={(e) => setBoatSize(e.target.value)} />
                           <input style={S.input} placeholder="Make (e.g. Sea Ray)" value={boatMake} onChange={(e) => setBoatMake(e.target.value)} />
                           <input style={S.input} placeholder="Model" value={boatModel} onChange={(e) => setBoatModel(e.target.value)} />
                         </div>
                       ) : (
-                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 12 }}>
                           <div>
                             <input style={S.input} placeholder="Year" value={year}
                               onChange={(e) => { setYear(e.target.value); setModel(""); setModelOptions([]); }}
