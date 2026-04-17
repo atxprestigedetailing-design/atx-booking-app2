@@ -285,6 +285,7 @@ export default function App() {
   const [completeLoading, setCompleteLoading]           = useState(false);
   const [squarePopup, setSquarePopup]                   = useState(false);
   const [squareBooking, setSquareBooking]               = useState<Booking | null>(null);
+  const [copiedAmount, setCopiedAmount]                 = useState<number | null>(null);
   const [editingBooking, setEditingBooking]             = useState<Booking | null>(null);
   const [editFields, setEditFields]                     = useState<Partial<Booking>>({});
   const [editSaving, setEditSaving]                     = useState(false);
@@ -713,17 +714,17 @@ export default function App() {
   }
 
   const S = {
-    page:           { minHeight: "100vh", background: "linear-gradient(180deg,#f7f7f8 0%,#efeff1 100%)", color: "#171717", padding: "32px 16px", fontFamily: 'Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif' } as const,
+    page:           { minHeight: "100vh", background: "#f5f4f2", color: "#171717", padding: "32px 16px", fontFamily: 'Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif' } as const,
     container:      { maxWidth: 920, margin: "0 auto" } as const,
-    card:           { background: "rgba(255,255,255,0.96)", border: "1px solid #e5e7eb", borderRadius: 24, boxShadow: "0 18px 45px rgba(17,24,39,0.08)", padding: 28 } as const,
-    title:          { fontSize: "2.4rem", fontWeight: 800, letterSpacing: "-1px", color: "#111827", margin: "0 0 14px", textAlign: "center" as const },
+    card:           { background: "#ffffff", border: "1px solid #e8e6e1", borderRadius: 24, boxShadow: "0 12px 40px rgba(0,0,0,0.06)", padding: 28, animation: "fadeSlideUp 0.35s ease both" } as const,
+    title:          { fontSize: "2.4rem", fontWeight: 900, letterSpacing: "-1.5px", color: "#0f0f0f", margin: "0 0 14px", textAlign: "center" as const },
     subtitle:       { fontSize: "1rem", color: "#6b7280", margin: "0 0 28px", textAlign: "center" as const },
-    primary:        { background: "#111827", color: "#fff", border: "none", borderRadius: 14, padding: "14px 20px", fontSize: "1rem", fontWeight: 700, cursor: "pointer", boxShadow: "0 10px 24px rgba(17,24,39,0.16)" } as const,
-    secondary:      { background: "#fff", color: "#111827", border: "1px solid #d1d5db", borderRadius: 14, padding: "13px 18px", fontSize: "1rem", fontWeight: 600, cursor: "pointer" } as const,
+    primary:        { background: "#0f0f0f", color: "#fff", border: "none", borderRadius: 14, padding: "14px 20px", fontSize: "1rem", fontWeight: 700, cursor: "pointer", transition: "transform 0.12s ease, opacity 0.12s ease", boxShadow: "0 6px 20px rgba(0,0,0,0.18)" } as const,
+    secondary:      { background: "#fff", color: "#0f0f0f", border: "1.5px solid #e0ddd8", borderRadius: 14, padding: "13px 18px", fontSize: "1rem", fontWeight: 600, cursor: "pointer", transition: "transform 0.12s ease" } as const,
     disabled:       { opacity: 0.45, cursor: "not-allowed" } as const,
     optionGrid:     { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 14, marginBottom: 20 } as const,
-    optionCard:     { background: "#fff", border: "1px solid #e5e7eb", borderRadius: 18, padding: 18, cursor: "pointer", textAlign: "left" as const, transition: "all 0.2s ease" },
-    selectedCard:   { border: "2px solid #2563eb", background: "#eff6ff", boxShadow: "0 0 0 2px rgba(37,99,235,0.1)" },
+    optionCard:     { background: "#fff", border: "1.5px solid #e8e6e1", borderRadius: 18, padding: 18, cursor: "pointer", textAlign: "left" as const, transition: "border 0.15s ease, background 0.15s ease, box-shadow 0.15s ease" },
+    selectedCard:   { border: "2px solid #0f0f0f", background: "#f7f6f4", boxShadow: "0 0 0 3px rgba(0,0,0,0.06)" },
     selectedGreen:  { border: "2px solid #059669", background: "#ecfdf5", boxShadow: "0 0 0 2px rgba(5,150,105,0.1)" },
     optionTitle:    { fontWeight: 700, fontSize: "1.05rem", marginBottom: 8, color: "#111827" },
     optionMeta:     { color: "#6b7280", fontSize: "0.95rem", lineHeight: 1.45 },
@@ -804,7 +805,7 @@ export default function App() {
 
   const ProgressBar = () => (
     <div style={{ marginBottom: 28 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", color: "#6b7280", fontSize: "0.9rem", marginBottom: 8 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", color: "#bbb", fontSize: "0.82rem", marginBottom: 6 }}>
         <span>Booking</span>
         <span>Step {step} of {TOTAL_STEPS - 1}</span>
       </div>
@@ -835,7 +836,7 @@ export default function App() {
         <div style={S.container}>
           <Header />
           <SquarePopup />
-          <div style={S.card}>
+          <div style={S.card} key={step}>
             <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 24, flexWrap: "wrap" as const }}>
               <button onClick={() => setView("booking")} style={{ ...S.secondary, padding: "9px 14px", fontSize: "0.9rem" }}>Back</button>
               <h2 style={{ ...S.title, margin: 0, fontSize: "1.8rem" }}>My Bookings</h2>
@@ -1045,19 +1046,56 @@ export default function App() {
                                 {[b.year, b.make, b.model, b.boatSize].filter(Boolean).join(" ")}
                                 {b.invoiceNote ? ` — ${b.invoiceNote}` : ""}
                               </div>
-                              {/* Amount due box showing both prices */}
-                              <div style={{ background: "#fefce8", border: "1px solid #fde047", borderRadius: 12, padding: "12px 16px", marginBottom: 14, display: "flex", gap: 16, flexWrap: "wrap" as const, alignItems: "center" }}>
-                                <div style={{ textAlign: "center" as const }}>
-                                  <div style={{ fontSize: "0.75rem", color: "#92400e", marginBottom: 2 }}>Venmo / Cash App</div>
-                                  <div style={{ fontSize: "1.4rem", fontWeight: 800, color: "#92400e" }}>${baseAmt.toFixed(2)}</div>
-                                  <div style={{ fontSize: "0.7rem", color: "#9ca3af" }}>No fee</div>
+                              {/* Amount due box showing both prices + copy button */}
+                              <div style={{ background: "#fefce8", border: "1px solid #fde047", borderRadius: 12, padding: "12px 16px", marginBottom: 14 }}>
+                                <div style={{ display: "flex", gap: 16, flexWrap: "wrap" as const, alignItems: "center", marginBottom: 12 }}>
+                                  <div style={{ textAlign: "center" as const }}>
+                                    <div style={{ fontSize: "0.75rem", color: "#92400e", marginBottom: 2 }}>Venmo / Cash App</div>
+                                    <div style={{ fontSize: "1.4rem", fontWeight: 800, color: "#92400e" }}>${baseAmt.toFixed(2)}</div>
+                                    <div style={{ fontSize: "0.7rem", color: "#9ca3af" }}>No fee</div>
+                                  </div>
+                                  <div style={{ color: "#d1d5db", fontSize: "1.2rem" }}>|</div>
+                                  <div style={{ textAlign: "center" as const }}>
+                                    <div style={{ fontSize: "0.75rem", color: "#92400e", marginBottom: 2 }}>Square (Card)</div>
+                                    <div style={{ fontSize: "1.4rem", fontWeight: 800, color: "#92400e" }}>${squareAmt}</div>
+                                    <div style={{ fontSize: "0.7rem", color: "#9ca3af" }}>Includes 4% fee</div>
+                                  </div>
                                 </div>
-                                <div style={{ color: "#d1d5db", fontSize: "1.2rem" }}>|</div>
-                                <div style={{ textAlign: "center" as const }}>
-                                  <div style={{ fontSize: "0.75rem", color: "#92400e", marginBottom: 2 }}>Square (Card)</div>
-                                  <div style={{ fontSize: "1.4rem", fontWeight: 800, color: "#92400e" }}>${squareAmt}</div>
-                                  <div style={{ fontSize: "0.7rem", color: "#9ca3af" }}>Includes 4% fee</div>
-                                </div>
+                                {/* Copy amount button */}
+                                <button
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(baseAmt.toFixed(2));
+                                    setCopiedAmount(baseAmt);
+                                    setTimeout(() => setCopiedAmount(null), 2500);
+                                  }}
+                                  style={{
+                                    width: "100%",
+                                    background: copiedAmount === baseAmt ? "#059669" : "#111827",
+                                    color: "#fff",
+                                    border: "none",
+                                    borderRadius: 10,
+                                    padding: "11px 16px",
+                                    fontSize: "0.9rem",
+                                    fontWeight: 700,
+                                    cursor: "pointer",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    gap: 8,
+                                    transition: "background 0.2s ease",
+                                  }}
+                                >
+                                  {copiedAmount === baseAmt ? (
+                                    <><span style={{ fontSize: "1rem" }}>✓</span> Copied ${baseAmt.toFixed(2)} to clipboard</>
+                                  ) : (
+                                    <><span style={{ fontSize: "1rem" }}>⎘</span> Copy Amount — ${baseAmt.toFixed(2)}</>
+                                  )}
+                                </button>
+                                {copiedAmount === baseAmt && (
+                                  <div style={{ fontSize: "0.78rem", color: "#059669", textAlign: "center" as const, marginTop: 6 }}>
+                                    Now open Venmo or Cash App and paste into the amount field
+                                  </div>
+                                )}
                               </div>
 
                               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
@@ -1149,7 +1187,7 @@ export default function App() {
         <div style={S.container}>
           <Header />
           <SquarePopup />
-          <div style={S.card}>
+          <div style={S.card} key={step}>
             <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 24, flexWrap: "wrap" as const }}>
               <button onClick={() => setView("myBookings")} style={{ ...S.secondary, padding: "9px 14px", fontSize: "0.9rem" }}>Back</button>
               <h2 style={{ ...S.title, margin: 0, fontSize: "1.8rem" }}>Admin</h2>
@@ -1504,7 +1542,7 @@ export default function App() {
       <div style={S.page}>
         <div style={S.container}>
           <Header />
-          <div style={S.card}>
+          <div style={S.card} key={step}>
             <button onClick={() => setView("myBookings")} style={{ ...S.secondary, padding: "9px 14px", fontSize: "0.9rem", marginBottom: 20 }}>Back to My Bookings</button>
             {changeSubmitted ? (
               <div style={S.successWrap}>
@@ -1550,17 +1588,28 @@ export default function App() {
   // BOOKING FLOW
   return (
     <div style={S.page}>
+      <style>{`
+        @keyframes fadeSlideUp {
+          from { opacity: 0; transform: translateY(18px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes checkDraw {
+          from { stroke-dashoffset: 50; opacity: 0; }
+          to   { stroke-dashoffset: 0;  opacity: 1; }
+        }
+        button:active { transform: scale(0.97) !important; }
+      `}</style>
       <div style={S.container}>
         <SquarePopup />
         <Header />
         {step > 0 && step < TOTAL_STEPS - 1 && <ProgressBar />}
-        <div style={S.card}>
+        <div style={S.card} key={step}>
 
           {/* STEP 0 */}
           {step === 0 && (
             <>
               <h2 style={S.title}>Book a Detail Service</h2>
-              <p style={S.subtitle}>Auto and marine detailing in Austin, TX.</p>
+              <p style={S.subtitle}>Serving Lago Vista, Cedar Park, and Leander areas.</p>
               <div style={{ display: "flex", justifyContent: "center", gap: 12, padding: "10px 0 2px", flexWrap: "wrap" as const }}>
                 <button style={S.primary} onClick={() => setStep(1)}>Book a Service</button>
                 {googleUser && (
