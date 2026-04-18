@@ -331,15 +331,12 @@ export default function App() {
   const [addressSelected, setAddressSelected]           = useState(false);
   const [makeOptions, setMakeOptions]                   = useState<string[]>([]);
   const [modelOptions, setModelOptions]                 = useState<string[]>([]);
-  const [loadingMakes, setLoadingMakes]                 = useState(false);
-  const [loadingModels, setLoadingModels]               = useState(false);
 
   const currentYear = new Date().getFullYear();
   const yearOptions = Array.from({ length: currentYear - 1995 + 1 }, (_, i) => String(currentYear - i));
 
   // ── Job Timer state ──
   const [timerBookingRow, setTimerBookingRow]   = useState<number | null>(null);
-  const [timerStart, setTimerStart]             = useState<number | null>(null);
   const [timerElapsed, setTimerElapsed]         = useState<number>(0); // seconds
   const [timerRunning, setTimerRunning]         = useState(false);
   const timerIntervalRef                        = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -364,7 +361,6 @@ export default function App() {
 
   function startTimer(rowIndex: number) {
     setTimerBookingRow(rowIndex);
-    setTimerStart(Date.now());
     setTimerElapsed(0);
     setTimerRunning(true);
   }
@@ -388,7 +384,6 @@ export default function App() {
       });
     } catch (e) { console.error("Timer save failed", e); }
     setTimerBookingRow(null);
-    setTimerStart(null);
   }
 
   useEffect(() => {
@@ -2147,13 +2142,13 @@ export default function App() {
                             <datalist id="year-options">{yearOptions.map((yr) => <option key={yr} value={yr} />)}</datalist>
                           </div>
                           <div>
-                            <input style={S.input} placeholder={loadingMakes ? "Loading..." : "Make"} value={make}
+                            <input style={S.input} placeholder="Make" value={make}
                               onChange={(e) => { setMake(e.target.value); setModel(""); setModelOptions([]); }}
                               list="make-options" autoComplete="off" />
                             <datalist id="make-options">{makeOptions.map((mk) => <option key={mk} value={mk} />)}</datalist>
                           </div>
                           <div>
-                            <input style={S.input} placeholder={!year || !make ? "Model" : loadingModels ? "Loading..." : "Model"} value={model}
+                            <input style={S.input} placeholder={!year || !make ? "Model" : "Model"} value={model}
                               onChange={(e) => setModel(e.target.value)}
                               list="model-options" autoComplete="off" />
                             <datalist id="model-options">{modelOptions.map((mdl) => <option key={mdl} value={mdl} />)}</datalist>
