@@ -11,7 +11,7 @@ const GOOGLE_CLIENT_ID =
   "447699234633-ivo2e1c2q843scj32k5323o2rkq6h7dp.apps.googleusercontent.com";
 
 const SCRIPT_URL =
-  "https://script.google.com/macros/s/AKfycbwhUXqvGwrsk2Kx1eFdiyv2qFmfFG556U1UJz5FyKVMcPd-Kc5eFAXmvk-TYakgqmqdEQ/exec";
+  "https://script.google.com/macros/s/AKfycbygvWEeGg4u5d9us9QzDuLaoNuefIUQ7M6Eh8BlmRuXEPoWRrvEn0O2jUPv4UKHili1qQ/exec";
 
 const TOTAL_STEPS = 9;
 const ADMIN_EMAIL = "atxprestigedetailing@gmail.com";
@@ -337,6 +337,60 @@ export default function App() {
   const currentYear = new Date().getFullYear();
   const yearOptions = Array.from({ length: currentYear - 1995 + 1 }, (_, i) => String(currentYear - i));
 
+  // ── Job Timer state ──
+  const [timerBookingRow, setTimerBookingRow]   = useState<number | null>(null);
+  const [timerStart, setTimerStart]             = useState<number | null>(null);
+  const [timerElapsed, setTimerElapsed]         = useState<number>(0); // seconds
+  const [timerRunning, setTimerRunning]         = useState(false);
+  const timerIntervalRef                        = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    if (timerRunning) {
+      timerIntervalRef.current = setInterval(() => {
+        setTimerElapsed(prev => prev + 1);
+      }, 1000);
+    } else {
+      if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+    }
+    return () => { if (timerIntervalRef.current) clearInterval(timerIntervalRef.current); };
+  }, [timerRunning]);
+
+  function timerDisplay(secs: number) {
+    const h = Math.floor(secs / 3600);
+    const m = Math.floor((secs % 3600) / 60);
+    const s = secs % 60;
+    return `${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`;
+  }
+
+  function startTimer(rowIndex: number) {
+    setTimerBookingRow(rowIndex);
+    setTimerStart(Date.now());
+    setTimerElapsed(0);
+    setTimerRunning(true);
+  }
+
+  async function stopTimer(booking: Booking) {
+    setTimerRunning(false);
+    const hours = (timerElapsed / 3600).toFixed(2);
+    // Auto-fill hours in complete form
+    setCompleteHours(hours);
+    const rate = parseFloat(booking.hourlyRate || "0");
+    if (rate > 0) setCompleteAmount((parseFloat(hours) * rate).toFixed(2));
+    // Save elapsed time to sheet
+    try {
+      await fetch(SCRIPT_URL, {
+        method: "POST",
+        body: JSON.stringify({
+          action: "updateBookingFields",
+          rowIndex: booking.rowIndex,
+          fields: { timerHours: hours },
+        }),
+      });
+    } catch (e) { console.error("Timer save failed", e); }
+    setTimerBookingRow(null);
+    setTimerStart(null);
+  }
+
   useEffect(() => {
     if (document.getElementById("google-gsi-script")) { setGoogleScriptLoaded(true); return; }
     const script = document.createElement("script");
@@ -505,7 +559,10 @@ export default function App() {
     try {
       const ok = await updateBooking(booking.rowIndex, { invoiceStatus: "paid" });
       if (ok) {
-        // Send payment confirmed email
+        const vehicleLabel = booking.vehicle === "boat"
+          ? [booking.boatSize, booking.make, booking.model].filter(Boolean).join(" ")
+          : [booking.year, booking.make, booking.model].filter(Boolean).join(" ");
+        const pkgLabel = booking.packageType === "basic" ? "Basic Detail" : booking.packageType === "premium" ? "Premium Detail" : booking.packageType === "exterior" ? "Exterior Only — Basic" : booking.packageType === "exteriorPremium" ? "Exterior Only — Premium" : booking.packageType === "interior" ? "Interior Only — Basic" : booking.packageType === "interiorPremium" ? "Interior Only — Premium" : booking.packageType;
         try {
           await fetch(SCRIPT_URL, {
             method: "POST",
@@ -513,8 +570,15 @@ export default function App() {
               action: "sendPaymentConfirmedEmail",
               customerName: booking.name,
               customerEmail: booking.email,
+              customerPhone: booking.phone,
               invoiceAmount: booking.invoiceAmount,
               serviceDate: booking.date,
+              packageType: pkgLabel,
+              vehicle: vehicleLabel,
+              hourlyRate: booking.hourlyRate,
+              addOns: booking.addOns,
+              invoiceNote: booking.invoiceNote,
+              rowIndex: booking.rowIndex,
             }),
           });
         } catch (emailErr) { console.error("Payment confirmed email failed", emailErr); }
@@ -541,34 +605,69 @@ export default function App() {
     } catch (e) { console.error("Square request email failed", e); }
   }
 
+  // Static vehicle data — reliable curated list
   useEffect(() => {
-    const load = async () => {
-      try {
-        setLoadingMakes(true);
-        const t = vehicle === "truckSuv" ? "truck" : "car";
-        const res = await fetch(`https://vpic.nhtsa.dot.gov/api/vehicles/GetMakesForVehicleType/${t}?format=json`);
-        const data = await res.json();
-        setMakeOptions(data.Results?.map((i: any) => i.MakeName || i.Make_Name).filter(Boolean).sort((a: string, b: string) => a.localeCompare(b)) || []);
-      } catch { setMakeOptions([]); }
-      finally { setLoadingMakes(false); }
-    };
-    if (vehicle && vehicle !== "boat") { load(); } else { setMakeOptions([]); }
+    if (!vehicle || vehicle === "boat") { setMakeOptions([]); return; }
+    const carMakes = [
+      "Acura","Alfa Romeo","Audi","BMW","Buick","Cadillac","Chevrolet","Chrysler",
+      "Dodge","Ferrari","Fiat","Ford","Genesis","GMC","Honda","Hyundai","Infiniti",
+      "Jaguar","Jeep","Kia","Lamborghini","Land Rover","Lexus","Lincoln","Maserati",
+      "Mazda","Mercedes-Benz","Mini","Mitsubishi","Nissan","Porsche","Ram","Rivian",
+      "Rolls-Royce","Subaru","Tesla","Toyota","Volkswagen","Volvo",
+    ];
+    const truckMakes = [
+      "Chevrolet","Ford","GMC","Ram","Toyota","Nissan","Honda","Jeep",
+      "Land Rover","Lexus","Lincoln","Cadillac","Rivian","Mercedes-Benz",
+    ];
+    setMakeOptions(vehicle === "truckSuv" ? truckMakes : carMakes);
   }, [vehicle]);
 
   useEffect(() => {
-    const load = async () => {
-      if (!year || !make || !vehicle || vehicle === "boat") { setModelOptions([]); return; }
-      try {
-        setLoadingModels(true);
-        const t = vehicle === "truckSuv" ? "truck" : "car";
-        const res = await fetch(`https://vpic.nhtsa.dot.gov/api/vehicles/GetModelsForMakeYear/make/${encodeURIComponent(make)}/modelyear/${year}/vehicletype/${t}?format=json`);
-        const data = await res.json();
-        setModelOptions(data.Results?.map((i: any) => i.Model_Name).filter(Boolean).sort((a: string, b: string) => a.localeCompare(b)) || []);
-      } catch { setModelOptions([]); }
-      finally { setLoadingModels(false); }
+    if (!make || !vehicle || vehicle === "boat") { setModelOptions([]); return; }
+    const modelMap: Record<string, string[]> = {
+      "Toyota": ["Camry","Corolla","RAV4","Tacoma","Tundra","Highlander","4Runner","Sienna","Prius","Avalon","Sequoia","Land Cruiser","Venza","C-HR"],
+      "Ford": ["F-150","F-250","F-350","Mustang","Explorer","Escape","Edge","Bronco","Bronco Sport","Expedition","Ranger","Maverick","EcoSport"],
+      "Chevrolet": ["Silverado 1500","Silverado 2500","Tahoe","Suburban","Equinox","Traverse","Blazer","Malibu","Camaro","Corvette","Colorado","Trax","Trailblazer"],
+      "Honda": ["Civic","Accord","CR-V","Pilot","Odyssey","HR-V","Ridgeline","Passport","Insight"],
+      "Nissan": ["Altima","Sentra","Maxima","Rogue","Murano","Pathfinder","Frontier","Titan","Armada","Kicks","Versa"],
+      "Hyundai": ["Elantra","Sonata","Tucson","Santa Fe","Palisade","Kona","Ioniq 5","Ioniq 6","Santa Cruz","Venue"],
+      "Kia": ["Forte","K5","Telluride","Sorento","Sportage","Soul","Stinger","EV6","Carnival","Seltos"],
+      "Jeep": ["Wrangler","Grand Cherokee","Cherokee","Compass","Gladiator","Renegade","Wagoneer","Grand Wagoneer"],
+      "GMC": ["Sierra 1500","Sierra 2500","Yukon","Yukon XL","Terrain","Acadia","Canyon","Envoy"],
+      "Ram": ["1500","2500","3500","ProMaster","ProMaster City"],
+      "Dodge": ["Charger","Challenger","Durango","Journey"],
+      "Subaru": ["Outback","Forester","Crosstrek","Impreza","Legacy","Ascent","WRX","BRZ","Solterra"],
+      "BMW": ["3 Series","5 Series","7 Series","X3","X5","X7","M3","M5","i4","iX","4 Series","2 Series"],
+      "Mercedes-Benz": ["C-Class","E-Class","S-Class","GLC","GLE","GLS","A-Class","CLA","AMG GT","EQS","EQE"],
+      "Audi": ["A3","A4","A6","A8","Q3","Q5","Q7","Q8","e-tron","RS3","RS6"],
+      "Lexus": ["ES","IS","GS","LS","RX","NX","GX","LX","UX","LC"],
+      "Cadillac": ["CT4","CT5","Escalade","Escalade ESV","XT4","XT5","XT6","Lyriq"],
+      "Lincoln": ["Navigator","Aviator","Corsair","Nautilus","Continental"],
+      "Acura": ["ILX","TLX","RLX","MDX","RDX","NSX"],
+      "Infiniti": ["Q50","Q60","QX50","QX60","QX80"],
+      "Volkswagen": ["Jetta","Passat","Golf","Tiguan","Atlas","Taos","ID.4","Arteon"],
+      "Mazda": ["Mazda3","Mazda6","CX-3","CX-5","CX-9","CX-30","CX-50","MX-5 Miata"],
+      "Volvo": ["S60","S90","V60","V90","XC40","XC60","XC90","C40"],
+      "Porsche": ["911","Cayenne","Macan","Panamera","Taycan","718"],
+      "Tesla": ["Model 3","Model S","Model X","Model Y","Cybertruck"],
+      "Land Rover": ["Defender","Discovery","Range Rover","Range Rover Sport","Range Rover Evoque","Range Rover Velar"],
+      "Jaguar": ["F-Pace","E-Pace","I-Pace","XE","XF","F-Type"],
+      "Genesis": ["G70","G80","G90","GV70","GV80","GV60"],
+      "Mitsubishi": ["Outlander","Eclipse Cross","Galant","Mirage","Outlander Sport"],
+      "Buick": ["Enclave","Encore","Encore GX","Envision","LaCrosse"],
+      "Chrysler": ["300","Pacifica","Voyager"],
+      "Rivian": ["R1T","R1S"],
+      "Mini": ["Cooper","Countryman","Clubman","Paceman"],
+      "Fiat": ["500","500X","500L"],
+      "Alfa Romeo": ["Giulia","Stelvio","Tonale"],
+      "Maserati": ["Ghibli","Quattroporte","Levante","Grecale"],
+      "Ferrari": ["Roma","Portofino","SF90","F8"],
+      "Lamborghini": ["Urus","Huracan","Aventador"],
+      "Rolls-Royce": ["Ghost","Phantom","Cullinan","Wraith","Dawn"],
     };
-    load();
-  }, [year, make, vehicle]);
+    const models = modelMap[make] || [];
+    setModelOptions(models.sort((a, b) => a.localeCompare(b)));
+  }, [make, vehicle]);
 
   useEffect(() => {
     if (step !== 5 || serviceType !== "mobile") return;
@@ -1297,6 +1396,23 @@ export default function App() {
                                   {isSelected ? "Cancel" : "Mark Complete"}
                                 </button>
                               )}
+                              {/* Job Timer button */}
+                              {!isComplete && (
+                                timerBookingRow === b.rowIndex ? (
+                                  <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#fef3c7", border: "1px solid #f59e0b", borderRadius: 8, padding: "5px 12px" }}>
+                                    <span style={{ fontSize: "0.9rem", fontWeight: 800, color: "#92400e", fontVariantNumeric: "tabular-nums" }}>{timerDisplay(timerElapsed)}</span>
+                                    <button onClick={() => stopTimer(b)}
+                                      style={{ background: "#dc2626", color: "#fff", border: "none", borderRadius: 6, padding: "4px 10px", fontSize: "0.78rem", fontWeight: 700, cursor: "pointer" }}>
+                                      Stop & Fill
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <button onClick={() => { startTimer(b.rowIndex); setSelectedAdminBooking(b); setCompleteHours(""); setCompleteAmount(""); setCompleteNote(""); setEditingBooking(null); }}
+                                    style={{ background: "#059669", color: "#fff", border: "none", borderRadius: 8, padding: "7px 14px", fontSize: "0.82rem", fontWeight: 600, cursor: "pointer" }}>
+                                    ▶ Start Timer
+                                  </button>
+                                )
+                              )}
                               <button onClick={() => { setEditingBooking(editingBooking?.rowIndex === b.rowIndex ? null : b); setEditFields({ name: b.name, phone: b.phone, email: b.email, date: b.date, time: b.time, year: b.year, make: b.make, model: b.model, boatSize: b.boatSize, packageType: b.packageType, serviceType: b.serviceType, address: b.address, notes: b.notes, clientType: b.clientType, recurringFrequency: b.recurringFrequency }); setSelectedAdminBooking(null); }}
                                 style={{ background: "#f3f4f6", color: "#374151", border: "none", borderRadius: 8, padding: "7px 14px", fontSize: "0.82rem", fontWeight: 600, cursor: "pointer" }}>
                                 {editingBooking?.rowIndex === b.rowIndex ? "Cancel Edit" : "Edit"}
@@ -1438,10 +1554,24 @@ export default function App() {
                                 )}
 
                                 <div style={{ fontSize: "0.8rem", color: "#9ca3af", marginBottom: 10 }}>This creates a pending invoice. You must release it from the Invoices tab before the client can see it.</div>
-                                <button onClick={handleMarkComplete} disabled={completeLoading || (!completeAmount && !completeHours)}
-                                  style={{ background: "#059669", color: "#fff", border: "none", borderRadius: 8, padding: "9px 18px", fontWeight: 700, fontSize: "0.88rem", cursor: "pointer", opacity: completeLoading || (!completeAmount && !completeHours) ? 0.5 : 1 }}>
-                                  {completeLoading ? "Saving..." : "Confirm Complete"}
-                                </button>
+                                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" as const }}>
+                                  <button onClick={handleMarkComplete} disabled={completeLoading || (!completeAmount && !completeHours)}
+                                    style={{ background: "#059669", color: "#fff", border: "none", borderRadius: 8, padding: "9px 18px", fontWeight: 700, fontSize: "0.88rem", cursor: "pointer", opacity: completeLoading || (!completeAmount && !completeHours) ? 0.5 : 1 }}>
+                                    {completeLoading ? "Saving..." : "Confirm Complete"}
+                                  </button>
+                                  <button onClick={async () => {
+                                    if (!b.phone) { alert("No phone number on file."); return; }
+                                    try { await fetch(SCRIPT_URL, { method: "POST", body: JSON.stringify({ action: "sendJobStartedSMS", customerName: b.name, customerPhone: b.phone, serviceDate: b.date }) }); alert("Job started text sent!"); } catch (e) { alert("SMS failed"); }
+                                  }} style={{ background: "#2563eb", color: "#fff", border: "none", borderRadius: 8, padding: "9px 14px", fontWeight: 600, fontSize: "0.82rem", cursor: "pointer" }}>
+                                    📱 Text: Job Started
+                                  </button>
+                                  <button onClick={async () => {
+                                    if (!b.phone) { alert("No phone number on file."); return; }
+                                    try { await fetch(SCRIPT_URL, { method: "POST", body: JSON.stringify({ action: "sendJobCompletedSMS", customerName: b.name, customerPhone: b.phone, serviceDate: b.date }) }); alert("Job done text sent!"); } catch (e) { alert("SMS failed"); }
+                                  }} style={{ background: "#7c3aed", color: "#fff", border: "none", borderRadius: 8, padding: "9px 14px", fontWeight: 600, fontSize: "0.82rem", cursor: "pointer" }}>
+                                    📱 Text: Job Done
+                                  </button>
+                                </div>
                               </div>
                             )}
                           </div>
