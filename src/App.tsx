@@ -11,7 +11,7 @@ const GOOGLE_CLIENT_ID =
   "447699234633-ivo2e1c2q843scj32k5323o2rkq6h7dp.apps.googleusercontent.com";
 
 const SCRIPT_URL =
-  "https://script.google.com/macros/s/AKfycbygvWEeGg4u5d9us9QzDuLaoNuefIUQ7M6Eh8BlmRuXEPoWRrvEn0O2jUPv4UKHili1qQ/exec";
+  "https://script.google.com/macros/s/AKfycbxn6UaCTX_t08iXdnAtltHVp-yuUPIYOD1iimJCjPun05dvJ7th5iLlyotETL2w9IN4lw/exec";
 
 const TOTAL_STEPS = 9;
 const ADMIN_EMAIL = "atxprestigedetailing@gmail.com";
@@ -274,7 +274,7 @@ export default function App() {
   });
   const [googleScriptLoaded, setGoogleScriptLoaded]     = useState(false);
   const [view, setView]                                 = useState<"booking" | "myBookings" | "requestChange" | "admin" | "balance">("booking");
-  const [adminTab, setAdminTab]                         = useState<"bookings" | "invoices">("bookings");
+  const [adminTab, setAdminTab]                         = useState<"bookings" | "invoices" | "revenue" | "availability">("bookings");
   const [adminBookings, setAdminBookings]               = useState<Booking[]>([]);
   const [adminLoading, setAdminLoading]                 = useState(false);
   const [adminFilter, setAdminFilter]                   = useState<"all" | "upcoming" | "past" | "maintenance">("all");
@@ -290,6 +290,12 @@ export default function App() {
   const [editFields, setEditFields]                     = useState<Partial<Booking>>({});
   const [editSaving, setEditSaving]                     = useState(false);
   const [bookingsTab, setBookingsTab]                   = useState<"appointments" | "maintenance">("appointments");
+  const [availSlots, setAvailSlots]                     = useState<{date: string; time: string; available: string}[]>([]);
+  const [availLoading, setAvailLoading]                 = useState(false);
+  const [newSlotDate, setNewSlotDate]                   = useState("");
+  const [newSlotTime, setNewSlotTime]                   = useState("");
+  const [addingSlot, setAddingSlot]                     = useState(false);
+  const [photoUploading, setPhotoUploading]             = useState<{[key: number]: string}>({});
   const [userBookings, setUserBookings]                 = useState<Booking[]>([]);
   const [bookingsLoading, setBookingsLoading]           = useState(false);
   const [changeTarget, setChangeTarget]                 = useState<Booking | null>(null);
@@ -1297,6 +1303,8 @@ export default function App() {
               <button onClick={() => setAdminTab("invoices")} style={{ background: "none", border: "none", cursor: "pointer", padding: "10px 18px", fontSize: "0.95rem", fontWeight: 700, color: adminTab === "invoices" ? "#d97706" : "#9ca3af", borderBottom: adminTab === "invoices" ? "3px solid #d97706" : "3px solid transparent", marginBottom: -2 }}>
                 Invoices {pendingInvoices.length > 0 && <span style={{ background: "#ef4444", color: "#fff", borderRadius: 999, padding: "1px 6px", fontSize: "0.72rem", marginLeft: 4 }}>{pendingInvoices.length}</span>}
               </button>
+              <button onClick={() => { setAdminTab("revenue"); }} style={{ background: "none", border: "none", cursor: "pointer", padding: "10px 18px", fontSize: "0.95rem", fontWeight: 700, color: adminTab === "revenue" ? "#059669" : "#9ca3af", borderBottom: adminTab === "revenue" ? "3px solid #059669" : "3px solid transparent", marginBottom: -2 }}>Revenue</button>
+              <button onClick={() => { setAdminTab("availability"); if (availSlots.length === 0) { setAvailLoading(true); fetch(`${SCRIPT_URL}?action=getAllAvailability`).then(r => r.json()).then(d => { setAvailSlots(d.slots || []); setAvailLoading(false); }).catch(() => setAvailLoading(false)); } }} style={{ background: "none", border: "none", cursor: "pointer", padding: "10px 18px", fontSize: "0.95rem", fontWeight: 700, color: adminTab === "availability" ? "#2563eb" : "#9ca3af", borderBottom: adminTab === "availability" ? "3px solid #2563eb" : "3px solid transparent", marginBottom: -2 }}>Availability</button>
             </div>
 
             {adminLoading ? (
@@ -1567,6 +1575,51 @@ export default function App() {
                                     📱 Text: Job Done
                                   </button>
                                 </div>
+
+                                {/* Photo upload — Before & After */}
+                                <div style={{ marginTop: 14, padding: 14, background: "#f0f9ff", borderRadius: 12, border: "1px solid #bae6fd" }}>
+                                  <div style={{ fontWeight: 700, color: "#0369a1", marginBottom: 10, fontSize: "0.85rem" }}>📸 Job Photos</div>
+                                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" as const }}>
+                                    {(["before", "after"] as const).map(type => (
+                                      <label key={type} style={{ cursor: "pointer" }}>
+                                        <input type="file" accept="image/*" capture="environment" style={{ display: "none" }}
+                                          onChange={async (e) => {
+                                            const file = e.target.files?.[0];
+                                            if (!file) return;
+                                            setPhotoUploading(prev => ({ ...prev, [b.rowIndex]: type }));
+                                            try {
+                                              const reader = new FileReader();
+                                              reader.onload = async () => {
+                                                const base64 = (reader.result as string).split(",")[1];
+                                                const res = await fetch(SCRIPT_URL, {
+                                                  method: "POST",
+                                                  body: JSON.stringify({
+                                                    action: "uploadJobPhoto",
+                                                    customerName: b.name,
+                                                    serviceDate: b.date,
+                                                    photoType: type,
+                                                    base64,
+                                                    mimeType: file.type,
+                                                    rowIndex: b.rowIndex,
+                                                  }),
+                                                });
+                                                const d = await res.json();
+                                                if (d.success) { alert(`${type === "before" ? "Before" : "After"} photo uploaded!`); }
+                                                else { alert("Upload failed: " + d.error); }
+                                                setPhotoUploading(prev => { const n = {...prev}; delete n[b.rowIndex]; return n; });
+                                              };
+                                              reader.readAsDataURL(file);
+                                            } catch { alert("Upload error"); setPhotoUploading(prev => { const n = {...prev}; delete n[b.rowIndex]; return n; }); }
+                                          }}
+                                        />
+                                        <span style={{ display: "inline-block", background: type === "before" ? "#0369a1" : "#059669", color: "#fff", border: "none", borderRadius: 8, padding: "7px 14px", fontSize: "0.82rem", fontWeight: 600, cursor: "pointer", opacity: photoUploading[b.rowIndex] ? 0.5 : 1 }}>
+                                          {photoUploading[b.rowIndex] === type ? "Uploading..." : type === "before" ? "📷 Before" : "📷 After"}
+                                        </span>
+                                      </label>
+                                    ))}
+                                  </div>
+                                  <div style={{ fontSize: "0.72rem", color: "#0369a1", marginTop: 8 }}>Photos save to Google Drive and link to this booking row.</div>
+                                </div>
                               </div>
                             )}
                           </div>
@@ -1649,6 +1702,203 @@ export default function App() {
 
                     {pendingInvoices.length === 0 && releasedInvoices.length === 0 && paidInvoices.length === 0 && (
                       <div style={{ textAlign: "center", padding: 40, color: "#6b7280" }}>No invoices yet. Mark a service complete to create one.</div>
+                    )}
+                  </>
+                )}
+
+                {/* ── REVENUE TAB ── */}
+                {adminTab === "revenue" && (() => {
+                  const paid = adminBookings.filter(b => b.invoiceStatus === "paid" && b.invoiceAmount);
+                  const now = new Date();
+                  const thisMonth = now.getMonth();
+                  const thisYear = now.getFullYear();
+
+                  // Group revenue by month
+                  const monthlyData: Record<string, number> = {};
+                  paid.forEach(b => {
+                    if (!b.date) return;
+                    const [y, m] = b.date.split("-").map(Number);
+                    const key = `${y}-${String(m).padStart(2,"0")}`;
+                    monthlyData[key] = (monthlyData[key] || 0) + parseFloat(b.invoiceAmount || "0");
+                  });
+
+                  const sortedMonths = Object.keys(monthlyData).sort();
+                  const last6 = sortedMonths.slice(-6);
+                  const maxVal = Math.max(...last6.map(k => monthlyData[k]), 1);
+
+                  const thisMonthKey = `${thisYear}-${String(thisMonth + 1).padStart(2,"0")}`;
+                  const lastMonthKey = `${thisMonth === 0 ? thisYear - 1 : thisYear}-${String(thisMonth === 0 ? 12 : thisMonth).padStart(2,"0")}`;
+                  const thisMonthRev = monthlyData[thisMonthKey] || 0;
+                  const lastMonthRev = monthlyData[lastMonthKey] || 0;
+                  const totalRev = paid.reduce((s, b) => s + parseFloat(b.invoiceAmount || "0"), 0);
+                  const avgJob = paid.length > 0 ? totalRev / paid.length : 0;
+                  const thisMonthJobs = paid.filter(b => {
+                    const [y, m] = (b.date || "").split("-").map(Number);
+                    return y === thisYear && m === thisMonth + 1;
+                  }).length;
+
+                  const monthName = (key: string) => {
+                    const [y, m] = key.split("-").map(Number);
+                    return new Date(y, m - 1).toLocaleDateString("en-US", { month: "short", year: "2-digit" });
+                  };
+
+                  return (
+                    <>
+                      {/* KPI cards */}
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 28 }}>
+                        {[
+                          { label: "This Month", value: `$${thisMonthRev.toFixed(0)}`, sub: lastMonthRev > 0 ? `vs $${lastMonthRev.toFixed(0)} last month` : "first month", color: "#059669" },
+                          { label: "Jobs This Month", value: String(thisMonthJobs), sub: "completed & paid", color: "#2563eb" },
+                          { label: "All-Time Revenue", value: `$${totalRev.toFixed(0)}`, sub: `${paid.length} jobs total`, color: "#7c3aed" },
+                          { label: "Avg Job Value", value: `$${avgJob.toFixed(0)}`, sub: "per completed job", color: "#d97706" },
+                        ].map((card, i) => (
+                          <div key={i} style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 16, padding: "16px 14px" }}>
+                            <div style={{ fontSize: "0.78rem", color: "#9ca3af", marginBottom: 6, fontWeight: 600, textTransform: "uppercase" as const, letterSpacing: "0.04em" }}>{card.label}</div>
+                            <div style={{ fontSize: "1.6rem", fontWeight: 900, color: card.color, letterSpacing: "-1px" }}>{card.value}</div>
+                            <div style={{ fontSize: "0.72rem", color: "#9ca3af", marginTop: 4 }}>{card.sub}</div>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Bar chart */}
+                      {last6.length > 0 ? (
+                        <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 16, padding: 20, marginBottom: 24 }}>
+                          <div style={{ fontWeight: 700, color: "#111827", marginBottom: 16, fontSize: "0.95rem" }}>Revenue — Last 6 Months</div>
+                          <div style={{ display: "flex", alignItems: "flex-end", gap: 8, height: 120 }}>
+                            {last6.map(k => {
+                              const pct = (monthlyData[k] / maxVal) * 100;
+                              const isThis = k === thisMonthKey;
+                              return (
+                                <div key={k} style={{ flex: 1, display: "flex", flexDirection: "column" as const, alignItems: "center", gap: 6 }}>
+                                  <div style={{ fontSize: "0.65rem", color: "#6b7280", fontWeight: 600 }}>${(monthlyData[k]/1000).toFixed(1)}k</div>
+                                  <div style={{ width: "100%", background: isThis ? "#059669" : "#d1fae5", borderRadius: "6px 6px 0 0", height: `${Math.max(pct, 4)}%`, transition: "height 0.3s ease" }} />
+                                  <div style={{ fontSize: "0.65rem", color: isThis ? "#059669" : "#9ca3af", fontWeight: isThis ? 700 : 400 }}>{monthName(k)}</div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ) : (
+                        <div style={{ textAlign: "center", padding: 40, color: "#6b7280" }}>No paid invoices yet to show revenue.</div>
+                      )}
+
+                      {/* Package breakdown */}
+                      {paid.length > 0 && (() => {
+                        const byPkg: Record<string, {count: number; rev: number}> = {};
+                        paid.forEach(b => {
+                          const pkg = b.packageType === "basic" ? "Basic Detail" : b.packageType === "premium" ? "Premium Detail" : b.packageType === "exterior" ? "Exterior Basic" : b.packageType === "exteriorPremium" ? "Exterior Premium" : b.packageType === "interior" ? "Interior Basic" : b.packageType === "interiorPremium" ? "Interior Premium" : b.packageType || "Other";
+                          if (!byPkg[pkg]) byPkg[pkg] = { count: 0, rev: 0 };
+                          byPkg[pkg].count++;
+                          byPkg[pkg].rev += parseFloat(b.invoiceAmount || "0");
+                        });
+                        return (
+                          <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 16, padding: 20 }}>
+                            <div style={{ fontWeight: 700, color: "#111827", marginBottom: 14, fontSize: "0.95rem" }}>Revenue by Service</div>
+                            {Object.entries(byPkg).sort((a, b) => b[1].rev - a[1].rev).map(([pkg, data], i) => (
+                              <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderTop: i > 0 ? "1px solid #f3f4f6" : "none" }}>
+                                <div>
+                                  <div style={{ fontSize: "0.88rem", fontWeight: 600, color: "#374151" }}>{pkg}</div>
+                                  <div style={{ fontSize: "0.75rem", color: "#9ca3af" }}>{data.count} job{data.count !== 1 ? "s" : ""}</div>
+                                </div>
+                                <div style={{ fontWeight: 800, color: "#059669" }}>${data.rev.toFixed(0)}</div>
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      })()}
+                    </>
+                  );
+                })()}
+
+                {/* ── AVAILABILITY TAB ── */}
+                {adminTab === "availability" && (
+                  <>
+                    {availLoading ? (
+                      <div style={{ textAlign: "center", padding: 40, color: "#6b7280" }}>Loading slots...</div>
+                    ) : (
+                      <>
+                        {/* Add new slot */}
+                        <div style={{ background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: 14, padding: 16, marginBottom: 20 }}>
+                          <div style={{ fontWeight: 700, color: "#374151", marginBottom: 12, fontSize: "0.9rem" }}>Add New Slot</div>
+                          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" as const, alignItems: "flex-end" }}>
+                            <div>
+                              <div style={{ fontSize: "0.75rem", color: "#6b7280", marginBottom: 4 }}>Date</div>
+                              <input type="date" value={newSlotDate} onChange={e => setNewSlotDate(e.target.value)}
+                                style={{ ...S.input, padding: "8px 12px", width: "auto" }} />
+                            </div>
+                            <div>
+                              <div style={{ fontSize: "0.75rem", color: "#6b7280", marginBottom: 4 }}>Time</div>
+                              <select value={newSlotTime} onChange={e => setNewSlotTime(e.target.value)}
+                                style={{ ...S.input, padding: "8px 12px", width: "auto", backgroundColor: "#fff" }}>
+                                <option value="">Select time</option>
+                                {["8:00 AM","9:00 AM","10:00 AM","11:00 AM","12:00 PM","1:00 PM","2:00 PM","3:00 PM","4:00 PM","4:30 PM","5:00 PM","6:00 PM"].map(t => (
+                                  <option key={t} value={t}>{t}</option>
+                                ))}
+                              </select>
+                            </div>
+                            <button disabled={!newSlotDate || !newSlotTime || addingSlot}
+                              onClick={async () => {
+                                setAddingSlot(true);
+                                try {
+                                  const res = await fetch(SCRIPT_URL, { method: "POST", body: JSON.stringify({ action: "addAvailabilitySlot", date: newSlotDate, time: newSlotTime }) });
+                                  const d = await res.json();
+                                  if (d.success) {
+                                    setAvailSlots(prev => [...prev, { date: newSlotDate, time: newSlotTime, available: "TRUE" }].sort((a,b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time)));
+                                    setNewSlotDate(""); setNewSlotTime("");
+                                  } else alert("Failed to add slot");
+                                } catch { alert("Error adding slot"); }
+                                setAddingSlot(false);
+                              }}
+                              style={{ background: "#0f0f0f", color: "#fff", border: "none", borderRadius: 10, padding: "9px 18px", fontWeight: 700, fontSize: "0.88rem", cursor: "pointer", opacity: !newSlotDate || !newSlotTime ? 0.4 : 1 }}>
+                              {addingSlot ? "Adding..." : "+ Add Slot"}
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Slot list grouped by date */}
+                        {(() => {
+                          const grouped: Record<string, typeof availSlots> = {};
+                          availSlots.forEach(s => {
+                            if (!grouped[s.date]) grouped[s.date] = [];
+                            grouped[s.date].push(s);
+                          });
+                          const sortedDates = Object.keys(grouped).sort();
+                          const upcoming = sortedDates.filter(d => {
+                            const [y,m,day] = d.split("-").map(Number);
+                            return new Date(y,m-1,day) >= new Date(new Date().setHours(0,0,0,0));
+                          });
+                          return upcoming.length === 0 ? (
+                            <div style={{ textAlign: "center", padding: 40, color: "#6b7280" }}>No upcoming slots.</div>
+                          ) : upcoming.map(date => (
+                            <div key={date} style={{ marginBottom: 16 }}>
+                              <div style={{ fontSize: "0.82rem", fontWeight: 700, color: "#374151", marginBottom: 8, textTransform: "uppercase" as const, letterSpacing: "0.04em" }}>
+                                {formatDateLabel(date)}
+                              </div>
+                              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" as const }}>
+                                {grouped[date].map((slot, i) => {
+                                  const isOpen = slot.available === "TRUE";
+                                  return (
+                                    <button key={i}
+                                      onClick={async () => {
+                                        const newAvail = isOpen ? "FALSE" : "TRUE";
+                                        try {
+                                          const res = await fetch(SCRIPT_URL, { method: "POST", body: JSON.stringify({ action: "toggleAvailabilitySlot", date: slot.date, time: slot.time, available: newAvail }) });
+                                          const d = await res.json();
+                                          if (d.success) {
+                                            setAvailSlots(prev => prev.map(s => s.date === slot.date && s.time === slot.time ? { ...s, available: newAvail } : s));
+                                          }
+                                        } catch { alert("Error toggling slot"); }
+                                      }}
+                                      style={{ background: isOpen ? "#ecfdf5" : "#fef2f2", color: isOpen ? "#059669" : "#dc2626", border: `1.5px solid ${isOpen ? "#6ee7b7" : "#fca5a5"}`, borderRadius: 10, padding: "7px 14px", fontSize: "0.85rem", fontWeight: 700, cursor: "pointer" }}>
+                                      {slot.time} {isOpen ? "✓" : "✗"}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          ));
+                        })()}
+                      </>
                     )}
                   </>
                 )}
