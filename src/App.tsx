@@ -11,7 +11,7 @@ const GOOGLE_CLIENT_ID =
   "447699234633-ivo2e1c2q843scj32k5323o2rkq6h7dp.apps.googleusercontent.com";
 
 const SCRIPT_URL =
-  "https://script.google.com/macros/s/AKfycbxn6UaCTX_t08iXdnAtltHVp-yuUPIYOD1iimJCjPun05dvJ7th5iLlyotETL2w9IN4lw/exec";
+  "https://script.google.com/macros/s/AKfycbzOpmjbu9R1W7iOw_GKEj7K5DnA97QVrN3QI7O3K2aN9i2v0FsQH_ysLfnFlLCZMETPSg/exec";
 
 const TOTAL_STEPS = 9;
 const ADMIN_EMAIL = "atxprestigedetailing@gmail.com";
@@ -71,6 +71,9 @@ type Booking = {
   invoiceAmount: string;
   invoiceStatus: string;
   invoiceNote: string;
+  photosLink: string;
+  beforePhotoUrl: string;
+  afterPhotoUrl: string;
   name: string;
   phone: string;
   email: string;
@@ -580,6 +583,9 @@ export default function App() {
               addOns: booking.addOns,
               invoiceNote: booking.invoiceNote,
               rowIndex: booking.rowIndex,
+              photosLink: (booking as any).photosLink || "",
+              beforePhotoUrl: (booking as any).beforePhotoUrl || "",
+              afterPhotoUrl: (booking as any).afterPhotoUrl || "",
             }),
           });
         } catch (emailErr) { console.error("Payment confirmed email failed", emailErr); }
@@ -1298,7 +1304,7 @@ export default function App() {
             </div>
 
             {/* Admin tabs */}
-            <div style={{ display: "flex", gap: 4, marginBottom: 24, borderBottom: "2px solid #e5e7eb" }}>
+            <div style={{ display: "flex", gap: 0, marginBottom: 24, borderBottom: "2px solid #e5e7eb", overflowX: "auto" as const, WebkitOverflowScrolling: "touch" as any, scrollbarWidth: "none" as any }}>
               <button onClick={() => setAdminTab("bookings")} style={{ background: "none", border: "none", cursor: "pointer", padding: "10px 18px", fontSize: "0.95rem", fontWeight: 700, color: adminTab === "bookings" ? "#111827" : "#9ca3af", borderBottom: adminTab === "bookings" ? "3px solid #111827" : "3px solid transparent", marginBottom: -2 }}>All Bookings</button>
               <button onClick={() => setAdminTab("invoices")} style={{ background: "none", border: "none", cursor: "pointer", padding: "10px 18px", fontSize: "0.95rem", fontWeight: 700, color: adminTab === "invoices" ? "#d97706" : "#9ca3af", borderBottom: adminTab === "invoices" ? "3px solid #d97706" : "3px solid transparent", marginBottom: -2 }}>
                 Invoices {pendingInvoices.length > 0 && <span style={{ background: "#ef4444", color: "#fff", borderRadius: 999, padding: "1px 6px", fontSize: "0.72rem", marginLeft: 4 }}>{pendingInvoices.length}</span>}
