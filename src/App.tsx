@@ -11,7 +11,7 @@ const GOOGLE_CLIENT_ID =
   "447699234633-ivo2e1c2q843scj32k5323o2rkq6h7dp.apps.googleusercontent.com";
 
 const SCRIPT_URL =
-  "https://script.google.com/macros/s/AKfycbw7ucFGQOubdHuO0fOKFF0w9T77DioTHEn_VUckC1CzA8UogAwsS3YNpUs-OiActtKl/exec";
+  "https://script.google.com/macros/s/AKfycbwJs3ZIhohPUP0yvUaBEeosqhVQk7IVCgYFJBc_RoZHXKYTxvUHE97rv2-5pqWTEHJNOQ/exec";
 
 const TOTAL_STEPS = 9;
 const ADMIN_EMAIL = "atxprestigedetailing@gmail.com";
@@ -299,6 +299,7 @@ export default function App() {
   const [newSlotTime, setNewSlotTime]                   = useState("");
   const [addingSlot, setAddingSlot]                     = useState(false);
   const [photoUploading, setPhotoUploading]             = useState<{[key: number]: string}>({});
+  const [processingRows, setProcessingRows]             = useState<Set<number>>(new Set());
   const [userBookings, setUserBookings]                 = useState<Booking[]>([]);
   const [bookingsLoading, setBookingsLoading]           = useState(false);
   const [changeTarget, setChangeTarget]                 = useState<Booking | null>(null);
@@ -455,30 +456,36 @@ export default function App() {
 
   async function handleMarkComplete() {
     if (!selectedAdminBooking) return;
-    // Calculate final amount: for non-maintenance use hours × rate, for maintenance use fixed amount
-    const rate = parseFloat(selectedAdminBooking.hourlyRate || "0");
-    const finalAmount = selectedAdminBooking.clientType !== "maintenance" && completeHours
+    if (processingRows.has(selectedAdminBooking.rowIndex)) return; // double-click guard
+    const savedBooking = selectedAdminBooking;
+    const rate = parseFloat(savedBooking.hourlyRate || "0");
+    const finalAmount = savedBooking.clientType !== "maintenance" && completeHours
       ? String((parseFloat(completeHours) * rate).toFixed(2))
       : completeAmount;
     if (!finalAmount || parseFloat(finalAmount) <= 0) { alert("Please enter the hours or amount."); return; }
+    setProcessingRows(prev => new Set([...prev, savedBooking.rowIndex]));
     setCompleteLoading(true);
+    // Optimistic UI update
+    setAdminBookings(prev => prev.map(b => b.rowIndex === savedBooking.rowIndex
+      ? { ...b, status: "Completed", invoiceAmount: finalAmount, invoiceStatus: "pending", invoiceNote: completeNote }
+      : b));
+    setSelectedAdminBooking(null); setCompleteAmount(""); setCompleteHours(""); setCompleteNote("");
     try {
-      const ok = await updateBooking(selectedAdminBooking.rowIndex, {
+      const ok = await updateBooking(savedBooking.rowIndex, {
         status: "Completed",
         invoiceAmount: finalAmount,
         invoiceStatus: "pending",
         invoiceNote: completeNote,
       });
       if (ok) {
-        // Auto-create next booking row for maintenance clients
-        if (selectedAdminBooking.clientType === "maintenance" && selectedAdminBooking.recurringFrequency && selectedAdminBooking.date) {
-          const nextDates = calcRecurringDates(selectedAdminBooking.date, selectedAdminBooking.recurringFrequency, 1);
+        if (savedBooking.clientType === "maintenance" && savedBooking.recurringFrequency && savedBooking.date) {
+          const nextDates = calcRecurringDates(savedBooking.date, savedBooking.recurringFrequency, 1);
           if (nextDates.length > 0) {
             // nextDates returns formatted labels — we need YYYY-MM-DD
             // Use fmtDate on the calculated date
-            const [y, m, d] = selectedAdminBooking.date.split("-").map(Number);
+            const [y, m, d] = savedBooking.date.split("-").map(Number);
             const start = new Date(y, m - 1, d);
-            const nextDate = selectedAdminBooking.recurringFrequency === "biweekly"
+            const nextDate = savedBooking.recurringFrequency === "biweekly"
               ? new Date(start.getFullYear(), start.getMonth(), start.getDate() + 14)
               : getNthWeekday(
                   start.getMonth() + 1 > 11 ? start.getFullYear() + 1 : start.getFullYear(),
@@ -494,7 +501,7 @@ export default function App() {
                   method: "POST",
                   body: JSON.stringify({
                     action: "createNextMaintenanceBooking",
-                    ...selectedAdminBooking,
+                    ...savedBooking,
                     date: nextDateStr,
                     displayDate: nextDateStr,
                     status: "Booked",
@@ -514,7 +521,7 @@ export default function App() {
         setCompleteNote("");
       } else { alert("Something went wrong. Please try again."); }
     } catch (e) { alert("Something went wrong."); }
-    finally { setCompleteLoading(false); }
+    finally { setCompleteLoading(false); setProcessingRows(prev => { const n = new Set(prev); n.delete(savedBooking.rowIndex); return n; }); }
   }
 
   async function handleSaveEdit() {
@@ -537,29 +544,39 @@ export default function App() {
   }
 
   async function handleReleaseInvoice(booking: Booking) {
+    if (processingRows.has(booking.rowIndex)) return;
+    setProcessingRows(prev => new Set([...prev, booking.rowIndex]));
+    // Optimistic update
+    setAdminBookings(prev => prev.map(b => b.rowIndex === booking.rowIndex ? { ...b, invoiceStatus: "released" } : b));
     try {
       const ok = await updateBooking(booking.rowIndex, { invoiceStatus: "released" });
       if (ok) {
-        // Send invoice email to customer
-        try {
-          await fetch(SCRIPT_URL, {
-            method: "POST",
-            body: JSON.stringify({
-              action: "sendInvoiceEmail",
-              customerName: booking.name,
-              customerEmail: booking.email,
-              invoiceAmount: booking.invoiceAmount,
-              invoiceNote: booking.invoiceNote,
-              serviceDate: booking.date,
-            }),
-          });
-        } catch (emailErr) { console.error("Invoice email failed", emailErr); }
+        fetch(SCRIPT_URL, {
+          method: "POST",
+          body: JSON.stringify({
+            action: "sendInvoiceEmail",
+            customerName: booking.name,
+            customerEmail: booking.email,
+            customerPhone: booking.phone,
+            invoiceAmount: booking.invoiceAmount,
+            invoiceNote: booking.invoiceNote,
+            serviceDate: booking.date,
+          }),
+        }).catch(e => console.error("Invoice email failed", e));
         await loadAdminBookings();
-      } else { alert("Something went wrong."); }
+      } else {
+        setAdminBookings(prev => prev.map(b => b.rowIndex === booking.rowIndex ? { ...b, invoiceStatus: "pending" } : b));
+        alert("Something went wrong.");
+      }
     } catch (e) { alert("Something went wrong."); }
+    finally { setProcessingRows(prev => { const n = new Set(prev); n.delete(booking.rowIndex); return n; }); }
   }
 
   async function handleMarkPaid(booking: Booking) {
+    if (processingRows.has(booking.rowIndex)) return;
+    setProcessingRows(prev => new Set([...prev, booking.rowIndex]));
+    // Optimistic update
+    setAdminBookings(prev => prev.map(b => b.rowIndex === booking.rowIndex ? { ...b, invoiceStatus: "paid" } : b));
     try {
       const ok = await updateBooking(booking.rowIndex, { invoiceStatus: "paid" });
       if (ok) {
@@ -567,8 +584,8 @@ export default function App() {
           ? [booking.boatSize, booking.make, booking.model].filter(Boolean).join(" ")
           : [booking.year, booking.make, booking.model].filter(Boolean).join(" ");
         const pkgLabel = booking.packageType === "basic" ? "Basic Detail" : booking.packageType === "premium" ? "Premium Detail" : booking.packageType === "exterior" ? "Exterior Only — Basic" : booking.packageType === "exteriorPremium" ? "Exterior Only — Premium" : booking.packageType === "interior" ? "Interior Only — Basic" : booking.packageType === "interiorPremium" ? "Interior Only — Premium" : booking.packageType;
-        try {
-          await fetch(SCRIPT_URL, {
+        // Send email non-blocking so UI doesn't wait
+        fetch(SCRIPT_URL, {
             method: "POST",
             body: JSON.stringify({
               action: "sendPaymentConfirmedEmail",
@@ -587,11 +604,14 @@ export default function App() {
               beforePhotoUrl: (booking as any).beforePhotoUrl || "",
               afterPhotoUrl: (booking as any).afterPhotoUrl || "",
             }),
-          });
-        } catch (emailErr) { console.error("Payment confirmed email failed", emailErr); }
+          }).catch(e => console.error("Payment confirmed email failed", e));
         await loadAdminBookings();
-      } else { alert("Something went wrong."); }
+      } else {
+        setAdminBookings(prev => prev.map(b => b.rowIndex === booking.rowIndex ? { ...b, invoiceStatus: "released" } : b));
+        alert("Something went wrong.");
+      }
     } catch (e) { alert("Something went wrong."); }
+    finally { setProcessingRows(prev => { const n = new Set(prev); n.delete(booking.rowIndex); return n; }); }
   }
 
   async function handleSquareRequest(booking: Booking) {
@@ -1582,49 +1602,56 @@ export default function App() {
                                   </button>
                                 </div>
 
-                                {/* Photo upload — Before & After */}
+                                {/* Photo upload — Before & After (multiple) */}
                                 <div style={{ marginTop: 14, padding: 14, background: "#f0f9ff", borderRadius: 12, border: "1px solid #bae6fd" }}>
-                                  <div style={{ fontWeight: 700, color: "#0369a1", marginBottom: 10, fontSize: "0.85rem" }}>📸 Job Photos</div>
+                                  <div style={{ fontWeight: 700, color: "#0369a1", marginBottom: 10, fontSize: "0.85rem" }}>Job Photos</div>
                                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap" as const }}>
                                     {(["before", "after"] as const).map(type => (
                                       <label key={type} style={{ cursor: "pointer" }}>
-                                        <input type="file" accept="image/*" capture="environment" style={{ display: "none" }}
+                                        <input type="file" accept="image/*" multiple style={{ display: "none" }}
                                           onChange={async (e) => {
-                                            const file = e.target.files?.[0];
-                                            if (!file) return;
+                                            const files = Array.from(e.target.files || []);
+                                            if (!files.length) return;
                                             setPhotoUploading(prev => ({ ...prev, [b.rowIndex]: type }));
-                                            try {
-                                              const reader = new FileReader();
-                                              reader.onload = async () => {
-                                                const base64 = (reader.result as string).split(",")[1];
-                                                const res = await fetch(SCRIPT_URL, {
-                                                  method: "POST",
-                                                  body: JSON.stringify({
-                                                    action: "uploadJobPhoto",
-                                                    customerName: b.name,
-                                                    serviceDate: b.date,
-                                                    photoType: type,
-                                                    base64,
-                                                    mimeType: file.type,
-                                                    rowIndex: b.rowIndex,
-                                                  }),
+                                            let uploaded = 0;
+                                            for (const file of files) {
+                                              try {
+                                                await new Promise<void>((resolve) => {
+                                                  const reader = new FileReader();
+                                                  reader.onload = async () => {
+                                                    const base64 = (reader.result as string).split(",")[1];
+                                                    const res = await fetch(SCRIPT_URL, {
+                                                      method: "POST",
+                                                      body: JSON.stringify({
+                                                        action: "uploadJobPhoto",
+                                                        customerName: b.name,
+                                                        serviceDate: b.date,
+                                                        photoType: type,
+                                                        base64,
+                                                        mimeType: file.type,
+                                                        rowIndex: b.rowIndex,
+                                                      }),
+                                                    });
+                                                    const d = await res.json();
+                                                    if (d.success) uploaded++;
+                                                    resolve();
+                                                  };
+                                                  reader.readAsDataURL(file);
                                                 });
-                                                const d = await res.json();
-                                                if (d.success) { alert(`${type === "before" ? "Before" : "After"} photo uploaded!`); }
-                                                else { alert("Upload failed: " + d.error); }
-                                                setPhotoUploading(prev => { const n = {...prev}; delete n[b.rowIndex]; return n; });
-                                              };
-                                              reader.readAsDataURL(file);
-                                            } catch { alert("Upload error"); setPhotoUploading(prev => { const n = {...prev}; delete n[b.rowIndex]; return n; }); }
+                                              } catch { console.error("Upload error for", file.name); }
+                                            }
+                                            alert(`${uploaded} of ${files.length} ${type} photo${files.length > 1 ? "s" : ""} uploaded!`);
+                                            setPhotoUploading(prev => { const n = {...prev}; delete n[b.rowIndex]; return n; });
+                                            e.target.value = "";
                                           }}
                                         />
                                         <span style={{ display: "inline-block", background: type === "before" ? "#0369a1" : "#059669", color: "#fff", border: "none", borderRadius: 8, padding: "7px 14px", fontSize: "0.82rem", fontWeight: 600, cursor: "pointer", opacity: photoUploading[b.rowIndex] ? 0.5 : 1 }}>
-                                          {photoUploading[b.rowIndex] === type ? "Uploading..." : type === "before" ? "📷 Before" : "📷 After"}
+                                          {photoUploading[b.rowIndex] === type ? `Uploading ${type}...` : type === "before" ? "Before Photos" : "After Photos"}
                                         </span>
                                       </label>
                                     ))}
                                   </div>
-                                  <div style={{ fontSize: "0.72rem", color: "#0369a1", marginTop: 8 }}>Photos save to Google Drive and link to this booking row.</div>
+                                  <div style={{ fontSize: "0.72rem", color: "#0369a1", marginTop: 8 }}>Select multiple photos at once. All save to Google Drive.</div>
                                 </div>
                               </div>
                             )}
@@ -1652,7 +1679,7 @@ export default function App() {
                                 </div>
                                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                                   <span style={{ fontWeight: 800, color: "#92400e", fontSize: "1.1rem" }}>${b.invoiceAmount}</span>
-                                  <button onClick={() => handleReleaseInvoice(b)} style={{ background: "#111827", color: "#fff", border: "none", borderRadius: 8, padding: "7px 14px", fontWeight: 600, fontSize: "0.82rem", cursor: "pointer" }}>Release to Client</button>
+                                  <button onClick={() => handleReleaseInvoice(b)} disabled={processingRows.has(b.rowIndex)} style={{ background: "#111827", color: "#fff", border: "none", borderRadius: 8, padding: "7px 14px", fontWeight: 600, fontSize: "0.82rem", cursor: "pointer", opacity: processingRows.has(b.rowIndex) ? 0.5 : 1 }}>{processingRows.has(b.rowIndex) ? "Processing..." : "Release to Client"}</button>
                                 </div>
                               </div>
                             </div>
@@ -1675,7 +1702,7 @@ export default function App() {
                                 </div>
                                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                                   <span style={{ fontWeight: 800, color: "#92400e", fontSize: "1.1rem" }}>${b.invoiceAmount}</span>
-                                  <button onClick={() => handleMarkPaid(b)} style={{ background: "#059669", color: "#fff", border: "none", borderRadius: 8, padding: "7px 14px", fontWeight: 600, fontSize: "0.82rem", cursor: "pointer" }}>Mark Paid</button>
+                                  <button onClick={() => handleMarkPaid(b)} disabled={processingRows.has(b.rowIndex)} style={{ background: "#059669", color: "#fff", border: "none", borderRadius: 8, padding: "7px 14px", fontWeight: 600, fontSize: "0.82rem", cursor: "pointer", opacity: processingRows.has(b.rowIndex) ? 0.5 : 1 }}>{processingRows.has(b.rowIndex) ? "Processing..." : "Mark Paid"}</button>
                                 </div>
                               </div>
                             </div>
