@@ -2025,6 +2025,9 @@ export default function App() {
                 <p style={{ ...S.subtitle, marginBottom: 24 }}>Serving Lago Vista, Cedar Park, and Leander areas.</p>
                 <div style={{ display: "flex", justifyContent: "center", gap: 12, flexWrap: "wrap" as const, marginBottom: 24 }}>
                   <button style={S.primary} onClick={() => setStep(1)}>Book a Service</button>
+                  {googleUser && googleUser.email === ADMIN_EMAIL && (
+                    <button style={{ ...S.primary, background: "#059669" }} onClick={() => { setView("admin"); loadAdminBookings(); }}>Admin Panel</button>
+                  )}
                   {googleUser && (
                     <button style={S.secondary} onClick={openMyBookings}>My Bookings</button>
                   )}
