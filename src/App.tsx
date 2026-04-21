@@ -11,7 +11,7 @@ const GOOGLE_CLIENT_ID =
   "447699234633-ivo2e1c2q843scj32k5323o2rkq6h7dp.apps.googleusercontent.com";
 
 const SCRIPT_URL =
-  "https://script.google.com/macros/s/AKfycbw0wBnda-jLBCDwuAB8Py7u5zweE7gthpAU9LkPHNvzXXQJp36lg8S_mR3PjLbyUJHcsw/exec";
+  "https://script.google.com/macros/s/AKfycbwUpM0rRBHs6hXCBzXCC1Ft4d4HTPgtBzTqb2SAEbaUXQ_gn37cQ-WY3BqqTjmfd3Z05g/exec";
 
 const TOTAL_STEPS = 9;
 const ADMIN_EMAIL = "atxprestigedetailing@gmail.com";
@@ -527,6 +527,9 @@ export default function App() {
   async function handleSaveEdit() {
     if (!editingBooking) return;
     setEditSaving(true);
+    const dateChanged = editFields.date && editFields.date !== editingBooking.date;
+    const timeChanged = editFields.time && editFields.time !== editingBooking.time;
+    const scheduleChanged = dateChanged || timeChanged;
     try {
       const res = await fetch(SCRIPT_URL, {
         method: "POST",
@@ -534,6 +537,20 @@ export default function App() {
           action: "updateBookingFields",
           rowIndex: editingBooking.rowIndex,
           fields: editFields,
+          // Pass original booking data so backend can update calendar + availability
+          oldDate: editingBooking.date,
+          oldTime: editingBooking.time,
+          scheduleChanged,
+          customerName: editingBooking.name,
+          customerEmail: editingBooking.email,
+          customerPhone: editingBooking.phone,
+          vehicle: editingBooking.vehicle === "boat"
+            ? [editingBooking.boatSize, editingBooking.make, editingBooking.model].filter(Boolean).join(" ")
+            : [editFields.year || editingBooking.year, editFields.make || editingBooking.make, editFields.model || editingBooking.model].filter(Boolean).join(" "),
+          packageType: editFields.packageType || editingBooking.packageType,
+          serviceType: editFields.serviceType || editingBooking.serviceType,
+          address: editFields.address || editingBooking.address,
+          hourlyRate: editingBooking.hourlyRate,
         }),
       });
       const data = await res.json();
