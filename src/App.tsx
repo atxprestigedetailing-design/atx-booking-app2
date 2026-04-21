@@ -1469,13 +1469,53 @@ export default function App() {
                             {editingBooking?.rowIndex === b.rowIndex && (
                               <div style={{ marginTop: 14, padding: 16, background: "#f9fafb", borderRadius: 12, border: "1px solid #e5e7eb" }}>
                                 <div style={{ fontWeight: 700, color: "#374151", marginBottom: 12 }}>Edit Booking</div>
+
+                                {/* Reschedule indicator */}
+                                {((editFields.date && editFields.date !== b.date) || (editFields.time && editFields.time !== b.time)) && (
+                                  <div style={{ background: "#fef3c7", border: "1.5px solid #f59e0b", borderRadius: 10, padding: "12px 14px", marginBottom: 14 }}>
+                                    <div style={{ fontWeight: 700, color: "#92400e", fontSize: "0.88rem", marginBottom: 4 }}>⚠ Reschedule Detected</div>
+                                    <div style={{ fontSize: "0.82rem", color: "#92400e" }}>
+                                      <span style={{ textDecoration: "line-through", opacity: 0.7 }}>{formatDateLabel(b.date)}{b.time ? ` at ${b.time}` : ""}</span>
+                                      <span style={{ margin: "0 8px" }}>→</span>
+                                      <strong>{formatDateLabel(editFields.date || b.date)}{(editFields.time || b.time) ? ` at ${editFields.time || b.time}` : ""}</strong>
+                                    </div>
+                                    <div style={{ fontSize: "0.75rem", color: "#b45309", marginTop: 4 }}>Customer will be notified by email and SMS. Calendar will be updated.</div>
+                                  </div>
+                                )}
+
+                                {/* Date & Time — full width with calendar picker */}
+                                <div style={{ marginBottom: 12, gridColumn: "1 / -1" }}>
+                                  <div style={{ fontSize: "0.78rem", color: "#6b7280", marginBottom: 6, fontWeight: 600 }}>Reschedule Date & Time</div>
+                                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                                    <div>
+                                      <div style={{ fontSize: "0.72rem", color: "#9ca3af", marginBottom: 3 }}>New Date</div>
+                                      <input
+                                        type="date"
+                                        style={{ ...S.input, padding: "8px 10px", fontSize: "0.85rem" }}
+                                        value={editFields.date || b.date}
+                                        onChange={e => setEditFields(prev => ({ ...prev, date: e.target.value }))}
+                                      />
+                                    </div>
+                                    <div>
+                                      <div style={{ fontSize: "0.72rem", color: "#9ca3af", marginBottom: 3 }}>New Time</div>
+                                      <select
+                                        style={{ ...S.input, padding: "8px 10px", fontSize: "0.85rem", backgroundColor: "#fff" }}
+                                        value={editFields.time || b.time}
+                                        onChange={e => setEditFields(prev => ({ ...prev, time: e.target.value }))}
+                                      >
+                                        {["8:00 AM","9:00 AM","10:00 AM","11:00 AM","12:00 PM","1:00 PM","2:00 PM","3:00 PM","4:00 PM","4:30 PM","5:00 PM","6:00 PM"].map(t => (
+                                          <option key={t} value={t}>{t}</option>
+                                        ))}
+                                      </select>
+                                    </div>
+                                  </div>
+                                </div>
+
                                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
                                   {[
                                     { label: "Name", key: "name" },
                                     { label: "Phone", key: "phone" },
                                     { label: "Email", key: "email" },
-                                    { label: "Date (YYYY-MM-DD)", key: "date" },
-                                    { label: "Time", key: "time" },
                                     { label: "Year", key: "year" },
                                     { label: "Make", key: "make" },
                                     { label: "Model", key: "model" },
@@ -1497,6 +1537,10 @@ export default function App() {
                                     <select style={{ ...S.input, padding: "8px 10px", fontSize: "0.85rem", backgroundColor: "#fff" }} value={(editFields as any).packageType || ""} onChange={e => setEditFields(prev => ({ ...prev, packageType: e.target.value }))}>
                                       <option value="basic">Basic</option>
                                       <option value="premium">Premium</option>
+                                      <option value="exterior">Exterior Basic</option>
+                                      <option value="exteriorPremium">Exterior Premium</option>
+                                      <option value="interior">Interior Basic</option>
+                                      <option value="interiorPremium">Interior Premium</option>
                                     </select>
                                   </div>
                                   <div>
