@@ -11,7 +11,7 @@ const GOOGLE_CLIENT_ID =
   "447699234633-ivo2e1c2q843scj32k5323o2rkq6h7dp.apps.googleusercontent.com";
 
 const SCRIPT_URL =
-  "https://script.google.com/macros/s/AKfycbwUpM0rRBHs6hXCBzXCC1Ft4d4HTPgtBzTqb2SAEbaUXQ_gn37cQ-WY3BqqTjmfd3Z05g/exec";
+  "https://script.google.com/macros/s/AKfycbyChpydFXNUZL-lUyEEW6KsdO_K10-Q0jCfFEuxH_k1OvQVRH9CyK9ys3kMh358geSJXw/exec";
 
 const TOTAL_STEPS = 9;
 const ADMIN_EMAIL = "atxprestigedetailing@gmail.com";
@@ -1498,15 +1498,25 @@ export default function App() {
                                     </div>
                                     <div>
                                       <div style={{ fontSize: "0.72rem", color: "#9ca3af", marginBottom: 3 }}>New Time</div>
-                                      <select
-                                        style={{ ...S.input, padding: "8px 10px", fontSize: "0.85rem", backgroundColor: "#fff" }}
-                                        value={editFields.time || b.time}
-                                        onChange={e => setEditFields(prev => ({ ...prev, time: e.target.value }))}
-                                      >
-                                        {["8:00 AM","9:00 AM","10:00 AM","11:00 AM","12:00 PM","1:00 PM","2:00 PM","3:00 PM","4:00 PM","4:30 PM","5:00 PM","6:00 PM"].map(t => (
-                                          <option key={t} value={t}>{t}</option>
-                                        ))}
-                                      </select>
+                                      {(() => {
+                                        const slotsForDate = allAvailableSlots.filter(s => s.date === (editFields.date || b.date));
+                                        return slotsForDate.length > 0 ? (
+                                          <select
+                                            style={{ ...S.input, padding: "8px 10px", fontSize: "0.85rem", backgroundColor: "#fff" }}
+                                            value={editFields.time || b.time}
+                                            onChange={e => setEditFields(prev => ({ ...prev, time: e.target.value }))}
+                                          >
+                                            <option value={b.time}>{b.time} (current)</option>
+                                            {slotsForDate.filter(s => s.time !== b.time).map(s => (
+                                              <option key={s.time} value={s.time}>{s.time}</option>
+                                            ))}
+                                          </select>
+                                        ) : (
+                                          <div style={{ padding: "8px 10px", background: "#fef2f2", border: "1px solid #fca5a5", borderRadius: 14, fontSize: "0.82rem", color: "#dc2626" }}>
+                                            No available slots on this date
+                                          </div>
+                                        );
+                                      })()}
                                     </div>
                                   </div>
                                 </div>
