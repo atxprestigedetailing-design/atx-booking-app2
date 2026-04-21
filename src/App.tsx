@@ -1413,10 +1413,15 @@ export default function App() {
                         const isSelected = selectedAdminBooking?.rowIndex === b.rowIndex;
 
                         return (
-                          <div key={i} style={{ background: "#fff", border: `1.5px solid ${isComplete ? "#e5e7eb" : isUpcoming(b.date) ? "#2563eb" : "#e5e7eb"}`, borderRadius: 14, padding: 16 }}>
+                          <div key={i} style={{ background: b.status === "Cancelled" ? "#fef2f2" : "#fff", border: `1.5px solid ${b.status === "Cancelled" ? "#fca5a5" : isComplete ? "#e5e7eb" : isUpcoming(b.date) ? "#2563eb" : "#e5e7eb"}`, borderRadius: 14, padding: 16, opacity: b.status === "Cancelled" ? 0.85 : 1 }}>
+                            {b.status === "Cancelled" && (
+                              <div style={{ background: "#dc2626", borderRadius: 8, padding: "6px 12px", marginBottom: 10, display: "flex", alignItems: "center", gap: 8 }}>
+                                <span style={{ color: "#fff", fontWeight: 800, fontSize: "0.85rem", letterSpacing: "0.04em" }}>✕ APPOINTMENT CANCELLED</span>
+                              </div>
+                            )}
                             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8, marginBottom: 6, flexWrap: "wrap" as const }}>
                               <div>
-                                <div style={{ fontWeight: 700, color: "#111827", fontSize: "0.95rem" }}>{b.name} — {formatDateLabel(b.date)}{b.time ? ` at ${b.time}` : ""}</div>
+                                <div style={{ fontWeight: 700, color: b.status === "Cancelled" ? "#991b1b" : "#111827", fontSize: "0.95rem" }}>{b.name} — {formatDateLabel(b.date)}{b.time ? ` at ${b.time}` : ""}</div>
                                 <div style={{ fontSize: "0.85rem", color: "#6b7280" }}>{b.email} · {b.phone}</div>
                                 <div style={{ fontSize: "0.85rem", color: "#6b7280" }}>{vl} · {b.packageType === "basic" ? "Basic Detail" : b.packageType === "premium" ? "Premium Detail" : b.packageType === "exterior" ? "Exterior Only — Basic" : b.packageType === "exteriorPremium" ? "Exterior Only — Premium" : b.packageType === "interior" ? "Interior Only — Basic" : b.packageType === "interiorPremium" ? "Interior Only — Premium" : b.packageType} · ${b.hourlyRate}/hr</div>
                                 {b.clientType === "maintenance" && <div style={{ fontSize: "0.8rem", color: "#059669", fontWeight: 600 }}>{b.recurringFrequency === "biweekly" ? "Bi-Weekly" : "Monthly"} Maintenance</div>}
@@ -1436,14 +1441,14 @@ export default function App() {
                             </div>
 
                             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" as const, marginTop: 8, alignItems: "center" }}>
-                              {!isComplete && (
+                              {!isComplete && b.status !== "Cancelled" && (
                                 <button onClick={() => { setSelectedAdminBooking(isSelected ? null : b); setCompleteAmount(b.hourlyRate ? String(parseFloat(b.hourlyRate) * 2) : ""); setCompleteHours(b.clientType === "maintenance" ? "2" : ""); setCompleteNote(""); setEditingBooking(null); }}
                                   style={{ background: isSelected ? "#f3f4f6" : "#111827", color: isSelected ? "#111827" : "#fff", border: "none", borderRadius: 8, padding: "7px 14px", fontSize: "0.82rem", fontWeight: 600, cursor: "pointer" }}>
                                   {isSelected ? "Cancel" : "Mark Complete"}
                                 </button>
                               )}
                               {/* Job Timer button */}
-                              {!isComplete && (
+                              {!isComplete && b.status !== "Cancelled" && (
                                 timerBookingRow === b.rowIndex ? (
                                   <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#fef3c7", border: "1px solid #f59e0b", borderRadius: 8, padding: "5px 12px" }}>
                                     <span style={{ fontSize: "0.9rem", fontWeight: 800, color: "#92400e", fontVariantNumeric: "tabular-nums" }}>{timerDisplay(timerElapsed)}</span>
@@ -1459,11 +1464,13 @@ export default function App() {
                                   </button>
                                 )
                               )}
-                              <button onClick={() => { setEditingBooking(editingBooking?.rowIndex === b.rowIndex ? null : b); setEditFields({ name: b.name, phone: b.phone, email: b.email, date: b.date, time: b.time, year: b.year, make: b.make, model: b.model, boatSize: b.boatSize, packageType: b.packageType, serviceType: b.serviceType, address: b.address, notes: b.notes, clientType: b.clientType, recurringFrequency: b.recurringFrequency }); setSelectedAdminBooking(null); }}
-                                style={{ background: "#f3f4f6", color: "#374151", border: "none", borderRadius: 8, padding: "7px 14px", fontSize: "0.82rem", fontWeight: 600, cursor: "pointer" }}>
-                                {editingBooking?.rowIndex === b.rowIndex ? "Cancel Edit" : "Edit"}
-                              </button>
-                              {!isComplete && isUpcoming(b.date) && (
+                              {b.status !== "Cancelled" && (
+                                <button onClick={() => { setEditingBooking(editingBooking?.rowIndex === b.rowIndex ? null : b); setEditFields({ name: b.name, phone: b.phone, email: b.email, date: b.date, time: b.time, year: b.year, make: b.make, model: b.model, boatSize: b.boatSize, packageType: b.packageType, serviceType: b.serviceType, address: b.address, notes: b.notes, clientType: b.clientType, recurringFrequency: b.recurringFrequency }); setSelectedAdminBooking(null); }}
+                                  style={{ background: "#f3f4f6", color: "#374151", border: "none", borderRadius: 8, padding: "7px 14px", fontSize: "0.82rem", fontWeight: 600, cursor: "pointer" }}>
+                                  {editingBooking?.rowIndex === b.rowIndex ? "Cancel Edit" : "Edit"}
+                                </button>
+                              )}
+                              {!isComplete && isUpcoming(b.date) && b.status !== "Cancelled" && (
                                 <button onClick={async () => {
                                   if (!window.confirm(`Cancel ${b.name}'s appointment on ${formatDateLabel(b.date)} at ${b.time}? This will notify the customer.`)) return;
                                   try {
