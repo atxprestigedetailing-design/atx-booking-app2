@@ -11,7 +11,7 @@ const GOOGLE_CLIENT_ID =
   "447699234633-ivo2e1c2q843scj32k5323o2rkq6h7dp.apps.googleusercontent.com";
 
 const SCRIPT_URL =
-  "https://script.google.com/macros/s/AKfycbyChpydFXNUZL-lUyEEW6KsdO_K10-Q0jCfFEuxH_k1OvQVRH9CyK9ys3kMh358geSJXw/exec";
+  "https://script.google.com/macros/s/AKfycbx5jYCvTR05naK0O9EPYrOn-XgjlnWE4z_EM0r16rkJbmG1Op1PPvb5R3OZP8GU5rmDoQ/exec";
 
 const TOTAL_STEPS = 9;
 const ADMIN_EMAIL = "atxprestigedetailing@gmail.com";
@@ -1424,8 +1424,8 @@ export default function App() {
                                 {b.notes && <div style={{ fontSize: "0.8rem", color: "#9ca3af" }}>Notes: {b.notes}</div>}
                               </div>
                               <div style={{ display: "flex", flexDirection: "column" as const, alignItems: "flex-end", gap: 4 }}>
-                                <span style={{ background: isComplete ? "#dcfce7" : isUpcoming(b.date) ? "#eff6ff" : "#f3f4f6", color: isComplete ? "#166534" : isUpcoming(b.date) ? "#2563eb" : "#9ca3af", fontSize: "0.72rem", fontWeight: 700, borderRadius: 999, padding: "2px 8px" }}>
-                                  {isComplete ? "COMPLETED" : isUpcoming(b.date) ? "UPCOMING" : "PAST"}
+                                <span style={{ background: b.status === "Cancelled" ? "#fef2f2" : isComplete ? "#dcfce7" : isUpcoming(b.date) ? "#eff6ff" : "#f3f4f6", color: b.status === "Cancelled" ? "#dc2626" : isComplete ? "#166534" : isUpcoming(b.date) ? "#2563eb" : "#9ca3af", fontSize: "0.72rem", fontWeight: 700, borderRadius: 999, padding: "2px 8px" }}>
+                                  {b.status === "Cancelled" ? "CANCELLED" : isComplete ? "COMPLETED" : isUpcoming(b.date) ? "UPCOMING" : "PAST"}
                                 </span>
                                 {b.invoiceStatus && b.invoiceStatus !== "" && (
                                   <span style={{ background: b.invoiceStatus === "paid" ? "#dcfce7" : b.invoiceStatus === "released" ? "#fef9c3" : "#fef3c7", color: b.invoiceStatus === "paid" ? "#166534" : "#92400e", fontSize: "0.72rem", fontWeight: 700, borderRadius: 999, padding: "2px 8px" }}>
@@ -1463,6 +1463,39 @@ export default function App() {
                                 style={{ background: "#f3f4f6", color: "#374151", border: "none", borderRadius: 8, padding: "7px 14px", fontSize: "0.82rem", fontWeight: 600, cursor: "pointer" }}>
                                 {editingBooking?.rowIndex === b.rowIndex ? "Cancel Edit" : "Edit"}
                               </button>
+                              {!isComplete && isUpcoming(b.date) && (
+                                <button onClick={async () => {
+                                  if (!window.confirm(`Cancel ${b.name}'s appointment on ${formatDateLabel(b.date)} at ${b.time}? This will notify the customer.`)) return;
+                                  try {
+                                    const vl = b.vehicle === "boat"
+                                      ? [b.boatSize, b.make, b.model].filter(Boolean).join(" ")
+                                      : [b.year, b.make, b.model].filter(Boolean).join(" ");
+                                    const res = await fetch(SCRIPT_URL, {
+                                      method: "POST",
+                                      body: JSON.stringify({
+                                        action: "cancelBooking",
+                                        rowIndex: b.rowIndex,
+                                        customerName: b.name,
+                                        customerEmail: b.email,
+                                        customerPhone: b.phone,
+                                        date: b.date,
+                                        time: b.time,
+                                        vehicle: vl,
+                                        packageType: b.packageType,
+                                        address: b.address,
+                                      }),
+                                    });
+                                    const d = await res.json();
+                                    if (d.success) {
+                                      setAdminBookings(prev => prev.map(bk => bk.rowIndex === b.rowIndex ? { ...bk, status: "Cancelled" } : bk));
+                                      alert(`Appointment cancelled. ${b.name} has been notified.`);
+                                    } else { alert("Something went wrong."); }
+                                  } catch (e) { alert("Something went wrong."); }
+                                }}
+                                style={{ background: "#fef2f2", color: "#dc2626", border: "1.5px solid #fca5a5", borderRadius: 8, padding: "7px 14px", fontSize: "0.82rem", fontWeight: 600, cursor: "pointer" }}>
+                                  Cancel Appt
+                                </button>
+                              )}
                             </div>
 
                             {/* Edit form */}
