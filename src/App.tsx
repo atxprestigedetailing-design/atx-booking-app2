@@ -1298,27 +1298,27 @@ export default function App() {
   // ADMIN VIEW
   if (view === "admin" && googleUser?.email === ADMIN_EMAIL) {
     const filtered = adminBookings.filter(b => {
-      if (adminFilter === "upcoming") return isUpcoming(b.date) && b.status !== "Completed";
-      if (adminFilter === "past") return !isUpcoming(b.date) || b.status === "Completed";
+      if (adminFilter === "upcoming") return isUpcoming(b.date) && b.status !== "Completed" && b.status !== "Cancelled";
+      if (adminFilter === "past") return !isUpcoming(b.date) || b.status === "Completed" || b.status === "Cancelled";
       if (adminFilter === "maintenance") return b.clientType === "maintenance";
       return true;
     }).sort((a, b) => {
-      // "All" tab: completed first (sorted newest → oldest), then upcoming (oldest → newest)
+      // "All" tab: completed/cancelled first (newest → oldest), then upcoming (soonest first)
       if (adminFilter === "all") {
-        const aComplete = a.status === "Completed";
-        const bComplete = b.status === "Completed";
-        if (aComplete && !bComplete) return -1;
-        if (!aComplete && bComplete) return 1;
-        if (aComplete && bComplete) return b.date.localeCompare(a.date); // completed: newest first
-        return a.date.localeCompare(b.date); // upcoming: soonest first
+        const aDone = a.status === "Completed" || a.status === "Cancelled";
+        const bDone = b.status === "Completed" || b.status === "Cancelled";
+        if (aDone && !bDone) return -1;
+        if (!aDone && bDone) return 1;
+        if (aDone && bDone) return b.date.localeCompare(a.date);
+        return a.date.localeCompare(b.date);
       }
       // "Upcoming" tab: soonest first
       if (adminFilter === "upcoming") return a.date.localeCompare(b.date);
       // "Past" tab: most recent first
       if (adminFilter === "past") return b.date.localeCompare(a.date);
       // "Maintenance" tab: upcoming first, then by date
-      const aUp = isUpcoming(a.date) && a.status !== "Completed";
-      const bUp = isUpcoming(b.date) && b.status !== "Completed";
+      const aUp = isUpcoming(a.date) && a.status !== "Completed" && a.status !== "Cancelled";
+      const bUp = isUpcoming(b.date) && b.status !== "Completed" && b.status !== "Cancelled";
       if (aUp && !bUp) return -1;
       if (!aUp && bUp) return 1;
       return aUp ? a.date.localeCompare(b.date) : b.date.localeCompare(a.date);
@@ -1367,7 +1367,7 @@ export default function App() {
                     </div>
                     {/* Maintenance schedule summary — all upcoming grouped by client */}
                     {adminFilter === "maintenance" && (() => {
-                      const futureMain = adminBookings.filter(b => b.clientType === "maintenance" && isUpcoming(b.date) && b.status !== "Completed");
+                      const futureMain = adminBookings.filter(b => b.clientType === "maintenance" && isUpcoming(b.date) && b.status !== "Completed" && b.status !== "Cancelled");
                       const grouped: Record<string, Booking[]> = {};
                       futureMain.forEach(b => {
                         if (!grouped[b.email]) grouped[b.email] = [];
