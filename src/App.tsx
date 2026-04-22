@@ -2419,53 +2419,68 @@ export default function App() {
               ))}
             </div>
 
-            {/* Add item form */}
+            {/* Add item modal */}
             {addingInventoryItem && (
-              <div style={{ background: "#f0fdf4", border: "1.5px solid #6ee7b7", borderRadius: 14, padding: 16, marginBottom: 20 }}>
-                <div style={{ fontWeight: 700, color: "#065f46", marginBottom: 12, fontSize: "0.9rem" }}>Add New Item</div>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 10, marginBottom: 12 }}>
-                  {[
-                    { key: "item", label: "Item Name", placeholder: "e.g. Rupes Blue Foam Pad" },
-                    { key: "category", label: "Category", placeholder: "e.g. Polishing Pads" },
-                    { key: "quantity", label: "Quantity", placeholder: "e.g. 2" },
-                    { key: "unit", label: "Unit", placeholder: "e.g. pack, bottle, gallon" },
-                    { key: "lowStockThreshold", label: "Low Stock Alert At", placeholder: "e.g. 1" },
-                    { key: "notes", label: "Notes (optional)", placeholder: "e.g. Pack of 10" },
-                  ].map(f => (
-                    <div key={f.key}>
-                      <div style={{ fontSize: "0.72rem", color: "#6b7280", marginBottom: 3, fontWeight: 600 }}>{f.label}</div>
-                      <input
-                        style={{ ...S.input, padding: "8px 10px", fontSize: "0.85rem" }}
-                        placeholder={f.placeholder}
-                        value={(newInventoryItem as any)[f.key]}
-                        onChange={e => setNewInventoryItem(prev => ({ ...prev, [f.key]: e.target.value }))}
-                      />
+              <div style={{ position: "fixed" as const, inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 16 }}>
+                <div style={{ background: "#fff", borderRadius: 20, padding: 28, maxWidth: 560, width: "100%", boxShadow: "0 20px 60px rgba(0,0,0,0.2)", maxHeight: "90vh", overflowY: "auto" as const }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+                    <div style={{ fontWeight: 800, color: "#111827", fontSize: "1.1rem" }}>Add New Item</div>
+                    <button onClick={() => { setAddingInventoryItem(false); setNewInventoryItem({ item: "", category: "", quantity: "", unit: "", lowStockThreshold: "", notes: "" }); }}
+                      style={{ background: "#f3f4f6", border: "none", borderRadius: 8, width: 32, height: 32, cursor: "pointer", fontSize: "1rem", color: "#374151", fontWeight: 700 }}>✕</button>
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
+                    <div style={{ gridColumn: "1 / -1" }}>
+                      <div style={{ fontSize: "0.75rem", color: "#6b7280", marginBottom: 4, fontWeight: 600 }}>Item Name *</div>
+                      <input style={{ ...S.input, padding: "10px 12px" }} placeholder="e.g. Rupes Blue Foam Pad" value={newInventoryItem.item} onChange={e => setNewInventoryItem(prev => ({ ...prev, item: e.target.value }))} autoFocus />
                     </div>
-                  ))}
-                </div>
-                <div style={{ display: "flex", gap: 8 }}>
-                  <button
-                    disabled={!newInventoryItem.item || !newInventoryItem.quantity || inventorySaving}
-                    onClick={async () => {
-                      setInventorySaving(true);
-                      try {
-                        const res = await fetch(SCRIPT_URL, { method: "POST", body: JSON.stringify({ action: "addInventoryItem", ...newInventoryItem }) });
-                        const d = await res.json();
-                        if (d.success) {
-                          await loadInventory();
-                          setAddingInventoryItem(false);
-                          setNewInventoryItem({ item: "", category: "", quantity: "", unit: "", lowStockThreshold: "", notes: "" });
-                        } else alert("Failed to add item.");
-                      } catch { alert("Error adding item."); }
-                      setInventorySaving(false);
-                    }}
-                    style={{ background: "#059669", color: "#fff", border: "none", borderRadius: 8, padding: "9px 18px", fontWeight: 700, fontSize: "0.85rem", cursor: "pointer", opacity: !newInventoryItem.item || !newInventoryItem.quantity ? 0.5 : 1 }}>
-                    {inventorySaving ? "Saving..." : "Save Item"}
-                  </button>
-                  <button onClick={() => { setAddingInventoryItem(false); setNewInventoryItem({ item: "", category: "", quantity: "", unit: "", lowStockThreshold: "", notes: "" }); }}
-                    style={{ background: "#f3f4f6", color: "#374151", border: "none", borderRadius: 8, padding: "9px 14px", fontWeight: 600, fontSize: "0.85rem", cursor: "pointer" }}>
-                    Cancel
-                  </button>
+                    <div>
+                      <div style={{ fontSize: "0.75rem", color: "#6b7280", marginBottom: 4, fontWeight: 600 }}>Category</div>
+                      <select style={{ ...S.input, padding: "10px 12px", backgroundColor: "#fff" }} value={newInventoryItem.category} onChange={e => setNewInventoryItem(prev => ({ ...prev, category: e.target.value }))}>
+                        <option value="">Select category</option>
+                        {CATEGORIES.filter(c => c !== "All").map(c => <option key={c} value={c}>{c}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: "0.75rem", color: "#6b7280", marginBottom: 4, fontWeight: 600 }}>Unit</div>
+                      <input style={{ ...S.input, padding: "10px 12px" }} placeholder="e.g. each, pack, gallon" value={newInventoryItem.unit} onChange={e => setNewInventoryItem(prev => ({ ...prev, unit: e.target.value }))} />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: "0.75rem", color: "#6b7280", marginBottom: 4, fontWeight: 600 }}>Quantity *</div>
+                      <input style={{ ...S.input, padding: "10px 12px" }} type="number" step="0.25" placeholder="e.g. 2" value={newInventoryItem.quantity} onChange={e => setNewInventoryItem(prev => ({ ...prev, quantity: e.target.value }))} />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: "0.75rem", color: "#6b7280", marginBottom: 4, fontWeight: 600 }}>Low Stock Alert At</div>
+                      <input style={{ ...S.input, padding: "10px 12px" }} type="number" step="0.25" placeholder="e.g. 1" value={newInventoryItem.lowStockThreshold} onChange={e => setNewInventoryItem(prev => ({ ...prev, lowStockThreshold: e.target.value }))} />
+                    </div>
+                    <div style={{ gridColumn: "1 / -1" }}>
+                      <div style={{ fontSize: "0.75rem", color: "#6b7280", marginBottom: 4, fontWeight: 600 }}>Notes (optional)</div>
+                      <input style={{ ...S.input, padding: "10px 12px" }} placeholder="e.g. Pack of 10, check Amazon" value={newInventoryItem.notes} onChange={e => setNewInventoryItem(prev => ({ ...prev, notes: e.target.value }))} />
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", gap: 10 }}>
+                    <button
+                      disabled={!newInventoryItem.item || !newInventoryItem.quantity || inventorySaving}
+                      onClick={async () => {
+                        setInventorySaving(true);
+                        try {
+                          const res = await fetch(SCRIPT_URL, { method: "POST", body: JSON.stringify({ action: "addInventoryItem", ...newInventoryItem }) });
+                          const d = await res.json();
+                          if (d.success) {
+                            await loadInventory();
+                            setAddingInventoryItem(false);
+                            setNewInventoryItem({ item: "", category: "", quantity: "", unit: "", lowStockThreshold: "", notes: "" });
+                          } else alert("Failed to add item.");
+                        } catch { alert("Error adding item."); }
+                        setInventorySaving(false);
+                      }}
+                      style={{ flex: 1, background: "#059669", color: "#fff", border: "none", borderRadius: 10, padding: "12px 18px", fontWeight: 700, fontSize: "0.95rem", cursor: "pointer", opacity: !newInventoryItem.item || !newInventoryItem.quantity ? 0.5 : 1 }}>
+                      {inventorySaving ? "Saving..." : "Save Item"}
+                    </button>
+                    <button onClick={() => { setAddingInventoryItem(false); setNewInventoryItem({ item: "", category: "", quantity: "", unit: "", lowStockThreshold: "", notes: "" }); }}
+                      style={{ background: "#f3f4f6", color: "#374151", border: "none", borderRadius: 10, padding: "12px 18px", fontWeight: 600, fontSize: "0.95rem", cursor: "pointer" }}>
+                      Cancel
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
