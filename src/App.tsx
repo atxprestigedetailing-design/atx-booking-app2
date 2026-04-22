@@ -11,7 +11,7 @@ const GOOGLE_CLIENT_ID =
   "447699234633-ivo2e1c2q843scj32k5323o2rkq6h7dp.apps.googleusercontent.com";
 
 const SCRIPT_URL =
-  "https://script.google.com/macros/s/AKfycbzny-6LBEjlrMjRpCgoPTOWdzL7Al1BzC98NhuelsSp-h1N7AVFNZTXaIoKOrkoCuZVrA/exec";
+  "https://script.google.com/macros/s/AKfycbw56h7YkeHCYTxQyGUZCNVJGj8QtR0jEl7xVk64CYO7lYOWmnz14N490NBHrzoHX_keKQ/exec";
 
 const TOTAL_STEPS = 9;
 const ADMIN_EMAIL = "atxprestigedetailing@gmail.com";
@@ -621,8 +621,9 @@ export default function App() {
           ? [booking.boatSize, booking.make, booking.model].filter(Boolean).join(" ")
           : [booking.year, booking.make, booking.model].filter(Boolean).join(" ");
         const pkgLabel = booking.packageType === "basic" ? "Basic Detail" : booking.packageType === "premium" ? "Premium Detail" : booking.packageType === "exterior" ? "Exterior Only — Basic" : booking.packageType === "exteriorPremium" ? "Exterior Only — Premium" : booking.packageType === "interior" ? "Interior Only — Basic" : booking.packageType === "interiorPremium" ? "Interior Only — Premium" : booking.packageType;
-        // Send email non-blocking so UI doesn't wait
-        fetch(SCRIPT_URL, {
+        // Send payment confirmed email — awaited so it doesn't get dropped
+        try {
+          const emailRes = await fetch(SCRIPT_URL, {
             method: "POST",
             body: JSON.stringify({
               action: "sendPaymentConfirmedEmail",
@@ -641,7 +642,14 @@ export default function App() {
               beforePhotoUrl: (booking as any).beforePhotoUrl || "",
               afterPhotoUrl: (booking as any).afterPhotoUrl || "",
             }),
-          }).catch(e => console.error("Payment confirmed email failed", e));
+          });
+          const emailData = await emailRes.json();
+          if (!emailData.success) {
+            console.error("Payment email error:", emailData.error);
+          }
+        } catch (emailErr) {
+          console.error("Payment confirmed email failed:", emailErr);
+        }
         await loadAdminBookings();
       } else {
         setAdminBookings(prev => prev.map(b => b.rowIndex === booking.rowIndex ? { ...b, invoiceStatus: "released" } : b));
