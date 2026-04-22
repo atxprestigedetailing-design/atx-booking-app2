@@ -1507,14 +1507,14 @@ export default function App() {
                             </div>
 
                             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" as const, marginTop: 8, alignItems: "center" }}>
-                              {!isComplete && b.status !== "Cancelled" && (
+                              {!isComplete && b.status !== "Cancelled" && b.status !== "Skipped" && (
                                 <button onClick={() => { setSelectedAdminBooking(isSelected ? null : b); setCompleteAmount(b.hourlyRate ? String(parseFloat(b.hourlyRate) * 2) : ""); setCompleteHours(b.clientType === "maintenance" ? "2" : ""); setCompleteNote(""); setEditingBooking(null); setBillingMode("hourly"); }}
                                   style={{ background: isSelected ? "#f3f4f6" : "#111827", color: isSelected ? "#111827" : "#fff", border: "none", borderRadius: 8, padding: "7px 14px", fontSize: "0.82rem", fontWeight: 600, cursor: "pointer" }}>
                                   {isSelected ? "Cancel" : "Mark Complete"}
                                 </button>
                               )}
                               {/* Job Timer button */}
-                              {!isComplete && b.status !== "Cancelled" && (
+                              {!isComplete && b.status !== "Cancelled" && b.status !== "Skipped" && (
                                 timerBookingRow === b.rowIndex ? (
                                   <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#fef3c7", border: "1px solid #f59e0b", borderRadius: 8, padding: "5px 12px" }}>
                                     <span style={{ fontSize: "0.9rem", fontWeight: 800, color: "#92400e", fontVariantNumeric: "tabular-nums" }}>{timerDisplay(timerElapsed)}</span>
@@ -1530,13 +1530,13 @@ export default function App() {
                                   </button>
                                 )
                               )}
-                              {b.status !== "Cancelled" && (
+                              {b.status !== "Cancelled" && b.status !== "Skipped" && (
                                 <button onClick={() => { setEditingBooking(editingBooking?.rowIndex === b.rowIndex ? null : b); setEditFields({ name: b.name, phone: b.phone, email: b.email, date: b.date, time: b.time, year: b.year, make: b.make, model: b.model, boatSize: b.boatSize, packageType: b.packageType, serviceType: b.serviceType, address: b.address, notes: b.notes, clientType: b.clientType, recurringFrequency: b.recurringFrequency, addOns: b.addOns }); setSelectedAdminBooking(null); }}
                                   style={{ background: "#f3f4f6", color: "#374151", border: "none", borderRadius: 8, padding: "7px 14px", fontSize: "0.82rem", fontWeight: 600, cursor: "pointer" }}>
                                   {editingBooking?.rowIndex === b.rowIndex ? "Cancel Edit" : "Edit"}
                                 </button>
                               )}
-                              {!isComplete && isUpcoming(b.date) && b.status !== "Cancelled" && (
+                              {!isComplete && isUpcoming(b.date) && b.status !== "Cancelled" && b.status !== "Skipped" && (
                                 <button onClick={async () => {
                                   if (!window.confirm(
                                     b.clientType === "maintenance"
@@ -1578,7 +1578,7 @@ export default function App() {
                                 </button>
                               )}
                               {/* Skip button — maintenance only */}
-                              {!isComplete && isUpcoming(b.date) && b.status !== "Cancelled" && b.clientType === "maintenance" && (
+                              {!isComplete && isUpcoming(b.date) && b.status !== "Cancelled" && b.status !== "Skipped" && b.clientType === "maintenance" && (
                                 <button onClick={async () => {
                                   if (!window.confirm(`Skip ${b.name}'s maintenance on ${formatDateLabel(b.date)}? They will be notified and moved to their next scheduled date.`)) return;
                                   try {
