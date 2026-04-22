@@ -11,7 +11,7 @@ const GOOGLE_CLIENT_ID =
   "447699234633-ivo2e1c2q843scj32k5323o2rkq6h7dp.apps.googleusercontent.com";
 
 const SCRIPT_URL =
-  "https://script.google.com/macros/s/AKfycbzoPahm1UXkSQ6C-SLD7TJTuugR5695PlnSPNEi8l_bvBqvUAtiG_lNQH9V_jbHTBxMzQ/exec";
+  "https://script.google.com/macros/s/AKfycby8tTTlfOB2AHqwZ5W8vmdDCv1V5PSCcjMMjxZNsmalHdtOAoMgkFZBCvSdNl8CkRxO/exec";
 
 const TOTAL_STEPS = 9;
 const ADMIN_EMAIL = "atxprestigedetailing@gmail.com";
@@ -1587,7 +1587,7 @@ export default function App() {
                                         customerPhone: b.phone,
                                         date: b.date,
                                         time: b.time,
-                                        vehicle: vl,
+                                        vehicleLabel: vl,
                                         packageType: b.packageType,
                                         address: b.address,
                                         recurringFrequency: b.recurringFrequency,
