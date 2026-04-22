@@ -11,7 +11,7 @@ const GOOGLE_CLIENT_ID =
   "447699234633-ivo2e1c2q843scj32k5323o2rkq6h7dp.apps.googleusercontent.com";
 
 const SCRIPT_URL =
-  "https://script.google.com/macros/s/AKfycbxwyBKFUhS0ogNzZ2ItMCS9q9acRbjZQAzXjWYZJH8J7zMXkixpFOkOmcrKefDf0y5w/exec";
+  "https://script.google.com/macros/s/AKfycbwJcKpJO3M_1AoydJykWMIFbExdRct4Qr4Iw-jkDG1NtOy4J-KbvRKR4jcxLM5CcDw9Iw/exec";
 
 const TOTAL_STEPS = 9;
 const ADMIN_EMAIL = "atxprestigedetailing@gmail.com";
@@ -359,6 +359,8 @@ export default function App() {
   const [inventorySearch, setInventorySearch]           = useState("");
   const [editingInventoryRow, setEditingInventoryRow]   = useState<number | null>(null);
   const [editingInventoryVal, setEditingInventoryVal]   = useState("");
+  const [editingThresholdRow, setEditingThresholdRow]   = useState<number | null>(null);
+  const [editingThresholdVal, setEditingThresholdVal]   = useState("");
   const [inventorySaving, setInventorySaving]           = useState(false);
   const [addingInventoryItem, setAddingInventoryItem]   = useState(false);
   const [newInventoryItem, setNewInventoryItem]         = useState({ item: "", category: "", quantity: "", unit: "", lowStockThreshold: "", notes: "" });
@@ -2287,8 +2289,9 @@ export default function App() {
     const isLowStock = (item: { quantity: string; lowStockThreshold: string }) => {
       const qty = parseFloat(item.quantity);
       const threshold = parseFloat(item.lowStockThreshold);
-      if (isNaN(qty) || isNaN(threshold) || threshold <= 0) return false;
-      return qty > 0 && qty < threshold;
+      if (isNaN(qty) || isNaN(threshold) || threshold <= 0) return false; // threshold 0 = no warning
+      if (qty <= 0) return false; // that's outOfStock, not low
+      return qty <= threshold;
     };
 
     const isOutOfStock = (item: { quantity: string }) => {
@@ -2499,11 +2502,62 @@ export default function App() {
                     {items.map((item) => {
                       const sc = stockColor(item);
                       const isEditing = editingInventoryRow === item.rowIndex;
+                      const isEditingThreshold = editingThresholdRow === item.rowIndex;
+                      const thresholdNum = parseFloat(item.lowStockThreshold);
+                      const hasThreshold = !isNaN(thresholdNum) && thresholdNum > 0;
                       return (
                         <div key={item.rowIndex} style={{ background: sc.bg, border: `1px solid ${sc.border}`, borderRadius: 12, padding: "12px 16px", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" as const }}>
+                          {/* Item name + notes */}
                           <div style={{ flex: 1, minWidth: 160 }}>
                             <div style={{ fontWeight: 600, color: "#111827", fontSize: "0.9rem" }}>{item.item}</div>
                             {item.notes && <div style={{ fontSize: "0.75rem", color: "#9ca3af", marginTop: 2 }}>{item.notes}</div>}
+                            {/* Threshold editor inline under the name */}
+                            <div style={{ marginTop: 4, display: "flex", alignItems: "center", gap: 6 }}>
+                              {isEditingThreshold ? (
+                                <>
+                                  <span style={{ fontSize: "0.72rem", color: "#6b7280" }}>Alert at:</span>
+                                  <input
+                                    type="number"
+                                    step="0.25"
+                                    min="0"
+                                    value={editingThresholdVal}
+                                    onChange={e => setEditingThresholdVal(e.target.value)}
+                                    style={{ ...S.input, width: 60, padding: "3px 8px", fontSize: "0.82rem" }}
+                                    autoFocus
+                                    onKeyDown={async e => {
+                                      if (e.key === "Enter") {
+                                        try {
+                                          const res = await fetch(SCRIPT_URL, { method: "POST", body: JSON.stringify({ action: "updateInventoryThreshold", rowIndex: item.rowIndex, lowStockThreshold: editingThresholdVal }) });
+                                          const d = await res.json();
+                                          if (d.success) { setInventoryItems(prev => prev.map(i => i.rowIndex === item.rowIndex ? { ...i, lowStockThreshold: editingThresholdVal } : i)); setEditingThresholdRow(null); }
+                                        } catch { console.error("Threshold update failed"); }
+                                      }
+                                      if (e.key === "Escape") setEditingThresholdRow(null);
+                                    }}
+                                  />
+                                  <button onClick={async () => {
+                                    try {
+                                      const res = await fetch(SCRIPT_URL, { method: "POST", body: JSON.stringify({ action: "updateInventoryThreshold", rowIndex: item.rowIndex, lowStockThreshold: editingThresholdVal }) });
+                                      const d = await res.json();
+                                      if (d.success) { setInventoryItems(prev => prev.map(i => i.rowIndex === item.rowIndex ? { ...i, lowStockThreshold: editingThresholdVal } : i)); setEditingThresholdRow(null); }
+                                      else alert("Failed to update.");
+                                    } catch { alert("Error."); }
+                                  }} style={{ background: "#059669", color: "#fff", border: "none", borderRadius: 5, padding: "3px 8px", fontWeight: 700, fontSize: "0.72rem", cursor: "pointer" }}>✓</button>
+                                  <button onClick={() => setEditingThresholdRow(null)}
+                                    style={{ background: "#f3f4f6", color: "#374151", border: "none", borderRadius: 5, padding: "3px 6px", fontSize: "0.72rem", cursor: "pointer" }}>✕</button>
+                                </>
+                              ) : (
+                                <button
+                                  onClick={() => { setEditingThresholdRow(item.rowIndex); setEditingThresholdVal(item.lowStockThreshold || "0"); setEditingInventoryRow(null); }}
+                                  style={{ background: "none", border: "none", padding: 0, cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}
+                                >
+                                  <span style={{ fontSize: "0.72rem", color: "#9ca3af" }}>
+                                    {hasThreshold ? `⚠ alert at ${item.lowStockThreshold}` : "⚠ no alert set"}
+                                  </span>
+                                  <span style={{ fontSize: "0.65rem", color: "#d1d5db" }}>✏</span>
+                                </button>
+                              )}
+                            </div>
                           </div>
 
                           {/* Quantity editor */}
@@ -2535,7 +2589,7 @@ export default function App() {
                                   style={{ background: "#f3f4f6", color: "#374151", border: "none", borderRadius: 6, padding: "5px 8px", fontWeight: 600, fontSize: "0.78rem", cursor: "pointer" }}>✕</button>
                               </div>
                             ) : (
-                              <button onClick={() => { setEditingInventoryRow(item.rowIndex); setEditingInventoryVal(item.quantity); }}
+                              <button onClick={() => { setEditingInventoryRow(item.rowIndex); setEditingInventoryVal(item.quantity); setEditingThresholdRow(null); }}
                                 style={{ background: sc.badgeBg, border: `1px solid ${sc.border}`, borderRadius: 8, padding: "5px 12px", cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>
                                 <span style={{ fontWeight: 800, fontSize: "1rem", color: sc.badge }}>{item.quantity}</span>
                                 <span style={{ fontSize: "0.78rem", color: "#6b7280" }}>{item.unit}</span>
