@@ -2288,7 +2288,7 @@ export default function App() {
       const qty = parseFloat(item.quantity);
       const threshold = parseFloat(item.lowStockThreshold);
       if (isNaN(qty) || isNaN(threshold) || threshold <= 0) return false;
-      return qty <= threshold;
+      return qty > 0 && qty < threshold;
     };
 
     const isOutOfStock = (item: { quantity: string }) => {
@@ -2327,25 +2327,69 @@ export default function App() {
             <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20, flexWrap: "wrap" as const }}>
               <button onClick={() => setView("booking")} style={{ ...S.secondary, padding: "9px 14px", fontSize: "0.9rem" }}>Back</button>
               <h2 style={{ ...S.title, margin: 0, fontSize: "1.8rem" }}>Inventory</h2>
-              <button onClick={loadInventory} style={{ ...S.secondary, marginLeft: "auto", padding: "9px 14px", fontSize: "0.9rem" }}>Refresh</button>
-              <button onClick={() => setAddingInventoryItem(true)} style={{ ...S.primary, padding: "9px 16px", fontSize: "0.9rem" }}>+ Add Item</button>
+              <button
+                onClick={() => { loadInventory(); }}
+                style={{ ...S.secondary, marginLeft: "auto", padding: "9px 14px", fontSize: "0.9rem" }}>
+                {inventoryLoading ? "Loading..." : "Refresh"}
+              </button>
+              <button
+                onClick={() => { setAddingInventoryItem(true); }}
+                style={{ ...S.primary, padding: "9px 16px", fontSize: "0.9rem" }}>
+                + Add Item
+              </button>
             </div>
 
-            {/* Low stock alert banner */}
-            {lowStockItems.length > 0 && (
-              <div style={{ background: "#fffbeb", border: "1.5px solid #fcd34d", borderRadius: 14, padding: "12px 16px", marginBottom: 20 }}>
-                <div style={{ fontWeight: 700, color: "#92400e", fontSize: "0.88rem", marginBottom: 8 }}>
-                  ⚠ {lowStockItems.length} item{lowStockItems.length !== 1 ? "s" : ""} need restocking
+            {/* Low stock alert banner — clean table layout */}
+            {(() => {
+              const outItems  = lowStockItems.filter(i => isOutOfStock(i));
+              const lowItems  = lowStockItems.filter(i => !isOutOfStock(i));
+              if (lowStockItems.length === 0) return null;
+              return (
+                <div style={{ background: "#fffbeb", border: "1.5px solid #fcd34d", borderRadius: 14, padding: "16px 18px", marginBottom: 20 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, flexWrap: "wrap" as const, gap: 8 }}>
+                    <div style={{ fontWeight: 700, color: "#92400e", fontSize: "0.95rem" }}>
+                      ⚠ Restock Needed
+                    </div>
+                    <button
+                      onClick={() => setInventoryFilter("low")}
+                      style={{ background: "#f59e0b", color: "#fff", border: "none", borderRadius: 8, padding: "5px 12px", fontSize: "0.78rem", fontWeight: 700, cursor: "pointer" }}>
+                      View All {lowStockItems.length} Items
+                    </button>
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: outItems.length > 0 && lowItems.length > 0 ? "1fr 1fr" : "1fr", gap: 12 }}>
+                    {outItems.length > 0 && (
+                      <div>
+                        <div style={{ fontSize: "0.72rem", fontWeight: 700, color: "#dc2626", textTransform: "uppercase" as const, letterSpacing: "0.06em", marginBottom: 6 }}>
+                          Out of Stock ({outItems.length})
+                        </div>
+                        {outItems.map((item, i) => (
+                          <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "5px 0", borderTop: i > 0 ? "1px solid #fee2e2" : "none" }}>
+                            <span style={{ fontSize: "0.82rem", color: "#7f1d1d", fontWeight: 500 }}>{item.item}</span>
+                            <span style={{ background: "#fef2f2", color: "#dc2626", border: "1px solid #fca5a5", borderRadius: 999, padding: "1px 8px", fontSize: "0.7rem", fontWeight: 700, whiteSpace: "nowrap" as const, marginLeft: 8 }}>OUT</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {lowItems.length > 0 && (
+                      <div>
+                        <div style={{ fontSize: "0.72rem", fontWeight: 700, color: "#d97706", textTransform: "uppercase" as const, letterSpacing: "0.06em", marginBottom: 6 }}>
+                          Running Low ({lowItems.length})
+                        </div>
+                        {lowItems.slice(0, 8).map((item, i) => (
+                          <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "5px 0", borderTop: i > 0 ? "1px solid #fef3c7" : "none" }}>
+                            <span style={{ fontSize: "0.82rem", color: "#78350f", fontWeight: 500 }}>{item.item}</span>
+                            <span style={{ fontSize: "0.78rem", color: "#b45309", fontWeight: 700, whiteSpace: "nowrap" as const, marginLeft: 8 }}>{item.quantity} {item.unit}</span>
+                          </div>
+                        ))}
+                        {lowItems.length > 8 && (
+                          <div style={{ fontSize: "0.75rem", color: "#b45309", marginTop: 6 }}>+{lowItems.length - 8} more — tap "View All" above</div>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
-                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" as const }}>
-                  {lowStockItems.map((item, i) => (
-                    <span key={i} style={{ background: isOutOfStock(item) ? "#fef2f2" : "#fefce8", color: isOutOfStock(item) ? "#dc2626" : "#92400e", border: `1px solid ${isOutOfStock(item) ? "#fca5a5" : "#fcd34d"}`, borderRadius: 999, padding: "2px 10px", fontSize: "0.75rem", fontWeight: 600 }}>
-                      {item.item} — {isOutOfStock(item) ? "OUT" : item.quantity + " " + item.unit}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
+              );
+            })()}
 
             {/* Search + filters */}
             <div style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap" as const, alignItems: "center" }}>
@@ -2359,7 +2403,7 @@ export default function App() {
                 {(["all", "low"] as const).map(f => (
                   <button key={f} onClick={() => setInventoryFilter(f)}
                     style={{ background: inventoryFilter === f ? "#111827" : "#f3f4f6", color: inventoryFilter === f ? "#fff" : "#374151", border: "none", borderRadius: 999, padding: "7px 14px", fontSize: "0.82rem", fontWeight: 600, cursor: "pointer" }}>
-                    {f === "all" ? "All" : "⚠ Low / Out"}
+                    {f === "all" ? "All Items" : "⚠ Low / Out"}
                   </button>
                 ))}
               </div>
