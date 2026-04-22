@@ -286,6 +286,7 @@ export default function App() {
   const [completeHours, setCompleteHours]               = useState("");
   const [completeNote, setCompleteNote]                 = useState("");
   const [completeLoading, setCompleteLoading]           = useState(false);
+  const [billingMode, setBillingMode]                   = useState<"hourly" | "flat">("hourly");
   const [squarePopup, setSquarePopup]                   = useState(false);
   const [squareBooking, setSquareBooking]               = useState<Booking | null>(null);
   const [copiedAmount, setCopiedAmount]                 = useState<number | null>(null);
@@ -1461,7 +1462,7 @@ export default function App() {
 
                             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" as const, marginTop: 8, alignItems: "center" }}>
                               {!isComplete && b.status !== "Cancelled" && (
-                                <button onClick={() => { setSelectedAdminBooking(isSelected ? null : b); setCompleteAmount(b.hourlyRate ? String(parseFloat(b.hourlyRate) * 2) : ""); setCompleteHours(b.clientType === "maintenance" ? "2" : ""); setCompleteNote(""); setEditingBooking(null); }}
+                                <button onClick={() => { setSelectedAdminBooking(isSelected ? null : b); setCompleteAmount(b.hourlyRate ? String(parseFloat(b.hourlyRate) * 2) : ""); setCompleteHours(b.clientType === "maintenance" ? "2" : ""); setCompleteNote(""); setEditingBooking(null); setBillingMode("hourly"); }}
                                   style={{ background: isSelected ? "#f3f4f6" : "#111827", color: isSelected ? "#111827" : "#fff", border: "none", borderRadius: 8, padding: "7px 14px", fontSize: "0.82rem", fontWeight: 600, cursor: "pointer" }}>
                                   {isSelected ? "Cancel" : "Mark Complete"}
                                 </button>
@@ -1477,7 +1478,7 @@ export default function App() {
                                     </button>
                                   </div>
                                 ) : (
-                                  <button onClick={() => { startTimer(b.rowIndex); setSelectedAdminBooking(b); setCompleteHours(""); setCompleteAmount(""); setCompleteNote(""); setEditingBooking(null); }}
+                                  <button onClick={() => { startTimer(b.rowIndex); setSelectedAdminBooking(b); setCompleteHours(""); setCompleteAmount(""); setCompleteNote(""); setEditingBooking(null); setBillingMode("hourly"); }}
                                     style={{ background: "#059669", color: "#fff", border: "none", borderRadius: 8, padding: "7px 14px", fontSize: "0.82rem", fontWeight: 600, cursor: "pointer" }}>
                                     ▶ Start Timer
                                   </button>
@@ -1719,48 +1720,97 @@ export default function App() {
                                 <div style={{ fontWeight: 700, color: "#374151", marginBottom: 10 }}>Confirm Service & Set Invoice</div>
 
                                 {b.clientType !== "maintenance" ? (
-                                  /* Non-maintenance: enter hours, auto-calculate amount */
+                                  /* Non-maintenance: hourly or flat rate toggle */
                                   <div style={{ marginBottom: 10 }}>
-                                    <div style={{ fontSize: "0.82rem", color: "#6b7280", marginBottom: 6 }}>
-                                      Rate: <strong>${b.hourlyRate}/hr</strong> — Enter total hours to calculate invoice
+                                    {/* Mode toggle */}
+                                    <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
+                                      <button
+                                        onClick={() => { setBillingMode("hourly"); setCompleteAmount(""); setCompleteHours(""); }}
+                                        style={{ flex: 1, padding: "8px 12px", borderRadius: 8, border: billingMode === "hourly" ? "2px solid #111827" : "1.5px solid #e5e7eb", background: billingMode === "hourly" ? "#111827" : "#fff", color: billingMode === "hourly" ? "#fff" : "#374151", fontWeight: 700, fontSize: "0.82rem", cursor: "pointer" }}
+                                      >
+                                        ⏱ Hourly
+                                      </button>
+                                      <button
+                                        onClick={() => { setBillingMode("flat"); setCompleteHours(""); setCompleteAmount(""); }}
+                                        style={{ flex: 1, padding: "8px 12px", borderRadius: 8, border: billingMode === "flat" ? "2px solid #7c3aed" : "1.5px solid #e5e7eb", background: billingMode === "flat" ? "#7c3aed" : "#fff", color: billingMode === "flat" ? "#fff" : "#374151", fontWeight: 700, fontSize: "0.82rem", cursor: "pointer" }}
+                                      >
+                                        💲 Flat Rate
+                                      </button>
                                     </div>
-                                    <div style={{ display: "flex", gap: 10, flexWrap: "wrap" as const }}>
-                                      <div style={{ flex: 1, minWidth: 120 }}>
-                                        <div style={{ fontSize: "0.78rem", color: "#6b7280", marginBottom: 4 }}>Hours Worked</div>
-                                        <input
-                                          style={{ ...S.input, padding: "10px 12px" }}
-                                          type="number"
-                                          step="0.5"
-                                          placeholder="e.g. 8"
-                                          value={completeHours}
-                                          onChange={e => {
-                                            setCompleteHours(e.target.value);
-                                            const hrs = parseFloat(e.target.value);
-                                            const rate2 = parseFloat(b.hourlyRate || "0");
-                                            if (hrs > 0 && rate2 > 0) setCompleteAmount((hrs * rate2).toFixed(2));
-                                            else setCompleteAmount("");
-                                          }}
-                                        />
-                                      </div>
-                                      <div style={{ flex: 1, minWidth: 120 }}>
-                                        <div style={{ fontSize: "0.78rem", color: "#6b7280", marginBottom: 4 }}>Invoice Amount</div>
-                                        <input
-                                          style={{ ...S.input, padding: "10px 12px", background: "#f3f4f6", fontWeight: 700 }}
-                                          type="number"
-                                          placeholder="Auto-calculated"
-                                          value={completeAmount}
-                                          onChange={e => setCompleteAmount(e.target.value)}
-                                        />
-                                      </div>
-                                      <div style={{ flex: 2, minWidth: 180 }}>
-                                        <div style={{ fontSize: "0.78rem", color: "#6b7280", marginBottom: 4 }}>Note (optional)</div>
-                                        <input style={{ ...S.input, padding: "10px 12px" }} placeholder="e.g. Boat detail, full interior" value={completeNote} onChange={e => setCompleteNote(e.target.value)} />
-                                      </div>
-                                    </div>
-                                    {completeHours && completeAmount && (
-                                      <div style={{ marginTop: 8, fontSize: "0.85rem", color: "#059669", fontWeight: 600 }}>
-                                        {completeHours} hrs × ${b.hourlyRate}/hr = ${completeAmount}
-                                      </div>
+
+                                    {billingMode === "hourly" ? (
+                                      <>
+                                        <div style={{ fontSize: "0.82rem", color: "#6b7280", marginBottom: 6 }}>
+                                          Rate: <strong>${b.hourlyRate}/hr</strong> — Enter total hours to calculate invoice
+                                        </div>
+                                        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" as const }}>
+                                          <div style={{ flex: 1, minWidth: 120 }}>
+                                            <div style={{ fontSize: "0.78rem", color: "#6b7280", marginBottom: 4 }}>Hours Worked</div>
+                                            <input
+                                              style={{ ...S.input, padding: "10px 12px" }}
+                                              type="number"
+                                              step="0.5"
+                                              placeholder="e.g. 8"
+                                              value={completeHours}
+                                              onChange={e => {
+                                                setCompleteHours(e.target.value);
+                                                const hrs = parseFloat(e.target.value);
+                                                const rate2 = parseFloat(b.hourlyRate || "0");
+                                                if (hrs > 0 && rate2 > 0) setCompleteAmount((hrs * rate2).toFixed(2));
+                                                else setCompleteAmount("");
+                                              }}
+                                            />
+                                          </div>
+                                          <div style={{ flex: 1, minWidth: 120 }}>
+                                            <div style={{ fontSize: "0.78rem", color: "#6b7280", marginBottom: 4 }}>Invoice Amount</div>
+                                            <input
+                                              style={{ ...S.input, padding: "10px 12px", background: "#f3f4f6", fontWeight: 700 }}
+                                              type="number"
+                                              placeholder="Auto-calculated"
+                                              value={completeAmount}
+                                              onChange={e => setCompleteAmount(e.target.value)}
+                                            />
+                                          </div>
+                                          <div style={{ flex: 2, minWidth: 180 }}>
+                                            <div style={{ fontSize: "0.78rem", color: "#6b7280", marginBottom: 4 }}>Note (optional)</div>
+                                            <input style={{ ...S.input, padding: "10px 12px" }} placeholder="e.g. Boat detail, full interior" value={completeNote} onChange={e => setCompleteNote(e.target.value)} />
+                                          </div>
+                                        </div>
+                                        {completeHours && completeAmount && (
+                                          <div style={{ marginTop: 8, fontSize: "0.85rem", color: "#059669", fontWeight: 600 }}>
+                                            {completeHours} hrs × ${b.hourlyRate}/hr = ${completeAmount}
+                                          </div>
+                                        )}
+                                      </>
+                                    ) : (
+                                      <>
+                                        <div style={{ fontSize: "0.82rem", color: "#7c3aed", marginBottom: 6, fontWeight: 600 }}>
+                                          Flat Rate — enter a custom amount (e.g. add-on consultation, package deal)
+                                        </div>
+                                        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" as const }}>
+                                          <div style={{ flex: 1, minWidth: 140 }}>
+                                            <div style={{ fontSize: "0.78rem", color: "#6b7280", marginBottom: 4 }}>Invoice Amount ($)</div>
+                                            <input
+                                              style={{ ...S.input, padding: "10px 12px", fontWeight: 700, border: "1.5px solid #a78bfa" }}
+                                              type="number"
+                                              step="0.01"
+                                              placeholder="e.g. 350"
+                                              value={completeAmount}
+                                              onChange={e => setCompleteAmount(e.target.value)}
+                                              autoFocus
+                                            />
+                                          </div>
+                                          <div style={{ flex: 2, minWidth: 180 }}>
+                                            <div style={{ fontSize: "0.78rem", color: "#6b7280", marginBottom: 4 }}>Note (optional)</div>
+                                            <input style={{ ...S.input, padding: "10px 12px" }} placeholder="e.g. Ceramic coating consultation" value={completeNote} onChange={e => setCompleteNote(e.target.value)} />
+                                          </div>
+                                        </div>
+                                        {completeAmount && (
+                                          <div style={{ marginTop: 8, fontSize: "0.85rem", color: "#7c3aed", fontWeight: 600 }}>
+                                            Flat rate: ${parseFloat(completeAmount).toFixed(2)}
+                                          </div>
+                                        )}
+                                      </>
                                     )}
                                   </div>
                                 ) : (
