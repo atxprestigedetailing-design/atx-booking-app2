@@ -362,6 +362,7 @@ export default function App() {
   const [inventorySaving, setInventorySaving]           = useState(false);
   const [addingInventoryItem, setAddingInventoryItem]   = useState(false);
   const [newInventoryItem, setNewInventoryItem]         = useState({ item: "", category: "", quantity: "", unit: "", lowStockThreshold: "", notes: "" });
+  const [invCatFilter, setInvCatFilter]                 = useState("All");
 
   const currentYear = new Date().getFullYear();
   const yearOptions = Array.from({ length: currentYear - 1995 + 1 }, (_, i) => String(currentYear - i));
@@ -2282,7 +2283,6 @@ export default function App() {
   // ── INVENTORY VIEW ──────────────────────────────────────────────────────────
   if (view === "inventory" && googleUser?.email === ADMIN_EMAIL) {
     const CATEGORIES = ["All", "Microfiber & Towels", "Polishing Pads", "Compounds & Polishes", "Chemicals & Cleaners", "Ceramic Coatings", "Tools & Equipment", "Brushes & Applicators", "Sandpaper & Abrasives", "Accessories & Misc"];
-    const [invCatFilter, setInvCatFilter] = useState("All");
 
     const isLowStock = (item: { quantity: string; lowStockThreshold: string }) => {
       const qty = parseFloat(item.quantity);
