@@ -11,7 +11,7 @@ const GOOGLE_CLIENT_ID =
   "447699234633-ivo2e1c2q843scj32k5323o2rkq6h7dp.apps.googleusercontent.com";
 
 const SCRIPT_URL =
-  "https://script.google.com/macros/s/AKfycbwJcKpJO3M_1AoydJykWMIFbExdRct4Qr4Iw-jkDG1NtOy4J-KbvRKR4jcxLM5CcDw9Iw/exec";
+  "https://script.google.com/macros/s/AKfycbzoPahm1UXkSQ6C-SLD7TJTuugR5695PlnSPNEi8l_bvBqvUAtiG_lNQH9V_jbHTBxMzQ/exec";
 
 const TOTAL_STEPS = 9;
 const ADMIN_EMAIL = "atxprestigedetailing@gmail.com";
@@ -1359,15 +1359,15 @@ export default function App() {
   // ADMIN VIEW
   if (view === "admin" && googleUser?.email === ADMIN_EMAIL) {
     const filtered = adminBookings.filter(b => {
-      if (adminFilter === "upcoming") return isUpcoming(b.date) && b.status !== "Completed" && b.status !== "Cancelled";
-      if (adminFilter === "past") return !isUpcoming(b.date) || b.status === "Completed" || b.status === "Cancelled";
+      if (adminFilter === "upcoming") return isUpcoming(b.date) && b.status !== "Completed" && b.status !== "Cancelled" && b.status !== "Skipped";
+      if (adminFilter === "past") return !isUpcoming(b.date) || b.status === "Completed" || b.status === "Cancelled" || b.status === "Skipped";
       if (adminFilter === "maintenance") return b.clientType === "maintenance";
       return true;
     }).sort((a, b) => {
       // "All" tab: completed/cancelled first (newest → oldest), then upcoming (soonest first)
       if (adminFilter === "all") {
-        const aDone = a.status === "Completed" || a.status === "Cancelled";
-        const bDone = b.status === "Completed" || b.status === "Cancelled";
+        const aDone = a.status === "Completed" || a.status === "Cancelled" || a.status === "Skipped";
+        const bDone = b.status === "Completed" || b.status === "Cancelled" || b.status === "Skipped";
         if (aDone && !bDone) return -1;
         if (!aDone && bDone) return 1;
         if (aDone && bDone) return b.date.localeCompare(a.date);
@@ -1378,8 +1378,8 @@ export default function App() {
       // "Past" tab: most recent first
       if (adminFilter === "past") return b.date.localeCompare(a.date);
       // "Maintenance" tab: upcoming first, then by date
-      const aUp = isUpcoming(a.date) && a.status !== "Completed" && a.status !== "Cancelled";
-      const bUp = isUpcoming(b.date) && b.status !== "Completed" && b.status !== "Cancelled";
+      const aUp = isUpcoming(a.date) && a.status !== "Completed" && a.status !== "Cancelled" && a.status !== "Skipped";
+      const bUp = isUpcoming(b.date) && b.status !== "Completed" && b.status !== "Cancelled" && b.status !== "Skipped";
       if (aUp && !bUp) return -1;
       if (!aUp && bUp) return 1;
       return aUp ? a.date.localeCompare(b.date) : b.date.localeCompare(a.date);
@@ -1428,7 +1428,7 @@ export default function App() {
                     </div>
                     {/* Maintenance schedule summary — all upcoming grouped by client */}
                     {adminFilter === "maintenance" && (() => {
-                      const futureMain = adminBookings.filter(b => b.clientType === "maintenance" && isUpcoming(b.date) && b.status !== "Completed" && b.status !== "Cancelled");
+                      const futureMain = adminBookings.filter(b => b.clientType === "maintenance" && isUpcoming(b.date) && b.status !== "Completed" && b.status !== "Cancelled" && b.status !== "Skipped");
                       const grouped: Record<string, Booking[]> = {};
                       futureMain.forEach(b => {
                         if (!grouped[b.email]) grouped[b.email] = [];
@@ -1474,10 +1474,15 @@ export default function App() {
                         const isSelected = selectedAdminBooking?.rowIndex === b.rowIndex;
 
                         return (
-                          <div key={i} style={{ background: b.status === "Cancelled" ? "#fef2f2" : "#fff", border: `1.5px solid ${b.status === "Cancelled" ? "#fca5a5" : isComplete ? "#e5e7eb" : isUpcoming(b.date) ? "#2563eb" : "#e5e7eb"}`, borderRadius: 14, padding: 16, opacity: b.status === "Cancelled" ? 0.85 : 1 }}>
+                          <div key={i} style={{ background: b.status === "Cancelled" ? "#fef2f2" : b.status === "Skipped" ? "#f0f9ff" : "#fff", border: `1.5px solid ${b.status === "Cancelled" ? "#fca5a5" : b.status === "Skipped" ? "#7dd3fc" : isComplete ? "#e5e7eb" : isUpcoming(b.date) ? "#2563eb" : "#e5e7eb"}`, borderRadius: 14, padding: 16, opacity: b.status === "Cancelled" || b.status === "Skipped" ? 0.85 : 1 }}>
                             {b.status === "Cancelled" && (
                               <div style={{ background: "#dc2626", borderRadius: 8, padding: "6px 12px", marginBottom: 10, display: "flex", alignItems: "center", gap: 8 }}>
                                 <span style={{ color: "#fff", fontWeight: 800, fontSize: "0.85rem", letterSpacing: "0.04em" }}>✕ APPOINTMENT CANCELLED</span>
+                              </div>
+                            )}
+                            {b.status === "Skipped" && (
+                              <div style={{ background: "#0369a1", borderRadius: 8, padding: "6px 12px", marginBottom: 10, display: "flex", alignItems: "center", gap: 8 }}>
+                                <span style={{ color: "#fff", fontWeight: 800, fontSize: "0.85rem", letterSpacing: "0.04em" }}>⏭ MAINTENANCE SKIPPED</span>
                               </div>
                             )}
                             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8, marginBottom: 6, flexWrap: "wrap" as const }}>
@@ -1490,8 +1495,8 @@ export default function App() {
                                 {b.notes && <div style={{ fontSize: "0.8rem", color: "#9ca3af" }}>Notes: {b.notes}</div>}
                               </div>
                               <div style={{ display: "flex", flexDirection: "column" as const, alignItems: "flex-end", gap: 4 }}>
-                                <span style={{ background: b.status === "Cancelled" ? "#fef2f2" : isComplete ? "#dcfce7" : isUpcoming(b.date) ? "#eff6ff" : "#f3f4f6", color: b.status === "Cancelled" ? "#dc2626" : isComplete ? "#166534" : isUpcoming(b.date) ? "#2563eb" : "#9ca3af", fontSize: "0.72rem", fontWeight: 700, borderRadius: 999, padding: "2px 8px" }}>
-                                  {b.status === "Cancelled" ? "CANCELLED" : isComplete ? "COMPLETED" : isUpcoming(b.date) ? "UPCOMING" : "PAST"}
+                                <span style={{ background: b.status === "Cancelled" ? "#fef2f2" : b.status === "Skipped" ? "#f0f9ff" : isComplete ? "#dcfce7" : isUpcoming(b.date) ? "#eff6ff" : "#f3f4f6", color: b.status === "Cancelled" ? "#dc2626" : b.status === "Skipped" ? "#0369a1" : isComplete ? "#166534" : isUpcoming(b.date) ? "#2563eb" : "#9ca3af", fontSize: "0.72rem", fontWeight: 700, borderRadius: 999, padding: "2px 8px" }}>
+                                  {b.status === "Cancelled" ? "CANCELLED" : b.status === "Skipped" ? "SKIPPED" : isComplete ? "COMPLETED" : isUpcoming(b.date) ? "UPCOMING" : "PAST"}
                                 </span>
                                 {b.invoiceStatus && b.invoiceStatus !== "" && (
                                   <span style={{ background: b.invoiceStatus === "paid" ? "#dcfce7" : b.invoiceStatus === "released" ? "#fef9c3" : "#fef3c7", color: b.invoiceStatus === "paid" ? "#166534" : "#92400e", fontSize: "0.72rem", fontWeight: 700, borderRadius: 999, padding: "2px 8px" }}>
@@ -1562,6 +1567,57 @@ export default function App() {
                                 }}
                                 style={{ background: "#fef2f2", color: "#dc2626", border: "1.5px solid #fca5a5", borderRadius: 8, padding: "7px 14px", fontSize: "0.82rem", fontWeight: 600, cursor: "pointer" }}>
                                   Cancel Appt
+                                </button>
+                              )}
+                              {/* Skip button — maintenance only */}
+                              {!isComplete && isUpcoming(b.date) && b.status !== "Cancelled" && b.clientType === "maintenance" && (
+                                <button onClick={async () => {
+                                  if (!window.confirm(`Skip ${b.name}'s maintenance on ${formatDateLabel(b.date)}? They will be notified and moved to their next scheduled date.`)) return;
+                                  try {
+                                    const vl = b.vehicle === "boat"
+                                      ? [b.boatSize, b.make, b.model].filter(Boolean).join(" ")
+                                      : [b.year, b.make, b.model].filter(Boolean).join(" ");
+                                    const res = await fetch(SCRIPT_URL, {
+                                      method: "POST",
+                                      body: JSON.stringify({
+                                        action: "skipMaintenanceBooking",
+                                        rowIndex: b.rowIndex,
+                                        customerName: b.name,
+                                        customerEmail: b.email,
+                                        customerPhone: b.phone,
+                                        date: b.date,
+                                        time: b.time,
+                                        vehicle: vl,
+                                        packageType: b.packageType,
+                                        address: b.address,
+                                        recurringFrequency: b.recurringFrequency,
+                                        // pass all booking fields for next booking creation
+                                        name: b.name,
+                                        phone: b.phone,
+                                        email: b.email,
+                                        year: b.year,
+                                        make: b.make,
+                                        model: b.model,
+                                        boatSize: b.boatSize,
+                                        vehicle: b.vehicle,
+                                        hourlyRate: b.hourlyRate,
+                                        addOns: b.addOns,
+                                        serviceType: b.serviceType,
+                                        clientType: b.clientType,
+                                        avgTime: b.avgTime,
+                                        notes: b.notes,
+                                      }),
+                                    });
+                                    const d = await res.json();
+                                    if (d.success) {
+                                      setAdminBookings(prev => prev.map(bk => bk.rowIndex === b.rowIndex ? { ...bk, status: "Skipped" } : bk));
+                                      alert(`Skipped. ${b.name} has been notified. Next appointment: ${d.nextDate || "see schedule"}.`);
+                                      await loadAdminBookings();
+                                    } else { alert("Something went wrong: " + (d.error || "")); }
+                                  } catch (e) { alert("Something went wrong."); }
+                                }}
+                                style={{ background: "#f0f9ff", color: "#0369a1", border: "1.5px solid #7dd3fc", borderRadius: 8, padding: "7px 14px", fontSize: "0.82rem", fontWeight: 600, cursor: "pointer" }}>
+                                  ⏭ Skip Appt
                                 </button>
                               )}
                             </div>
