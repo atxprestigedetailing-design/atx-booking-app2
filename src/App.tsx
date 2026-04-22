@@ -11,7 +11,7 @@ const GOOGLE_CLIENT_ID =
   "447699234633-ivo2e1c2q843scj32k5323o2rkq6h7dp.apps.googleusercontent.com";
 
 const SCRIPT_URL =
-  "https://script.google.com/macros/s/AKfycbx5jYCvTR05naK0O9EPYrOn-XgjlnWE4z_EM0r16rkJbmG1Op1PPvb5R3OZP8GU5rmDoQ/exec";
+  "https://script.google.com/macros/s/AKfycbzny-6LBEjlrMjRpCgoPTOWdzL7Al1BzC98NhuelsSp-h1N7AVFNZTXaIoKOrkoCuZVrA/exec";
 
 const TOTAL_STEPS = 9;
 const ADMIN_EMAIL = "atxprestigedetailing@gmail.com";
@@ -530,6 +530,22 @@ export default function App() {
     const dateChanged = editFields.date && editFields.date !== editingBooking.date;
     const timeChanged = editFields.time && editFields.time !== editingBooking.time;
     const scheduleChanged = dateChanged || timeChanged;
+
+    // Build change summary for email
+    const pkgLabel = (p: string) => p === "basic" ? "Basic Detail" : p === "premium" ? "Premium Detail" : p === "exterior" ? "Exterior Basic" : p === "exteriorPremium" ? "Exterior Premium" : p === "interior" ? "Interior Basic" : p === "interiorPremium" ? "Interior Premium" : p;
+    const svcLabel = (s: string) => s === "mobile" ? "Mobile" : s === "dropoff" ? "Drop-Off" : s;
+    const ctLabel  = (c: string) => c === "oneTime" ? "One-Time" : c === "maintenance" ? "Maintenance" : c;
+    const changeDetails: { field: string; from: string; to: string }[] = [];
+    if (editFields.packageType && editFields.packageType !== editingBooking.packageType) changeDetails.push({ field: "Package", from: pkgLabel(editingBooking.packageType), to: pkgLabel(editFields.packageType) });
+    if (editFields.addOns !== undefined && editFields.addOns !== editingBooking.addOns) changeDetails.push({ field: "Add-Ons", from: editingBooking.addOns || "None", to: editFields.addOns || "None" });
+    if (editFields.clientType && editFields.clientType !== editingBooking.clientType) changeDetails.push({ field: "Client Type", from: ctLabel(editingBooking.clientType), to: ctLabel(editFields.clientType) });
+    if (editFields.recurringFrequency !== undefined && editFields.recurringFrequency !== editingBooking.recurringFrequency) changeDetails.push({ field: "Frequency", from: editingBooking.recurringFrequency || "None", to: editFields.recurringFrequency || "None" });
+    if (editFields.year && editFields.year !== editingBooking.year) changeDetails.push({ field: "Year", from: editingBooking.year, to: editFields.year });
+    if (editFields.make && editFields.make !== editingBooking.make) changeDetails.push({ field: "Make", from: editingBooking.make, to: editFields.make });
+    if (editFields.model && editFields.model !== editingBooking.model) changeDetails.push({ field: "Model", from: editingBooking.model, to: editFields.model });
+    if (editFields.serviceType && editFields.serviceType !== editingBooking.serviceType) changeDetails.push({ field: "Service Type", from: svcLabel(editingBooking.serviceType), to: svcLabel(editFields.serviceType) });
+    if (editFields.address && editFields.address !== editingBooking.address) changeDetails.push({ field: "Address", from: editingBooking.address, to: editFields.address });
+
     try {
       const res = await fetch(SCRIPT_URL, {
         method: "POST",
@@ -537,7 +553,6 @@ export default function App() {
           action: "updateBookingFields",
           rowIndex: editingBooking.rowIndex,
           fields: editFields,
-          // Pass original booking data so backend can update calendar + availability
           oldDate: editingBooking.date,
           oldTime: editingBooking.time,
           scheduleChanged,
@@ -551,6 +566,10 @@ export default function App() {
           serviceType: editFields.serviceType || editingBooking.serviceType,
           address: editFields.address || editingBooking.address,
           hourlyRate: editingBooking.hourlyRate,
+          serviceDate: editFields.date || editingBooking.date,
+          // Change notification payload
+          hasDetailChanges: changeDetails.length > 0,
+          changeDetails: JSON.stringify(changeDetails),
         }),
       });
       const data = await res.json();
@@ -1465,7 +1484,7 @@ export default function App() {
                                 )
                               )}
                               {b.status !== "Cancelled" && (
-                                <button onClick={() => { setEditingBooking(editingBooking?.rowIndex === b.rowIndex ? null : b); setEditFields({ name: b.name, phone: b.phone, email: b.email, date: b.date, time: b.time, year: b.year, make: b.make, model: b.model, boatSize: b.boatSize, packageType: b.packageType, serviceType: b.serviceType, address: b.address, notes: b.notes, clientType: b.clientType, recurringFrequency: b.recurringFrequency }); setSelectedAdminBooking(null); }}
+                                <button onClick={() => { setEditingBooking(editingBooking?.rowIndex === b.rowIndex ? null : b); setEditFields({ name: b.name, phone: b.phone, email: b.email, date: b.date, time: b.time, year: b.year, make: b.make, model: b.model, boatSize: b.boatSize, packageType: b.packageType, serviceType: b.serviceType, address: b.address, notes: b.notes, clientType: b.clientType, recurringFrequency: b.recurringFrequency, addOns: b.addOns }); setSelectedAdminBooking(null); }}
                                   style={{ background: "#f3f4f6", color: "#374151", border: "none", borderRadius: 8, padding: "7px 14px", fontSize: "0.82rem", fontWeight: 600, cursor: "pointer" }}>
                                   {editingBooking?.rowIndex === b.rowIndex ? "Cancel Edit" : "Edit"}
                                 </button>
@@ -1616,6 +1635,71 @@ export default function App() {
                                     </select>
                                   </div>
                                 </div>
+
+                                {/* Add-Ons editor — full width */}
+                                <div style={{ marginBottom: 14, padding: "12px 14px", background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: 12 }}>
+                                  <div style={{ fontSize: "0.78rem", color: "#6b7280", marginBottom: 10, fontWeight: 600 }}>Add-On Services</div>
+                                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 6 }}>
+                                    {(b.vehicle === "boat" ? marineAddOnOptions : addOnOptions).map(option => {
+                                      const currentAddOns = (editFields.addOns || "").split(",").map((s: string) => s.trim()).filter(Boolean);
+                                      const isChecked = currentAddOns.includes(option.label);
+                                      return (
+                                        <label key={option.label} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: "0.82rem", color: "#374151" }}>
+                                          <input
+                                            type="checkbox"
+                                            checked={isChecked}
+                                            style={{ accentColor: "#0f0f0f", width: 15, height: 15 }}
+                                            onChange={() => {
+                                              const updated = isChecked
+                                                ? currentAddOns.filter((a: string) => a !== option.label)
+                                                : [...currentAddOns, option.label];
+                                              setEditFields(prev => ({ ...prev, addOns: updated.join(", ") }));
+                                            }}
+                                          />
+                                          <span>{option.label}</span>
+                                          <span style={{ color: "#9ca3af", marginLeft: "auto" }}>{option.priceText}</span>
+                                        </label>
+                                      );
+                                    })}
+                                  </div>
+                                  {editFields.addOns !== b.addOns && (
+                                    <div style={{ marginTop: 10, fontSize: "0.78rem", color: "#7c3aed", background: "#f5f3ff", border: "1px solid #ddd6fe", borderRadius: 8, padding: "6px 10px" }}>
+                                      <span style={{ fontWeight: 700 }}>Changed: </span>
+                                      <span style={{ textDecoration: "line-through", opacity: 0.6 }}>{b.addOns || "None"}</span>
+                                      <span style={{ margin: "0 6px" }}>→</span>
+                                      <strong>{editFields.addOns || "None"}</strong>
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* Change summary — shows all detected changes before saving */}
+                                {(() => {
+                                  const pkgLabel = (p: string) => p === "basic" ? "Basic Detail" : p === "premium" ? "Premium Detail" : p === "exterior" ? "Exterior Basic" : p === "exteriorPremium" ? "Exterior Premium" : p === "interior" ? "Interior Basic" : p === "interiorPremium" ? "Interior Premium" : p;
+                                  const svcLabel = (s: string) => s === "mobile" ? "Mobile" : s === "dropoff" ? "Drop-Off" : s;
+                                  const ctLabel  = (c: string) => c === "oneTime" ? "One-Time" : c === "maintenance" ? "Maintenance" : c;
+                                  const changes: { field: string; from: string; to: string }[] = [];
+                                  if (editFields.packageType && editFields.packageType !== b.packageType) changes.push({ field: "Package", from: pkgLabel(b.packageType), to: pkgLabel(editFields.packageType) });
+                                  if (editFields.addOns !== undefined && editFields.addOns !== b.addOns) changes.push({ field: "Add-Ons", from: b.addOns || "None", to: editFields.addOns || "None" });
+                                  if (editFields.clientType && editFields.clientType !== b.clientType) changes.push({ field: "Client Type", from: ctLabel(b.clientType), to: ctLabel(editFields.clientType) });
+                                  if (editFields.recurringFrequency !== undefined && editFields.recurringFrequency !== b.recurringFrequency) changes.push({ field: "Frequency", from: b.recurringFrequency || "None", to: editFields.recurringFrequency || "None" });
+                                  if (editFields.year && editFields.year !== b.year) changes.push({ field: "Year", from: b.year, to: editFields.year });
+                                  if (editFields.make && editFields.make !== b.make) changes.push({ field: "Make", from: b.make, to: editFields.make });
+                                  if (editFields.model && editFields.model !== b.model) changes.push({ field: "Model", from: b.model, to: editFields.model });
+                                  if (editFields.serviceType && editFields.serviceType !== b.serviceType) changes.push({ field: "Service Type", from: svcLabel(b.serviceType), to: svcLabel(editFields.serviceType) });
+                                  if (editFields.address && editFields.address !== b.address) changes.push({ field: "Address", from: b.address, to: editFields.address });
+                                  if (changes.length === 0) return null;
+                                  return (
+                                    <div style={{ marginBottom: 14, padding: "12px 14px", background: "#fffbeb", border: "1.5px solid #fcd34d", borderRadius: 12 }}>
+                                      <div style={{ fontSize: "0.78rem", fontWeight: 700, color: "#92400e", marginBottom: 8 }}>📧 Booking change email will be sent to {b.email}</div>
+                                      {changes.map((c, i) => (
+                                        <div key={i} style={{ fontSize: "0.78rem", color: "#78350f", marginBottom: 3 }}>
+                                          <strong>{c.field}:</strong> <span style={{ textDecoration: "line-through", opacity: 0.6 }}>{c.from}</span> → <strong>{c.to}</strong>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  );
+                                })()}
+
                                 <div style={{ display: "flex", gap: 8 }}>
                                   <button onClick={handleSaveEdit} disabled={editSaving}
                                     style={{ background: "#2563eb", color: "#fff", border: "none", borderRadius: 8, padding: "9px 18px", fontWeight: 700, fontSize: "0.88rem", cursor: "pointer", opacity: editSaving ? 0.5 : 1 }}>
