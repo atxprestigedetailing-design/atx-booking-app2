@@ -11,7 +11,7 @@ const GOOGLE_CLIENT_ID =
   "447699234633-ivo2e1c2q843scj32k5323o2rkq6h7dp.apps.googleusercontent.com";
 
 const SCRIPT_URL =
-  "https://script.google.com/macros/s/AKfycby8tTTlfOB2AHqwZ5W8vmdDCv1V5PSCcjMMjxZNsmalHdtOAoMgkFZBCvSdNl8CkRxO/exec";
+  "https://script.google.com/macros/s/AKfycbx2RewZO-f4B0Fg5Q4uo5ZSTRnX-06bBBr2motUzztVWRIZsCLexDMZFxaprG-B9Js6HQ/exec";
 
 const TOTAL_STEPS = 9;
 const ADMIN_EMAIL = "atxprestigedetailing@gmail.com";
@@ -1538,7 +1538,11 @@ export default function App() {
                               )}
                               {!isComplete && isUpcoming(b.date) && b.status !== "Cancelled" && (
                                 <button onClick={async () => {
-                                  if (!window.confirm(`Cancel ${b.name}'s appointment on ${formatDateLabel(b.date)} at ${b.time}? This will notify the customer.`)) return;
+                                  if (!window.confirm(
+                                    b.clientType === "maintenance"
+                                      ? `Cancel ${b.name}'s entire maintenance plan? This will cancel ALL upcoming maintenance appointments, reopen the slots, and remove all calendar events.`
+                                      : `Cancel ${b.name}'s appointment on ${formatDateLabel(b.date)} at ${b.time}? This will notify the customer.`
+                                  )) return;
                                   try {
                                     const vl = b.vehicle === "boat"
                                       ? [b.boatSize, b.make, b.model].filter(Boolean).join(" ")
@@ -1556,12 +1560,16 @@ export default function App() {
                                         vehicle: vl,
                                         packageType: b.packageType,
                                         address: b.address,
+                                        clientType: b.clientType,
                                       }),
                                     });
                                     const d = await res.json();
                                     if (d.success) {
                                       setAdminBookings(prev => prev.map(bk => bk.rowIndex === b.rowIndex ? { ...bk, status: "Cancelled" } : bk));
-                                      alert(`Appointment cancelled. ${b.name} has been notified.`);
+                                      const msg = b.clientType === "maintenance"
+                                        ? `Maintenance plan cancelled. All upcoming appointments removed and ${b.name} has been notified.`
+                                        : `Appointment cancelled. ${b.name} has been notified.`;
+                                      alert(msg);
                                     } else { alert("Something went wrong."); }
                                   } catch (e) { alert("Something went wrong."); }
                                 }}
