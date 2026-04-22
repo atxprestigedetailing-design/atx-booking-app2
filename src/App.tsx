@@ -11,7 +11,7 @@ const GOOGLE_CLIENT_ID =
   "447699234633-ivo2e1c2q843scj32k5323o2rkq6h7dp.apps.googleusercontent.com";
 
 const SCRIPT_URL =
-  "https://script.google.com/macros/s/AKfycbw56h7YkeHCYTxQyGUZCNVJGj8QtR0jEl7xVk64CYO7lYOWmnz14N490NBHrzoHX_keKQ/exec";
+  "https://script.google.com/macros/s/AKfycbxwyBKFUhS0ogNzZ2ItMCS9q9acRbjZQAzXjWYZJH8J7zMXkixpFOkOmcrKefDf0y5w/exec";
 
 const TOTAL_STEPS = 9;
 const ADMIN_EMAIL = "atxprestigedetailing@gmail.com";
@@ -276,7 +276,7 @@ export default function App() {
     } catch { return null; }
   });
   const [googleScriptLoaded, setGoogleScriptLoaded]     = useState(false);
-  const [view, setView]                                 = useState<"booking" | "myBookings" | "requestChange" | "admin" | "balance">("booking");
+  const [view, setView]                                 = useState<"booking" | "myBookings" | "requestChange" | "admin" | "balance" | "inventory">("booking");
   const [adminTab, setAdminTab]                         = useState<"bookings" | "invoices" | "revenue" | "availability">("bookings");
   const [adminBookings, setAdminBookings]               = useState<Booking[]>([]);
   const [adminLoading, setAdminLoading]                 = useState(false);
@@ -342,6 +342,26 @@ export default function App() {
   const [addressSelected, setAddressSelected]           = useState(false);
   const [makeOptions, setMakeOptions]                   = useState<string[]>([]);
   const [modelOptions, setModelOptions]                 = useState<string[]>([]);
+
+  // ── Inventory state ──
+  type InventoryItem = {
+    rowIndex: number;
+    item: string;
+    category: string;
+    quantity: string;
+    unit: string;
+    lowStockThreshold: string;
+    notes: string;
+  };
+  const [inventoryItems, setInventoryItems]             = useState<InventoryItem[]>([]);
+  const [inventoryLoading, setInventoryLoading]         = useState(false);
+  const [inventoryFilter, setInventoryFilter]           = useState<"all" | "low">("all");
+  const [inventorySearch, setInventorySearch]           = useState("");
+  const [editingInventoryRow, setEditingInventoryRow]   = useState<number | null>(null);
+  const [editingInventoryVal, setEditingInventoryVal]   = useState("");
+  const [inventorySaving, setInventorySaving]           = useState(false);
+  const [addingInventoryItem, setAddingInventoryItem]   = useState(false);
+  const [newInventoryItem, setNewInventoryItem]         = useState({ item: "", category: "", quantity: "", unit: "", lowStockThreshold: "", notes: "" });
 
   const currentYear = new Date().getFullYear();
   const yearOptions = Array.from({ length: currentYear - 1995 + 1 }, (_, i) => String(currentYear - i));
@@ -453,6 +473,16 @@ export default function App() {
       setAdminBookings(bookings);
     } catch (e) { console.error("Failed to load admin bookings", e); }
     finally { setAdminLoading(false); }
+  }, []);
+
+  const loadInventory = useCallback(async () => {
+    setInventoryLoading(true);
+    try {
+      const res = await fetch(`${SCRIPT_URL}?action=getInventory`);
+      const data = await res.json();
+      setInventoryItems(data.items || []);
+    } catch (e) { console.error("Failed to load inventory", e); }
+    finally { setInventoryLoading(false); }
   }, []);
 
   async function handleMarkComplete() {
@@ -2249,6 +2279,251 @@ export default function App() {
     );
   }
 
+  // ── INVENTORY VIEW ──────────────────────────────────────────────────────────
+  if (view === "inventory" && googleUser?.email === ADMIN_EMAIL) {
+    const CATEGORIES = ["All", "Microfiber & Towels", "Polishing Pads", "Compounds & Polishes", "Chemicals & Cleaners", "Ceramic Coatings", "Tools & Equipment", "Brushes & Applicators", "Sandpaper & Abrasives", "Accessories & Misc"];
+    const [invCatFilter, setInvCatFilter] = useState("All");
+
+    const isLowStock = (item: { quantity: string; lowStockThreshold: string }) => {
+      const qty = parseFloat(item.quantity);
+      const threshold = parseFloat(item.lowStockThreshold);
+      if (isNaN(qty) || isNaN(threshold) || threshold <= 0) return false;
+      return qty <= threshold;
+    };
+
+    const isOutOfStock = (item: { quantity: string }) => {
+      const qty = parseFloat(item.quantity);
+      return !isNaN(qty) && qty <= 0;
+    };
+
+    const filtered = inventoryItems.filter(item => {
+      const matchCat = invCatFilter === "All" || item.category === invCatFilter;
+      const matchSearch = !inventorySearch || item.item.toLowerCase().includes(inventorySearch.toLowerCase()) || item.category.toLowerCase().includes(inventorySearch.toLowerCase());
+      const matchLow = inventoryFilter === "all" || isLowStock(item) || isOutOfStock(item);
+      return matchCat && matchSearch && matchLow;
+    });
+
+    const grouped: Record<string, typeof filtered> = {};
+    filtered.forEach(item => {
+      const cat = item.category || "Uncategorized";
+      if (!grouped[cat]) grouped[cat] = [];
+      grouped[cat].push(item);
+    });
+
+    const lowStockItems = inventoryItems.filter(i => isLowStock(i) || isOutOfStock(i));
+
+    const stockColor = (item: { quantity: string; lowStockThreshold: string }) => {
+      if (isOutOfStock(item)) return { bg: "#fef2f2", border: "#fca5a5", badge: "#dc2626", badgeBg: "#fef2f2", label: "OUT" };
+      if (isLowStock(item))   return { bg: "#fffbeb", border: "#fcd34d", badge: "#d97706", badgeBg: "#fefce8", label: "LOW" };
+      return { bg: "#fff", border: "#e5e7eb", badge: "#059669", badgeBg: "#f0fdf4", label: "OK" };
+    };
+
+    return (
+      <div style={S.page}>
+        <div style={S.container}>
+          <Header />
+          <div style={S.card}>
+            {/* Header row */}
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20, flexWrap: "wrap" as const }}>
+              <button onClick={() => setView("booking")} style={{ ...S.secondary, padding: "9px 14px", fontSize: "0.9rem" }}>Back</button>
+              <h2 style={{ ...S.title, margin: 0, fontSize: "1.8rem" }}>Inventory</h2>
+              <button onClick={loadInventory} style={{ ...S.secondary, marginLeft: "auto", padding: "9px 14px", fontSize: "0.9rem" }}>Refresh</button>
+              <button onClick={() => setAddingInventoryItem(true)} style={{ ...S.primary, padding: "9px 16px", fontSize: "0.9rem" }}>+ Add Item</button>
+            </div>
+
+            {/* Low stock alert banner */}
+            {lowStockItems.length > 0 && (
+              <div style={{ background: "#fffbeb", border: "1.5px solid #fcd34d", borderRadius: 14, padding: "12px 16px", marginBottom: 20 }}>
+                <div style={{ fontWeight: 700, color: "#92400e", fontSize: "0.88rem", marginBottom: 8 }}>
+                  ⚠ {lowStockItems.length} item{lowStockItems.length !== 1 ? "s" : ""} need restocking
+                </div>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" as const }}>
+                  {lowStockItems.map((item, i) => (
+                    <span key={i} style={{ background: isOutOfStock(item) ? "#fef2f2" : "#fefce8", color: isOutOfStock(item) ? "#dc2626" : "#92400e", border: `1px solid ${isOutOfStock(item) ? "#fca5a5" : "#fcd34d"}`, borderRadius: 999, padding: "2px 10px", fontSize: "0.75rem", fontWeight: 600 }}>
+                      {item.item} — {isOutOfStock(item) ? "OUT" : item.quantity + " " + item.unit}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Search + filters */}
+            <div style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap" as const, alignItems: "center" }}>
+              <input
+                style={{ ...S.input, flex: 1, minWidth: 180, padding: "9px 14px", fontSize: "0.9rem" }}
+                placeholder="Search items..."
+                value={inventorySearch}
+                onChange={e => setInventorySearch(e.target.value)}
+              />
+              <div style={{ display: "flex", gap: 6 }}>
+                {(["all", "low"] as const).map(f => (
+                  <button key={f} onClick={() => setInventoryFilter(f)}
+                    style={{ background: inventoryFilter === f ? "#111827" : "#f3f4f6", color: inventoryFilter === f ? "#fff" : "#374151", border: "none", borderRadius: 999, padding: "7px 14px", fontSize: "0.82rem", fontWeight: 600, cursor: "pointer" }}>
+                    {f === "all" ? "All" : "⚠ Low / Out"}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Category filter pills */}
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" as const, marginBottom: 20 }}>
+              {CATEGORIES.map(cat => (
+                <button key={cat} onClick={() => setInvCatFilter(cat)}
+                  style={{ background: invCatFilter === cat ? "#7c3aed" : "#f3f4f6", color: invCatFilter === cat ? "#fff" : "#374151", border: "none", borderRadius: 999, padding: "5px 12px", fontSize: "0.78rem", fontWeight: 600, cursor: "pointer" }}>
+                  {cat}
+                </button>
+              ))}
+            </div>
+
+            {/* Add item form */}
+            {addingInventoryItem && (
+              <div style={{ background: "#f0fdf4", border: "1.5px solid #6ee7b7", borderRadius: 14, padding: 16, marginBottom: 20 }}>
+                <div style={{ fontWeight: 700, color: "#065f46", marginBottom: 12, fontSize: "0.9rem" }}>Add New Item</div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 10, marginBottom: 12 }}>
+                  {[
+                    { key: "item", label: "Item Name", placeholder: "e.g. Rupes Blue Foam Pad" },
+                    { key: "category", label: "Category", placeholder: "e.g. Polishing Pads" },
+                    { key: "quantity", label: "Quantity", placeholder: "e.g. 2" },
+                    { key: "unit", label: "Unit", placeholder: "e.g. pack, bottle, gallon" },
+                    { key: "lowStockThreshold", label: "Low Stock Alert At", placeholder: "e.g. 1" },
+                    { key: "notes", label: "Notes (optional)", placeholder: "e.g. Pack of 10" },
+                  ].map(f => (
+                    <div key={f.key}>
+                      <div style={{ fontSize: "0.72rem", color: "#6b7280", marginBottom: 3, fontWeight: 600 }}>{f.label}</div>
+                      <input
+                        style={{ ...S.input, padding: "8px 10px", fontSize: "0.85rem" }}
+                        placeholder={f.placeholder}
+                        value={(newInventoryItem as any)[f.key]}
+                        onChange={e => setNewInventoryItem(prev => ({ ...prev, [f.key]: e.target.value }))}
+                      />
+                    </div>
+                  ))}
+                </div>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button
+                    disabled={!newInventoryItem.item || !newInventoryItem.quantity || inventorySaving}
+                    onClick={async () => {
+                      setInventorySaving(true);
+                      try {
+                        const res = await fetch(SCRIPT_URL, { method: "POST", body: JSON.stringify({ action: "addInventoryItem", ...newInventoryItem }) });
+                        const d = await res.json();
+                        if (d.success) {
+                          await loadInventory();
+                          setAddingInventoryItem(false);
+                          setNewInventoryItem({ item: "", category: "", quantity: "", unit: "", lowStockThreshold: "", notes: "" });
+                        } else alert("Failed to add item.");
+                      } catch { alert("Error adding item."); }
+                      setInventorySaving(false);
+                    }}
+                    style={{ background: "#059669", color: "#fff", border: "none", borderRadius: 8, padding: "9px 18px", fontWeight: 700, fontSize: "0.85rem", cursor: "pointer", opacity: !newInventoryItem.item || !newInventoryItem.quantity ? 0.5 : 1 }}>
+                    {inventorySaving ? "Saving..." : "Save Item"}
+                  </button>
+                  <button onClick={() => { setAddingInventoryItem(false); setNewInventoryItem({ item: "", category: "", quantity: "", unit: "", lowStockThreshold: "", notes: "" }); }}
+                    style={{ background: "#f3f4f6", color: "#374151", border: "none", borderRadius: 8, padding: "9px 14px", fontWeight: 600, fontSize: "0.85rem", cursor: "pointer" }}>
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {inventoryLoading ? (
+              <div style={{ textAlign: "center", padding: 40, color: "#6b7280" }}>Loading inventory...</div>
+            ) : filtered.length === 0 ? (
+              <div style={{ textAlign: "center", padding: 40, color: "#6b7280" }}>No items found.</div>
+            ) : (
+              Object.entries(grouped).sort(([a], [b]) => a.localeCompare(b)).map(([cat, items]) => (
+                <div key={cat} style={{ marginBottom: 28 }}>
+                  <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "#9ca3af", textTransform: "uppercase" as const, letterSpacing: "0.08em", marginBottom: 10, paddingBottom: 6, borderBottom: "1px solid #f3f4f6" }}>
+                    {cat} <span style={{ fontWeight: 400 }}>({items.length})</span>
+                  </div>
+                  <div style={{ display: "grid", gap: 8 }}>
+                    {items.map((item) => {
+                      const sc = stockColor(item);
+                      const isEditing = editingInventoryRow === item.rowIndex;
+                      return (
+                        <div key={item.rowIndex} style={{ background: sc.bg, border: `1px solid ${sc.border}`, borderRadius: 12, padding: "12px 16px", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" as const }}>
+                          <div style={{ flex: 1, minWidth: 160 }}>
+                            <div style={{ fontWeight: 600, color: "#111827", fontSize: "0.9rem" }}>{item.item}</div>
+                            {item.notes && <div style={{ fontSize: "0.75rem", color: "#9ca3af", marginTop: 2 }}>{item.notes}</div>}
+                          </div>
+
+                          {/* Quantity editor */}
+                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            {isEditing ? (
+                              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                <input
+                                  type="number"
+                                  step="0.25"
+                                  value={editingInventoryVal}
+                                  onChange={e => setEditingInventoryVal(e.target.value)}
+                                  style={{ ...S.input, width: 80, padding: "6px 10px", fontSize: "0.9rem", fontWeight: 700 }}
+                                  autoFocus
+                                />
+                                <span style={{ fontSize: "0.82rem", color: "#6b7280" }}>{item.unit}</span>
+                                <button onClick={async () => {
+                                  setInventorySaving(true);
+                                  try {
+                                    const res = await fetch(SCRIPT_URL, { method: "POST", body: JSON.stringify({ action: "updateInventoryQty", rowIndex: item.rowIndex, quantity: editingInventoryVal }) });
+                                    const d = await res.json();
+                                    if (d.success) {
+                                      setInventoryItems(prev => prev.map(i => i.rowIndex === item.rowIndex ? { ...i, quantity: editingInventoryVal } : i));
+                                      setEditingInventoryRow(null);
+                                    } else alert("Failed to update.");
+                                  } catch { alert("Error updating."); }
+                                  setInventorySaving(false);
+                                }} style={{ background: "#059669", color: "#fff", border: "none", borderRadius: 6, padding: "5px 10px", fontWeight: 700, fontSize: "0.78rem", cursor: "pointer" }}>✓</button>
+                                <button onClick={() => setEditingInventoryRow(null)}
+                                  style={{ background: "#f3f4f6", color: "#374151", border: "none", borderRadius: 6, padding: "5px 8px", fontWeight: 600, fontSize: "0.78rem", cursor: "pointer" }}>✕</button>
+                              </div>
+                            ) : (
+                              <button onClick={() => { setEditingInventoryRow(item.rowIndex); setEditingInventoryVal(item.quantity); }}
+                                style={{ background: sc.badgeBg, border: `1px solid ${sc.border}`, borderRadius: 8, padding: "5px 12px", cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>
+                                <span style={{ fontWeight: 800, fontSize: "1rem", color: sc.badge }}>{item.quantity}</span>
+                                <span style={{ fontSize: "0.78rem", color: "#6b7280" }}>{item.unit}</span>
+                                <span style={{ fontSize: "0.68rem", color: "#9ca3af" }}>✏</span>
+                              </button>
+                            )}
+                          </div>
+
+                          {/* Quick +/- buttons */}
+                          {!isEditing && (
+                            <div style={{ display: "flex", gap: 4 }}>
+                              <button onClick={async () => {
+                                const newQty = String(Math.max(0, parseFloat(item.quantity || "0") - 1));
+                                try {
+                                  const res = await fetch(SCRIPT_URL, { method: "POST", body: JSON.stringify({ action: "updateInventoryQty", rowIndex: item.rowIndex, quantity: newQty }) });
+                                  const d = await res.json();
+                                  if (d.success) setInventoryItems(prev => prev.map(i => i.rowIndex === item.rowIndex ? { ...i, quantity: newQty } : i));
+                                } catch { console.error("Qty update failed"); }
+                              }} style={{ width: 28, height: 28, borderRadius: 6, border: "1px solid #e5e7eb", background: "#fff", cursor: "pointer", fontWeight: 700, fontSize: "1rem", color: "#374151", display: "flex", alignItems: "center", justifyContent: "center" }}>−</button>
+                              <button onClick={async () => {
+                                const newQty = String(parseFloat(item.quantity || "0") + 1);
+                                try {
+                                  const res = await fetch(SCRIPT_URL, { method: "POST", body: JSON.stringify({ action: "updateInventoryQty", rowIndex: item.rowIndex, quantity: newQty }) });
+                                  const d = await res.json();
+                                  if (d.success) setInventoryItems(prev => prev.map(i => i.rowIndex === item.rowIndex ? { ...i, quantity: newQty } : i));
+                                } catch { console.error("Qty update failed"); }
+                              }} style={{ width: 28, height: 28, borderRadius: 6, border: "1px solid #e5e7eb", background: "#fff", cursor: "pointer", fontWeight: 700, fontSize: "1rem", color: "#374151", display: "flex", alignItems: "center", justifyContent: "center" }}>+</button>
+                            </div>
+                          )}
+
+                          {/* Status badge */}
+                          <span style={{ background: sc.badgeBg, color: sc.badge, fontSize: "0.68rem", fontWeight: 700, borderRadius: 999, padding: "2px 8px", border: `1px solid ${sc.border}`, whiteSpace: "nowrap" as const }}>
+                            {sc.label}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // BOOKING FLOW
   return (
     <div style={S.page}>
@@ -2280,6 +2555,9 @@ export default function App() {
                   <button style={S.primary} onClick={() => setStep(1)}>Book a Service</button>
                   {googleUser && googleUser.email === ADMIN_EMAIL && (
                     <button style={{ ...S.primary, background: "#059669" }} onClick={() => { setView("admin"); loadAdminBookings(); }}>Admin Panel</button>
+                  )}
+                  {googleUser && googleUser.email === ADMIN_EMAIL && (
+                    <button style={{ ...S.primary, background: "#7c3aed" }} onClick={() => { setView("inventory"); loadInventory(); }}>Inventory</button>
                   )}
                   {googleUser && (
                     <button style={S.secondary} onClick={openMyBookings}>My Bookings</button>
