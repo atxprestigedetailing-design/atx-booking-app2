@@ -11,7 +11,7 @@ const GOOGLE_CLIENT_ID =
   "447699234633-ivo2e1c2q843scj32k5323o2rkq6h7dp.apps.googleusercontent.com";
 
 const SCRIPT_URL =
-  "https://script.google.com/macros/s/AKfycbwvUq-_pzgPYz1QJYOMB9OIuQQM3S4wYnwK_0jBiGQ21zGmyfVTKBXwXop7fpLRHqVCNA/exec";
+  "https://script.google.com/macros/s/AKfycbye9trOlVL4JdCxHqHco1G_1eNDYeTGIMd6NBiJl6BQLV8UrXp7w9niWGCfsSAoxSp-FQ/exec";
 
 const TOTAL_STEPS = 9;
 const ADMIN_EMAIL = "atxprestigedetailing@gmail.com";
@@ -365,6 +365,9 @@ export default function App() {
   const [addingInventoryItem, setAddingInventoryItem]   = useState(false);
   const [newInventoryItem, setNewInventoryItem]         = useState({ item: "", category: "", quantity: "", unit: "", lowStockThreshold: "", notes: "" });
   const [invCatFilter, setInvCatFilter]                 = useState("All");
+  const [maintTimeConflicts, setMaintTimeConflicts]     = useState<{date:string;dateLabel:string;time:string;clientName:string;vehicle:string}[]>([]);
+  const [maintTimeChecking, setMaintTimeChecking]       = useState(false);
+  const [maintTimeCheckedFor, setMaintTimeCheckedFor]   = useState<{rowIndex:number;time:string}|null>(null);
 
   const currentYear = new Date().getFullYear();
   const yearOptions = Array.from({ length: currentYear - 1995 + 1 }, (_, i) => String(currentYear - i));
@@ -556,6 +559,32 @@ export default function App() {
       } else { alert("Something went wrong. Please try again."); }
     } catch (e) { alert("Something went wrong."); }
     finally { setCompleteLoading(false); setProcessingRows(prev => { const n = new Set(prev); n.delete(savedBooking.rowIndex); return n; }); }
+  }
+
+  async function applyMaintenanceTimeUpdate(booking: Booking, newTime: string) {
+    try {
+      const res = await fetch(SCRIPT_URL, {
+        method: "POST",
+        body: JSON.stringify({
+          action: "updateMaintenanceTime",
+          customerEmail: booking.email,
+          customerName: booking.name,
+          customerPhone: booking.phone,
+          make: booking.make,
+          model: booking.model,
+          newTime,
+        }),
+      });
+      const d = await res.json();
+      if (d.success) {
+        alert(`Done! Updated ${d.updatedRows} booking${d.updatedRows !== 1 ? "s" : ""} and ${d.updatedCal} calendar event${d.updatedCal !== 1 ? "s" : ""} to ${newTime}.`);
+        setMaintTimeCheckedFor(null);
+        setMaintTimeConflicts([]);
+        await loadAdminBookings();
+        setEditingBooking(null);
+        setEditFields({});
+      } else { alert("Something went wrong: " + (d.error || "")); }
+    } catch (e) { alert("Something went wrong."); }
   }
 
   async function handleSaveEdit() {
@@ -1818,57 +1847,115 @@ export default function App() {
                                 </div>
 
                                 {/* Update all future times — maintenance only */}
-                                {b.clientType === "maintenance" && (
-                                  <div style={{ marginTop: 16, padding: "14px 16px", background: "#f0f9ff", border: "1.5px solid #7dd3fc", borderRadius: 12 }}>
-                                    <div style={{ fontWeight: 700, color: "#0369a1", fontSize: "0.88rem", marginBottom: 4 }}>Update Time for Entire Schedule</div>
-                                    <div style={{ fontSize: "0.78rem", color: "#0284c7", marginBottom: 10 }}>Changes the time on ALL future appointments and calendar events for this vehicle. Use this when the client wants a permanent time change.</div>
-                                    <div style={{ display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap" as const }}>
-                                      <div>
-                                        <div style={{ fontSize: "0.72rem", color: "#6b7280", marginBottom: 4 }}>New Time for All Future Appointments</div>
-                                        <select
-                                          id={`newTimeAll-${b.rowIndex}`}
-                                          style={{ ...S.input, padding: "8px 12px", fontSize: "0.85rem", backgroundColor: "#fff", width: "auto" }}
-                                          defaultValue={b.time}
-                                        >
-                                          {["7:00 AM","7:30 AM","8:00 AM","8:30 AM","9:00 AM","9:30 AM","10:00 AM","10:30 AM","11:00 AM","11:30 AM","12:00 PM","12:30 PM","1:00 PM","1:30 PM","2:00 PM","2:30 PM","3:00 PM","3:30 PM","4:00 PM","4:30 PM","5:00 PM","5:30 PM","6:00 PM","6:30 PM","7:00 PM"].map(t => (
-                                            <option key={t} value={t}>{t}</option>
-                                          ))}
-                                        </select>
+                                {b.clientType === "maintenance" && (() => {
+                                  const ALL_TIMES = ["7:00 AM","7:30 AM","8:00 AM","8:30 AM","9:00 AM","9:30 AM","10:00 AM","10:30 AM","11:00 AM","11:30 AM","12:00 PM","12:30 PM","1:00 PM","1:30 PM","2:00 PM","2:30 PM","3:00 PM","3:30 PM","4:00 PM","4:30 PM","5:00 PM","5:30 PM","6:00 PM","6:30 PM","7:00 PM"];
+                                  const checkedForThis = maintTimeCheckedFor?.rowIndex === b.rowIndex;
+                                  const selectedNewTime = maintTimeCheckedFor?.time || "";
+                                  const hasConflicts = checkedForThis && maintTimeConflicts.length > 0;
+                                  const isClean = checkedForThis && maintTimeConflicts.length === 0;
+
+                                  return (
+                                    <div style={{ marginTop: 16, padding: "14px 16px", background: "#f0f9ff", border: "1.5px solid #7dd3fc", borderRadius: 12 }}>
+                                      <div style={{ fontWeight: 700, color: "#0369a1", fontSize: "0.88rem", marginBottom: 4 }}>Update Time for Entire Schedule</div>
+                                      <div style={{ fontSize: "0.78rem", color: "#0284c7", marginBottom: 12 }}>Changes the time on ALL future appointments and calendar events for this vehicle. Checks for conflicts with other bookings first.</div>
+
+                                      <div style={{ display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap" as const, marginBottom: 12 }}>
+                                        <div>
+                                          <div style={{ fontSize: "0.72rem", color: "#6b7280", marginBottom: 4 }}>Select New Time</div>
+                                          <select
+                                            id={`newTimeAll-${b.rowIndex}`}
+                                            style={{ ...S.input, padding: "8px 12px", fontSize: "0.85rem", backgroundColor: "#fff", width: "auto" }}
+                                            defaultValue={b.time}
+                                            onChange={() => {
+                                              // Reset conflict check when time changes
+                                              setMaintTimeCheckedFor(null);
+                                              setMaintTimeConflicts([]);
+                                            }}
+                                          >
+                                            {ALL_TIMES.map(t => (
+                                              <option key={t} value={t}>{t}{t === b.time ? " (current)" : ""}</option>
+                                            ))}
+                                          </select>
+                                        </div>
+                                        <button
+                                          disabled={maintTimeChecking}
+                                          onClick={async () => {
+                                            const sel = document.getElementById(`newTimeAll-${b.rowIndex}`) as HTMLSelectElement;
+                                            const newTime = sel?.value;
+                                            if (!newTime || newTime === b.time) { alert("Please select a different time."); return; }
+                                            setMaintTimeChecking(true);
+                                            setMaintTimeConflicts([]);
+                                            setMaintTimeCheckedFor(null);
+                                            try {
+                                              const res = await fetch(SCRIPT_URL, {
+                                                method: "POST",
+                                                body: JSON.stringify({
+                                                  action: "checkMaintenanceTimeConflicts",
+                                                  customerEmail: b.email,
+                                                  make: b.make,
+                                                  model: b.model,
+                                                  newTime,
+                                                  frequency: b.recurringFrequency,
+                                                  refDate: b.date,
+                                                }),
+                                              });
+                                              const d = await res.json();
+                                              if (d.success) {
+                                                setMaintTimeConflicts(d.conflicts || []);
+                                                setMaintTimeCheckedFor({ rowIndex: b.rowIndex, time: newTime });
+                                              } else { alert("Check failed: " + (d.error || "")); }
+                                            } catch (e) { alert("Something went wrong."); }
+                                            setMaintTimeChecking(false);
+                                          }}
+                                          style={{ background: "#0369a1", color: "#fff", border: "none", borderRadius: 8, padding: "9px 16px", fontWeight: 700, fontSize: "0.85rem", cursor: "pointer", opacity: maintTimeChecking ? 0.6 : 1 }}>
+                                          {maintTimeChecking ? "Checking..." : "Check for Conflicts"}
+                                        </button>
                                       </div>
-                                      <button
-                                        onClick={async () => {
-                                          const sel = document.getElementById(`newTimeAll-${b.rowIndex}`) as HTMLSelectElement;
-                                          const newTime = sel?.value;
-                                          if (!newTime) return;
-                                          if (!window.confirm(`Change ALL future ${b.make} ${b.model} maintenance appointments to ${newTime}? This will update your calendar too.`)) return;
-                                          try {
-                                            const res = await fetch(SCRIPT_URL, {
-                                              method: "POST",
-                                              body: JSON.stringify({
-                                                action: "updateMaintenanceTime",
-                                                customerEmail: b.email,
-                                                customerName: b.name,
-                                                customerPhone: b.phone,
-                                                make: b.make,
-                                                model: b.model,
-                                                newTime,
-                                              }),
-                                            });
-                                            const d = await res.json();
-                                            if (d.success) {
-                                              alert(`Done! Updated ${d.updatedRows} booking${d.updatedRows !== 1 ? "s" : ""} and ${d.updatedCal} calendar event${d.updatedCal !== 1 ? "s" : ""} to ${newTime}.`);
-                                              await loadAdminBookings();
-                                              setEditingBooking(null);
-                                              setEditFields({});
-                                            } else { alert("Something went wrong: " + (d.error || "")); }
-                                          } catch (e) { alert("Something went wrong."); }
-                                        }}
-                                        style={{ background: "#0369a1", color: "#fff", border: "none", borderRadius: 8, padding: "9px 16px", fontWeight: 700, fontSize: "0.85rem", cursor: "pointer" }}>
-                                        Update All Future Times
-                                      </button>
+
+                                      {/* Conflict results */}
+                                      {hasConflicts && (
+                                        <div style={{ background: "#fef2f2", border: "1.5px solid #fca5a5", borderRadius: 10, padding: "12px 16px", marginBottom: 12 }}>
+                                          <div style={{ fontWeight: 700, color: "#dc2626", fontSize: "0.85rem", marginBottom: 8 }}>
+                                            ⚠ {maintTimeConflicts.length} conflict{maintTimeConflicts.length !== 1 ? "s" : ""} found at {selectedNewTime}
+                                          </div>
+                                          <div style={{ fontSize: "0.78rem", color: "#7f1d1d", marginBottom: 8 }}>
+                                            The following existing bookings overlap with this time:
+                                          </div>
+                                          {maintTimeConflicts.map((c, ci) => (
+                                            <div key={ci} style={{ background: "#fff", border: "1px solid #fca5a5", borderRadius: 8, padding: "8px 12px", marginBottom: 6, fontSize: "0.82rem" }}>
+                                              <span style={{ fontWeight: 700, color: "#111827" }}>{c.dateLabel}</span>
+                                              <span style={{ color: "#6b7280" }}> — {c.clientName}</span>
+                                              <span style={{ color: "#9ca3af" }}> · {c.vehicle}</span>
+                                            </div>
+                                          ))}
+                                          <div style={{ fontSize: "0.75rem", color: "#9ca3af", marginTop: 8 }}>You can still apply the change — these are informational so you can decide how to handle each conflict manually.</div>
+                                          <button
+                                            onClick={async () => {
+                                              if (!window.confirm(`Apply ${selectedNewTime} to all future ${b.make} ${b.model} appointments anyway? ${maintTimeConflicts.length} conflict${maintTimeConflicts.length !== 1 ? "s" : ""} will need to be resolved manually.`)) return;
+                                              await applyMaintenanceTimeUpdate(b, selectedNewTime);
+                                            }}
+                                            style={{ marginTop: 10, background: "#dc2626", color: "#fff", border: "none", borderRadius: 8, padding: "8px 14px", fontWeight: 700, fontSize: "0.82rem", cursor: "pointer" }}>
+                                            Apply Anyway
+                                          </button>
+                                        </div>
+                                      )}
+
+                                      {isClean && (
+                                        <div style={{ background: "#f0fdf4", border: "1.5px solid #6ee7b7", borderRadius: 10, padding: "12px 16px", marginBottom: 12 }}>
+                                          <div style={{ fontWeight: 700, color: "#059669", fontSize: "0.85rem", marginBottom: 4 }}>✓ No conflicts — {selectedNewTime} is clear for all future dates</div>
+                                          <div style={{ fontSize: "0.78rem", color: "#047857" }}>Safe to apply. This will update all future bookings and calendar events.</div>
+                                          <button
+                                            onClick={async () => {
+                                              await applyMaintenanceTimeUpdate(b, selectedNewTime);
+                                            }}
+                                            style={{ marginTop: 10, background: "#059669", color: "#fff", border: "none", borderRadius: 8, padding: "8px 14px", fontWeight: 700, fontSize: "0.82rem", cursor: "pointer" }}>
+                                            Apply to All Future Appointments
+                                          </button>
+                                        </div>
+                                      )}
                                     </div>
-                                  </div>
-                                )}
+                                  );
+                                })()}
                               </div>
                             )}
 
