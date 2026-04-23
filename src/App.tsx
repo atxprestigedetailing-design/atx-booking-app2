@@ -343,7 +343,42 @@ export default function App() {
   const [makeOptions, setMakeOptions]                   = useState<string[]>([]);
   const [modelOptions, setModelOptions]                 = useState<string[]>([]);
 
-  // ── Inventory state ──
+  // ── Global styles injected once into <head> so they apply on ALL views ──
+  useEffect(() => {
+    const styleId = "atx-global-styles";
+    if (document.getElementById(styleId)) return;
+    const style = document.createElement("style");
+    style.id = styleId;
+    style.textContent = `
+      @keyframes fadeSlideUp {
+        from { opacity: 0; transform: translateY(18px); }
+        to   { opacity: 1; transform: translateY(0); }
+      }
+      @keyframes checkDraw {
+        from { stroke-dashoffset: 50; opacity: 0; }
+        to   { stroke-dashoffset: 0;  opacity: 1; }
+      }
+      @keyframes toastIn {
+        from { opacity: 0; transform: translateX(60px); }
+        to   { opacity: 1; transform: translateX(0); }
+      }
+      @keyframes spin {
+        from { transform: rotate(0deg); }
+        to   { transform: rotate(360deg); }
+      }
+      button { transition: background 0.15s, opacity 0.15s, transform 0.1s, box-shadow 0.15s; }
+      button:hover:not(:disabled) { filter: brightness(1.08); box-shadow: 0 2px 8px rgba(0,0,0,0.13); transform: translateY(-1px); }
+      button:active:not(:disabled) { transform: scale(0.97) translateY(0px) !important; filter: brightness(0.96); box-shadow: none; }
+      .booking-card { transition: box-shadow 0.18s, transform 0.18s, border-color 0.18s; }
+      .booking-card:hover { box-shadow: 0 4px 18px rgba(0,0,0,0.10); transform: translateY(-2px); }
+      .inv-item { transition: box-shadow 0.15s, transform 0.15s; }
+      .inv-item:hover { box-shadow: 0 2px 12px rgba(0,0,0,0.08); transform: translateY(-1px); }
+      .option-card { transition: background 0.15s, border-color 0.15s, box-shadow 0.15s, transform 0.12s; }
+      .option-card:hover { box-shadow: 0 3px 14px rgba(0,0,0,0.10); transform: translateY(-2px); }
+      input:focus, select:focus { outline: none; border-color: #2563eb !important; box-shadow: 0 0 0 3px rgba(37,99,235,0.12); }
+    `;
+    document.head.appendChild(style);
+  }, []);
   type InventoryItem = {
     rowIndex: number;
     item: string;
@@ -1447,6 +1482,17 @@ export default function App() {
 
     return (
       <div style={S.page}>
+        {/* Toast container */}
+        <div style={{ position: "fixed" as const, bottom: 24, right: 24, zIndex: 9999, display: "flex", flexDirection: "column" as const, gap: 10, alignItems: "flex-end" }}>
+          {toasts.map(t => (
+            <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 10, background: t.type === "error" ? "#fef2f2" : t.type === "success" ? "#f0fdf4" : "#1e293b", color: t.type === "error" ? "#dc2626" : t.type === "success" ? "#065f46" : "#fff", border: t.type === "error" ? "1.5px solid #fca5a5" : t.type === "success" ? "1.5px solid #6ee7b7" : "none", borderRadius: 14, padding: "12px 18px", fontSize: "0.88rem", fontWeight: 600, boxShadow: "0 4px 20px rgba(0,0,0,0.18)", animation: "toastIn 0.25s ease", maxWidth: 320, cursor: "pointer" }} onClick={() => dismissToast(t.id)}>
+              {t.type === "loading" && <div style={{ width: 16, height: 16, border: "2.5px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", borderRadius: "50%", animation: "spin 0.7s linear infinite", flexShrink: 0 }} />}
+              {t.type === "success" && <span style={{ fontSize: "1rem" }}>✓</span>}
+              {t.type === "error" && <span style={{ fontSize: "1rem" }}>✕</span>}
+              <span>{t.message}</span>
+            </div>
+          ))}
+        </div>
         <div style={S.container}>
           <Header />
           <SquarePopup />
@@ -2884,24 +2930,6 @@ export default function App() {
           from { stroke-dashoffset: 50; opacity: 0; }
           to   { stroke-dashoffset: 0;  opacity: 1; }
         }
-        @keyframes toastIn {
-          from { opacity: 0; transform: translateX(60px); }
-          to   { opacity: 1; transform: translateX(0); }
-        }
-        @keyframes spin {
-          from { transform: rotate(0deg); }
-          to   { transform: rotate(360deg); }
-        }
-        button { transition: background 0.15s, opacity 0.15s, transform 0.1s, box-shadow 0.15s; }
-        button:hover:not(:disabled) { filter: brightness(1.08); box-shadow: 0 2px 8px rgba(0,0,0,0.13); transform: translateY(-1px); }
-        button:active:not(:disabled) { transform: scale(0.97) translateY(0px) !important; filter: brightness(0.96); box-shadow: none; }
-        .booking-card { transition: box-shadow 0.18s, transform 0.18s, border-color 0.18s; }
-        .booking-card:hover { box-shadow: 0 4px 18px rgba(0,0,0,0.10); transform: translateY(-2px); }
-        .inv-item { transition: box-shadow 0.15s, transform 0.15s; }
-        .inv-item:hover { box-shadow: 0 2px 12px rgba(0,0,0,0.08); transform: translateY(-1px); }
-        .option-card { transition: background 0.15s, border-color 0.15s, box-shadow 0.15s, transform 0.12s; }
-        .option-card:hover { box-shadow: 0 3px 14px rgba(0,0,0,0.10); transform: translateY(-2px); }
-        input:focus, select:focus { outline: none; border-color: #2563eb !important; box-shadow: 0 0 0 3px rgba(37,99,235,0.12); }
       `}</style>
 
       {/* Toast container */}
