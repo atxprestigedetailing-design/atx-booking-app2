@@ -350,32 +350,164 @@ export default function App() {
     const style = document.createElement("style");
     style.id = styleId;
     style.textContent = `
+      @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap');
+
+      *, *::before, *::after { box-sizing: border-box; }
+
       @keyframes fadeSlideUp {
-        from { opacity: 0; transform: translateY(18px); }
+        from { opacity: 0; transform: translateY(24px); }
         to   { opacity: 1; transform: translateY(0); }
+      }
+      @keyframes fadeSlideIn {
+        from { opacity: 0; transform: translateX(-16px); }
+        to   { opacity: 1; transform: translateX(0); }
       }
       @keyframes checkDraw {
         from { stroke-dashoffset: 50; opacity: 0; }
         to   { stroke-dashoffset: 0;  opacity: 1; }
       }
       @keyframes toastIn {
-        from { opacity: 0; transform: translateX(60px); }
-        to   { opacity: 1; transform: translateX(0); }
+        from { opacity: 0; transform: translateX(60px) scale(0.95); }
+        to   { opacity: 1; transform: translateX(0) scale(1); }
       }
       @keyframes spin {
         from { transform: rotate(0deg); }
         to   { transform: rotate(360deg); }
       }
-      button { transition: background 0.15s, opacity 0.15s, transform 0.1s, box-shadow 0.15s; }
-      button:hover:not(:disabled) { filter: brightness(1.08); box-shadow: 0 2px 8px rgba(0,0,0,0.13); transform: translateY(-1px); }
-      button:active:not(:disabled) { transform: scale(0.97) translateY(0px) !important; filter: brightness(0.96); box-shadow: none; }
-      .booking-card { transition: box-shadow 0.18s, transform 0.18s, border-color 0.18s; }
-      .booking-card:hover { box-shadow: 0 4px 18px rgba(0,0,0,0.10); transform: translateY(-2px); }
-      .inv-item { transition: box-shadow 0.15s, transform 0.15s; }
-      .inv-item:hover { box-shadow: 0 2px 12px rgba(0,0,0,0.08); transform: translateY(-1px); }
-      .option-card { transition: background 0.15s, border-color 0.15s, box-shadow 0.15s, transform 0.12s; }
-      .option-card:hover { box-shadow: 0 3px 14px rgba(0,0,0,0.10); transform: translateY(-2px); }
-      input:focus, select:focus { outline: none; border-color: #2563eb !important; box-shadow: 0 0 0 3px rgba(37,99,235,0.12); }
+      @keyframes orb1 {
+        0%,100% { transform: translate(0,0) scale(1); }
+        33%     { transform: translate(60px,-40px) scale(1.1); }
+        66%     { transform: translate(-30px,60px) scale(0.95); }
+      }
+      @keyframes orb2 {
+        0%,100% { transform: translate(0,0) scale(1); }
+        33%     { transform: translate(-80px,50px) scale(1.05); }
+        66%     { transform: translate(40px,-70px) scale(1.1); }
+      }
+      @keyframes orb3 {
+        0%,100% { transform: translate(0,0) scale(1); }
+        50%     { transform: translate(50px,80px) scale(1.08); }
+      }
+      @keyframes shimmer {
+        0%   { background-position: -200% 0; }
+        100% { background-position: 200% 0; }
+      }
+      @keyframes pulse-glow {
+        0%,100% { box-shadow: 0 0 20px rgba(59,130,246,0.3); }
+        50%     { box-shadow: 0 0 40px rgba(59,130,246,0.6); }
+      }
+      @keyframes stagger-in {
+        from { opacity: 0; transform: translateY(16px); }
+        to   { opacity: 1; transform: translateY(0); }
+      }
+
+      /* Animated orb background */
+      .atx-bg {
+        position: fixed; inset: 0; overflow: hidden; z-index: 0; pointer-events: none;
+      }
+      .atx-orb {
+        position: absolute; border-radius: 50%;
+        filter: blur(80px); opacity: 0.35;
+      }
+      .atx-orb-1 {
+        width: 600px; height: 600px; top: -200px; right: -100px;
+        background: radial-gradient(circle, #1e40af 0%, transparent 70%);
+        animation: orb1 18s ease-in-out infinite;
+      }
+      .atx-orb-2 {
+        width: 500px; height: 500px; bottom: -100px; left: -150px;
+        background: radial-gradient(circle, #0e7490 0%, transparent 70%);
+        animation: orb2 22s ease-in-out infinite;
+      }
+      .atx-orb-3 {
+        width: 400px; height: 400px; top: 40%; left: 40%;
+        background: radial-gradient(circle, #5b21b6 0%, transparent 70%);
+        animation: orb3 26s ease-in-out infinite;
+      }
+      .atx-grid {
+        position: absolute; inset: 0;
+        background-image: linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+                          linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+        background-size: 60px 60px;
+      }
+
+      /* Button effects */
+      button {
+        font-family: 'Outfit', sans-serif;
+        transition: transform 0.15s cubic-bezier(0.16,1,0.3,1), box-shadow 0.15s ease, filter 0.15s ease, opacity 0.15s ease;
+      }
+      button:hover:not(:disabled) {
+        transform: translateY(-2px);
+        filter: brightness(1.12);
+        box-shadow: 0 8px 30px rgba(0,0,0,0.35);
+      }
+      button:active:not(:disabled) {
+        transform: translateY(0px) scale(0.97) !important;
+        filter: brightness(0.92);
+      }
+
+      /* Card hover */
+      .booking-card {
+        transition: box-shadow 0.25s ease, transform 0.25s cubic-bezier(0.16,1,0.3,1), border-color 0.2s ease;
+      }
+      .booking-card:hover {
+        box-shadow: 0 20px 60px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.12);
+        transform: translateY(-3px);
+        border-color: rgba(255,255,255,0.2) !important;
+      }
+      .inv-item {
+        transition: box-shadow 0.2s ease, transform 0.2s cubic-bezier(0.16,1,0.3,1);
+      }
+      .inv-item:hover {
+        box-shadow: 0 12px 40px rgba(0,0,0,0.4);
+        transform: translateY(-2px);
+      }
+      .option-card {
+        transition: all 0.2s cubic-bezier(0.16,1,0.3,1);
+      }
+      .option-card:hover {
+        background: rgba(255,255,255,0.08) !important;
+        border-color: rgba(255,255,255,0.2) !important;
+        transform: translateY(-3px);
+        box-shadow: 0 12px 40px rgba(0,0,0,0.4);
+      }
+
+      /* Input focus */
+      input, select, textarea {
+        font-family: 'Outfit', sans-serif;
+        transition: border-color 0.2s ease, box-shadow 0.2s ease;
+      }
+      input:focus, select:focus, textarea:focus {
+        outline: none;
+        border-color: rgba(59,130,246,0.7) !important;
+        box-shadow: 0 0 0 3px rgba(59,130,246,0.15) !important;
+      }
+
+      /* Staggered card animations */
+      .stagger-1 { animation: stagger-in 0.4s cubic-bezier(0.16,1,0.3,1) 0.05s both; }
+      .stagger-2 { animation: stagger-in 0.4s cubic-bezier(0.16,1,0.3,1) 0.10s both; }
+      .stagger-3 { animation: stagger-in 0.4s cubic-bezier(0.16,1,0.3,1) 0.15s both; }
+      .stagger-4 { animation: stagger-in 0.4s cubic-bezier(0.16,1,0.3,1) 0.20s both; }
+
+      /* Scrollbar */
+      ::-webkit-scrollbar { width: 6px; height: 6px; }
+      ::-webkit-scrollbar-track { background: rgba(255,255,255,0.03); }
+      ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 3px; }
+      ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.22); }
+
+      /* Selection */
+      ::selection { background: rgba(59,130,246,0.35); color: #fff; }
+
+      /* Status badges — override inline styles for dark theme */
+      .badge-upcoming  { background: rgba(59,130,246,0.18) !important; color: #93c5fd !important; border: 1px solid rgba(59,130,246,0.3) !important; }
+      .badge-completed { background: rgba(16,185,129,0.18) !important; color: #6ee7b7 !important; border: 1px solid rgba(16,185,129,0.3) !important; }
+      .badge-cancelled { background: rgba(239,68,68,0.18) !important; color: #fca5a5 !important; border: 1px solid rgba(239,68,68,0.3) !important; }
+      .badge-skipped   { background: rgba(99,179,237,0.18) !important; color: #93c5fd !important; border: 1px solid rgba(99,179,237,0.3) !important; }
+      .badge-paid      { background: rgba(16,185,129,0.18) !important; color: #6ee7b7 !important; border: 1px solid rgba(16,185,129,0.3) !important; }
+
+      /* Progress bar */
+      .progress-bar-track { background: rgba(255,255,255,0.06) !important; }
+      .progress-bar-fill  { background: linear-gradient(90deg, #3b82f6, #8b5cf6) !important; box-shadow: 0 0 12px rgba(59,130,246,0.5); }
     `;
     document.head.appendChild(style);
   }, []);
@@ -1009,87 +1141,80 @@ export default function App() {
   }
 
   const S = {
-    page:           { minHeight: "100vh", background: "#f5f4f2", color: "#171717", padding: "32px 16px", fontFamily: 'Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif' } as const,
-    container:      { maxWidth: 920, margin: "0 auto" } as const,
-    card:           { background: "#ffffff", border: "1px solid #e8e6e1", borderRadius: 24, boxShadow: "0 12px 40px rgba(0,0,0,0.06)", padding: 28, animation: "fadeSlideUp 0.35s ease both" } as const,
-    title:          { fontSize: "2.4rem", fontWeight: 900, letterSpacing: "-1.5px", color: "#0f0f0f", margin: "0 0 14px", textAlign: "center" as const },
-    subtitle:       { fontSize: "1rem", color: "#6b7280", margin: "0 0 28px", textAlign: "center" as const },
-    primary:        { background: "#0f0f0f", color: "#fff", border: "none", borderRadius: 14, padding: "14px 20px", fontSize: "1rem", fontWeight: 700, cursor: "pointer", transition: "transform 0.12s ease, opacity 0.12s ease", boxShadow: "0 6px 20px rgba(0,0,0,0.18)" } as const,
-    secondary:      { background: "#fff", color: "#0f0f0f", border: "1.5px solid #e0ddd8", borderRadius: 14, padding: "13px 18px", fontSize: "1rem", fontWeight: 600, cursor: "pointer", transition: "transform 0.12s ease" } as const,
-    disabled:       { opacity: 0.45, cursor: "not-allowed" } as const,
+    page:           { minHeight: "100vh", background: "#080c12", color: "#e8eaf0", padding: "32px 16px", fontFamily: '"Outfit", ui-sans-serif, system-ui, sans-serif', position: "relative" as const, overflow: "hidden" } as const,
+    container:      { maxWidth: 960, margin: "0 auto", position: "relative" as const, zIndex: 1 } as const,
+    card:           { background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.10)", borderRadius: 28, boxShadow: "0 24px 80px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.08)", padding: 32, animation: "fadeSlideUp 0.45s cubic-bezier(0.16,1,0.3,1) both", backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)" } as const,
+    title:          { fontSize: "2.6rem", fontWeight: 900, letterSpacing: "-2px", color: "#ffffff", margin: "0 0 14px", textAlign: "center" as const, textShadow: "0 2px 20px rgba(99,179,237,0.3)" },
+    subtitle:       { fontSize: "1rem", color: "rgba(255,255,255,0.5)", margin: "0 0 28px", textAlign: "center" as const },
+    primary:        { background: "linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)", color: "#fff", border: "none", borderRadius: 14, padding: "14px 24px", fontSize: "1rem", fontWeight: 700, cursor: "pointer", boxShadow: "0 8px 32px rgba(59,130,246,0.4), inset 0 1px 0 rgba(255,255,255,0.2)" } as const,
+    secondary:      { background: "rgba(255,255,255,0.07)", color: "#e8eaf0", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 14, padding: "13px 20px", fontSize: "1rem", fontWeight: 600, cursor: "pointer", backdropFilter: "blur(10px)" } as const,
+    disabled:       { opacity: 0.35, cursor: "not-allowed" } as const,
     optionGrid:     { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 14, marginBottom: 20 } as const,
-    optionCard:     { background: "#fff", border: "1.5px solid #e8e6e1", borderRadius: 18, padding: 18, cursor: "pointer", textAlign: "left" as const, transition: "border 0.15s ease, background 0.15s ease, box-shadow 0.15s ease" },
-    selectedCard:   { border: "2px solid #0f0f0f", background: "#f7f6f4", boxShadow: "0 0 0 3px rgba(0,0,0,0.06)" },
-    selectedGreen:  { border: "2px solid #059669", background: "#ecfdf5", boxShadow: "0 0 0 2px rgba(5,150,105,0.1)" },
-    optionTitle:    { fontWeight: 700, fontSize: "1.05rem", marginBottom: 8, color: "#111827" },
-    optionMeta:     { color: "#6b7280", fontSize: "0.95rem", lineHeight: 1.45 },
-    estimateBox:    { background: "#f5f4f2", border: "1px solid #ece9e4", borderRadius: 16, padding: 16, textAlign: "center" as const, marginTop: 6 } as const,
-    estimateLabel:  { color: "#6b7280", fontSize: "0.95rem", marginBottom: 6 },
-    estimateValue:  { fontSize: "1.05rem", fontWeight: 800, color: "#111827", lineHeight: 1.5 },
-    noteBox:        { marginTop: 14, background: "#f5f4f2", border: "1px solid #ece9e4", borderRadius: 16, padding: 14, color: "#374151", textAlign: "center" as const, lineHeight: 1.45 } as const,
+    optionCard:     { background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.10)", borderRadius: 20, padding: 20, cursor: "pointer", textAlign: "left" as const, transition: "all 0.2s cubic-bezier(0.16,1,0.3,1)", backdropFilter: "blur(10px)" },
+    selectedCard:   { border: "1.5px solid rgba(99,179,237,0.8)", background: "rgba(59,130,246,0.15)", boxShadow: "0 0 0 3px rgba(59,130,246,0.2), 0 8px 32px rgba(59,130,246,0.2)", transform: "translateY(-2px)" },
+    selectedGreen:  { border: "1.5px solid rgba(52,211,153,0.8)", background: "rgba(16,185,129,0.15)", boxShadow: "0 0 0 3px rgba(16,185,129,0.2)" },
+    optionTitle:    { fontWeight: 700, fontSize: "1.05rem", marginBottom: 8, color: "#f1f5f9" },
+    optionMeta:     { color: "rgba(255,255,255,0.5)", fontSize: "0.95rem", lineHeight: 1.45 },
+    estimateBox:    { background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: 16, textAlign: "center" as const, marginTop: 6 } as const,
+    estimateLabel:  { color: "rgba(255,255,255,0.5)", fontSize: "0.95rem", marginBottom: 6 },
+    estimateValue:  { fontSize: "1.05rem", fontWeight: 800, color: "#f1f5f9", lineHeight: 1.5 },
+    noteBox:        { marginTop: 14, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: 14, color: "rgba(255,255,255,0.6)", textAlign: "center" as const, lineHeight: 1.45 } as const,
     addOnGrid:      { display: "grid", gap: 12, marginBottom: 18 } as const,
-    addOnRow:       { display: "flex", alignItems: "center", gap: 14, padding: 16, borderRadius: 16, border: "1.5px solid #ece9e4", background: "#fff", cursor: "pointer", justifyContent: "space-between", flexWrap: "wrap" as const },
+    addOnRow:       { display: "flex", alignItems: "center", gap: 14, padding: 16, borderRadius: 16, border: "1px solid rgba(255,255,255,0.10)", background: "rgba(255,255,255,0.04)", cursor: "pointer", justifyContent: "space-between", flexWrap: "wrap" as const, backdropFilter: "blur(10px)" },
     checkWrap:      { display: "flex", alignItems: "center", gap: 12, flex: 1, minWidth: 220 },
-    checkbox:       { width: 18, height: 18, accentColor: "#0f0f0f" },
-    addOnPrice:     { color: "#374151", fontWeight: 700 },
+    checkbox:       { width: 18, height: 18, accentColor: "#3b82f6" },
+    addOnPrice:     { color: "#93c5fd", fontWeight: 700 },
     inputGrid:      { display: "grid", gap: 14, maxWidth: 560, margin: "0 auto" } as const,
-    input:          { width: "100%", boxSizing: "border-box" as const, background: "#fff", color: "#111827", border: "1px solid #d1d5db", borderRadius: 14, padding: "14px 16px", fontSize: "1rem", outline: "none" },
+    input:          { width: "100%", boxSizing: "border-box" as const, background: "rgba(255,255,255,0.06)", color: "#f1f5f9", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 14, padding: "14px 16px", fontSize: "1rem", outline: "none", backdropFilter: "blur(10px)" },
     buttonRow:      { display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" as const, marginTop: 24 },
     rightButtons:   { display: "flex", gap: 12, marginLeft: "auto" } as const,
     summaryGrid:    { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14, marginTop: 22 } as const,
-    summaryCard:    { background: "#fafaf9", border: "1px solid #ece9e4", borderRadius: 16, padding: 16 },
-    sectionLabel:   { fontSize: "0.95rem", fontWeight: 700, color: "#374151", marginTop: 6, marginBottom: -4, textAlign: "left" as const },
-    summaryHeading: { fontSize: "0.92rem", color: "#6b7280", marginBottom: 8, textTransform: "uppercase" as const, letterSpacing: "0.04em" },
-    summaryValue:   { fontSize: "1rem", fontWeight: 700, lineHeight: 1.5, color: "#111827", wordBreak: "break-word" as const },
+    summaryCard:    { background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: 16 },
+    sectionLabel:   { fontSize: "0.95rem", fontWeight: 700, color: "#cbd5e1", marginTop: 6, marginBottom: -4, textAlign: "left" as const },
+    summaryHeading: { fontSize: "0.82rem", color: "rgba(255,255,255,0.4)", marginBottom: 8, textTransform: "uppercase" as const, letterSpacing: "0.08em" },
+    summaryValue:   { fontSize: "1rem", fontWeight: 700, lineHeight: 1.5, color: "#f1f5f9", wordBreak: "break-word" as const },
     successWrap:    { textAlign: "center" as const, padding: "10px 0" },
-    successText:    { fontSize: "1.05rem", color: "#4b5563", lineHeight: 1.6, maxWidth: 620, margin: "0 auto 24px" },
+    successText:    { fontSize: "1.05rem", color: "rgba(255,255,255,0.6)", lineHeight: 1.6, maxWidth: 620, margin: "0 auto 24px" },
   };
 
   const Header = () => (
-    <div style={{ display: "flex", justifyContent: "center", marginBottom: 32 }}>
+    <div style={{ display: "flex", justifyContent: "center", marginBottom: 36 }}>
       <div style={{ maxWidth: 760, width: "100%" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 12 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 16 }}>
           <a href="https://atxprestigedetailing.com" target="_blank" rel="noopener noreferrer" style={{ display: "flex", alignItems: "center", gap: 14, textDecoration: "none", flex: 1, minWidth: 0 }}>
-            <img src={logo} alt="ATX Prestige Detailing logo" style={{ width: 72, height: 72, objectFit: "contain" as const, flexShrink: 0 }} />
+            <div style={{ width: 72, height: 72, borderRadius: "50%", background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.15)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, backdropFilter: "blur(10px)", boxShadow: "0 8px 32px rgba(0,0,0,0.3)" }}>
+              <img src={logo} alt="ATX Prestige Detailing logo" style={{ width: 56, height: 56, objectFit: "contain" as const }} />
+            </div>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <h1 style={{ fontSize: "clamp(1.5rem, 5vw, 2.8rem)", fontWeight: 800, letterSpacing: "-1px", color: "#111827", margin: 0, lineHeight: 1.05 }}>ATX Prestige Detailing</h1>
-              <p style={{ color: "#6b7280", fontSize: "clamp(0.8rem, 2.5vw, 1rem)", marginTop: 6, marginBottom: 0, lineHeight: 1.4, fontStyle: "italic" }}>Defined by Detail, Driven by Standards, Trusted for Prestige</p>
+              <h1 style={{ fontSize: "clamp(1.5rem, 5vw, 2.6rem)", fontWeight: 900, letterSpacing: "-1.5px", color: "#ffffff", margin: 0, lineHeight: 1.05, textShadow: "0 2px 20px rgba(99,179,237,0.3)" }}>ATX Prestige Detailing</h1>
+              <p style={{ color: "rgba(255,255,255,0.45)", fontSize: "clamp(0.78rem, 2.2vw, 0.95rem)", marginTop: 6, marginBottom: 0, lineHeight: 1.4, fontStyle: "italic" }}>Defined by Detail, Driven by Standards, Trusted for Prestige</p>
             </div>
           </a>
         </div>
         <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center" }}>
           {googleUser ? (
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <img src={googleUser.picture} alt={googleUser.name} style={{ width: 32, height: 32, borderRadius: "50%", border: "2px solid #e5e7eb", flexShrink: 0 }} />
+            <div style={{ display: "flex", alignItems: "center", gap: 10, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.10)", borderRadius: 14, padding: "8px 14px", backdropFilter: "blur(10px)" }}>
+              <img src={googleUser.picture} alt={googleUser.name} style={{ width: 32, height: 32, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.2)", flexShrink: 0 }} />
               <div>
-                <div style={{ fontSize: "0.85rem", fontWeight: 700, color: "#111827" }}>{googleUser.name}</div>
-                <div style={{ fontSize: "0.72rem", color: "#6b7280" }}>{googleUser.email}</div>
+                <div style={{ fontSize: "0.85rem", fontWeight: 700, color: "#f1f5f9" }}>{googleUser.name}</div>
+                <div style={{ fontSize: "0.72rem", color: "rgba(255,255,255,0.45)" }}>{googleUser.email}</div>
               </div>
-              <button onClick={handleSignOut} style={{ fontSize: "0.8rem", color: "#6b7280", background: "none", border: "1px solid #d1d5db", borderRadius: 8, padding: "4px 10px", cursor: "pointer", marginLeft: 4 }}>Sign out</button>
+              <button onClick={handleSignOut} style={{ fontSize: "0.78rem", color: "rgba(255,255,255,0.5)", background: "none", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 8, padding: "4px 10px", cursor: "pointer", marginLeft: 4 }}>Sign out</button>
             </div>
           ) : (
             <button
               onClick={() => window.google?.accounts?.id?.prompt()}
               style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                background: "#fff",
-                border: "1px solid #d1d5db",
-                borderRadius: 8,
-                padding: "8px 14px",
-                fontSize: "0.9rem",
-                fontWeight: 600,
-                cursor: "pointer",
-                color: "#374151",
-                boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
+                display: "flex", alignItems: "center", gap: 10,
+                background: "rgba(255,255,255,0.07)",
+                border: "1px solid rgba(255,255,255,0.12)",
+                borderRadius: 12, padding: "10px 18px",
+                fontSize: "0.9rem", fontWeight: 600, cursor: "pointer",
+                color: "#e8eaf0", backdropFilter: "blur(10px)",
+                boxShadow: "0 4px 16px rgba(0,0,0,0.2)",
               }}
             >
-              <img
-                src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg"
-                alt="Google"
-                style={{ width: 18, height: 18 }}
-              />
+              <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" style={{ width: 18, height: 18 }} />
               Sign in with Google
             </button>
           )}
@@ -1100,25 +1225,25 @@ export default function App() {
 
   const ProgressBar = () => (
     <div style={{ marginBottom: 28 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", color: "#bbb", fontSize: "0.82rem", marginBottom: 6 }}>
-        <span>Booking</span>
+      <div style={{ display: "flex", justifyContent: "space-between", color: "rgba(255,255,255,0.35)", fontSize: "0.82rem", marginBottom: 8 }}>
+        <span style={{ letterSpacing: "0.05em", textTransform: "uppercase" as const, fontSize: "0.72rem" }}>Booking</span>
         <span>Step {step} of {TOTAL_STEPS - 1}</span>
       </div>
-      <div style={{ height: 3, background: "#ece9e4", borderRadius: 999, overflow: "hidden" }}>
-        <div style={{ height: "100%", width: `${(step / (TOTAL_STEPS - 1)) * 100}%`, background: "#0f0f0f", borderRadius: 999, transition: "width 0.4s cubic-bezier(0.4,0,0.2,1)" }} />
+      <div className="progress-bar-track" style={{ height: 3, borderRadius: 999, overflow: "hidden" }}>
+        <div className="progress-bar-fill" style={{ height: "100%", width: `${(step / (TOTAL_STEPS - 1)) * 100}%`, borderRadius: 999, transition: "width 0.5s cubic-bezier(0.16,1,0.3,1)" }} />
       </div>
     </div>
   );
 
   // SQUARE POPUP MODAL — defined here so it's available in all views
   const SquarePopup = () => squarePopup ? (
-    <div style={{ position: "fixed" as const, inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 16 }}>
-      <div style={{ background: "#fff", borderRadius: 20, padding: 28, maxWidth: 400, width: "100%", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
-        <h3 style={{ margin: "0 0 12px", fontWeight: 800, color: "#111827" }}>Square Invoice Request</h3>
-        <p style={{ color: "#6b7280", fontSize: "0.95rem", lineHeight: 1.6, margin: "0 0 20px" }}>
-          We received your request. We will send you a Square invoice to <strong>{squareBooking?.email}</strong> shortly so you can pay by credit or debit card.
+    <div style={{ position: "fixed" as const, inset: 0, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 16, backdropFilter: "blur(8px)" }}>
+      <div style={{ background: "rgba(15,20,30,0.95)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 24, padding: 32, maxWidth: 400, width: "100%", boxShadow: "0 40px 100px rgba(0,0,0,0.6)" }}>
+        <h3 style={{ margin: "0 0 12px", fontWeight: 800, color: "#f1f5f9" }}>Square Invoice Request</h3>
+        <p style={{ color: "rgba(255,255,255,0.55)", fontSize: "0.95rem", lineHeight: 1.6, margin: "0 0 20px" }}>
+          We received your request. We will send you a Square invoice to <strong style={{ color: "#93c5fd" }}>{squareBooking?.email}</strong> shortly so you can pay by credit or debit card.
         </p>
-        <p style={{ color: "#9ca3af", fontSize: "0.82rem", margin: "0 0 20px" }}>Note: A 4% processing fee applies to card payments.</p>
+        <p style={{ color: "rgba(255,255,255,0.35)", fontSize: "0.82rem", margin: "0 0 20px" }}>Note: A 4% processing fee applies to card payments.</p>
         <button onClick={() => { setSquarePopup(false); setSquareBooking(null); }} style={{ background: "#111827", color: "#fff", border: "none", borderRadius: 12, padding: "12px 20px", fontWeight: 700, cursor: "pointer", width: "100%" }}>Got it</button>
       </div>
     </div>
@@ -1128,6 +1253,14 @@ export default function App() {
   if (view === "myBookings") {
     return (
       <div style={S.page}>
+
+      {/* Animated background */}
+      <div className="atx-bg">
+        <div className="atx-grid" />
+        <div className="atx-orb atx-orb-1" />
+        <div className="atx-orb atx-orb-2" />
+        <div className="atx-orb atx-orb-3" />
+      </div>
         <div style={S.container}>
           <Header />
           <SquarePopup />
@@ -1482,6 +1615,14 @@ export default function App() {
 
     return (
       <div style={S.page}>
+
+      {/* Animated background */}
+      <div className="atx-bg">
+        <div className="atx-grid" />
+        <div className="atx-orb atx-orb-1" />
+        <div className="atx-orb atx-orb-2" />
+        <div className="atx-orb atx-orb-3" />
+      </div>
         {/* Toast container */}
         <div style={{ position: "fixed" as const, bottom: 24, right: 24, zIndex: 9999, display: "flex", flexDirection: "column" as const, gap: 10, alignItems: "flex-end" }}>
           {toasts.map(t => (
@@ -2518,6 +2659,14 @@ export default function App() {
 
     return (
       <div style={S.page}>
+
+      {/* Animated background */}
+      <div className="atx-bg">
+        <div className="atx-grid" />
+        <div className="atx-orb atx-orb-1" />
+        <div className="atx-orb atx-orb-2" />
+        <div className="atx-orb atx-orb-3" />
+      </div>
         <div style={S.container}>
           <Header />
           <div style={S.card} key={step}>
@@ -2604,6 +2753,14 @@ export default function App() {
 
     return (
       <div style={S.page}>
+
+      {/* Animated background */}
+      <div className="atx-bg">
+        <div className="atx-grid" />
+        <div className="atx-orb atx-orb-1" />
+        <div className="atx-orb atx-orb-2" />
+        <div className="atx-orb atx-orb-3" />
+      </div>
         <div style={S.container}>
           <Header />
           <div style={S.card}>
@@ -2921,6 +3078,14 @@ export default function App() {
   // BOOKING FLOW
   return (
     <div style={S.page}>
+
+      {/* Animated background */}
+      <div className="atx-bg">
+        <div className="atx-grid" />
+        <div className="atx-orb atx-orb-1" />
+        <div className="atx-orb atx-orb-2" />
+        <div className="atx-orb atx-orb-3" />
+      </div>
       <style>{`
         @keyframes fadeSlideUp {
           from { opacity: 0; transform: translateY(18px); }
@@ -2962,31 +3127,31 @@ export default function App() {
           {/* STEP 0 */}
           {step === 0 && (
             <>
-              <div style={{ textAlign: "center" as const, padding: "8px 0 20px" }}>
-                <div style={{ fontSize: "0.72rem", fontWeight: 700, letterSpacing: "0.14em", color: "#ccc", textTransform: "uppercase" as const, marginBottom: 10 }}>Premium Auto & Marine</div>
-                <h2 style={{ ...S.title, fontSize: "clamp(2rem, 6vw, 3.2rem)", marginBottom: 10 }}>Detailing, Elevated.</h2>
-                <p style={{ ...S.subtitle, marginBottom: 24 }}>Serving Lago Vista, Cedar Park, and Leander areas.</p>
-                <div style={{ display: "flex", justifyContent: "center", gap: 12, flexWrap: "wrap" as const, marginBottom: 24 }}>
-                  <button style={S.primary} onClick={() => setStep(1)}>Book a Service</button>
+              <div style={{ textAlign: "center" as const, padding: "16px 0 24px" }}>
+                <div className="stagger-1" style={{ display: "inline-block", fontSize: "0.72rem", fontWeight: 700, letterSpacing: "0.18em", color: "rgba(99,179,237,0.8)", textTransform: "uppercase" as const, marginBottom: 16, background: "rgba(59,130,246,0.1)", border: "1px solid rgba(59,130,246,0.25)", borderRadius: 999, padding: "5px 16px" }}>Premium Auto & Marine Detailing</div>
+                <h2 className="stagger-2" style={{ ...S.title, fontSize: "clamp(2.2rem, 7vw, 3.8rem)", marginBottom: 12, background: "linear-gradient(135deg, #ffffff 0%, rgba(255,255,255,0.7) 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>Detailing, Elevated.</h2>
+                <p className="stagger-3" style={{ ...S.subtitle, marginBottom: 32, fontSize: "1.05rem" }}>Serving Lago Vista, Cedar Park, and Leander areas.</p>
+                <div className="stagger-4" style={{ display: "flex", justifyContent: "center", gap: 12, flexWrap: "wrap" as const, marginBottom: 28 }}>
+                  <button style={{ ...S.primary, padding: "16px 32px", fontSize: "1.05rem", letterSpacing: "-0.3px" }} onClick={() => setStep(1)}>Book a Service →</button>
                   {googleUser && googleUser.email === ADMIN_EMAIL && (
-                    <button style={{ ...S.primary, background: "#059669" }} onClick={() => { setView("admin"); loadAdminBookings(); }}>Admin Panel</button>
+                    <button style={{ ...S.primary, background: "linear-gradient(135deg, #059669, #047857)" }} onClick={() => { setView("admin"); loadAdminBookings(); }}>Admin Panel</button>
                   )}
                   {googleUser && googleUser.email === ADMIN_EMAIL && (
-                    <button style={{ ...S.primary, background: "#7c3aed" }} onClick={() => { setView("inventory"); loadInventory(); }}>Inventory</button>
+                    <button style={{ ...S.primary, background: "linear-gradient(135deg, #7c3aed, #5b21b6)" }} onClick={() => { setView("inventory"); loadInventory(); }}>Inventory</button>
                   )}
                   {googleUser && (
                     <button style={S.secondary} onClick={openMyBookings}>My Bookings</button>
                   )}
                 </div>
                 {!googleUser && (
-                  <p style={{ textAlign: "center" as const, color: "#bbb", fontSize: "0.85rem", marginBottom: 20 }}>
+                  <p style={{ textAlign: "center" as const, color: "rgba(255,255,255,0.35)", fontSize: "0.85rem", marginBottom: 20 }}>
                     Sign in with Google to view your past and upcoming appointments.
                   </p>
                 )}
               </div>
-              <div style={{ borderTop: "1px solid #f0ede8", paddingTop: 16, display: "flex", gap: 8, flexWrap: "wrap" as const, justifyContent: "center" }}>
+              <div style={{ borderTop: "1px solid rgba(255,255,255,0.07)", paddingTop: 18, display: "flex", gap: 8, flexWrap: "wrap" as const, justifyContent: "center" }}>
                 {["Auto Detail", "Marine Detail", "Maintenance Plans", "Mobile Service"].map(tag => (
-                  <span key={tag} style={{ background: "#f5f4f2", borderRadius: 999, padding: "5px 14px", fontSize: "0.82rem", color: "#666", fontWeight: 500, border: "1px solid #ece9e4" }}>{tag}</span>
+                  <span key={tag} style={{ background: "rgba(255,255,255,0.06)", borderRadius: 999, padding: "6px 16px", fontSize: "0.82rem", color: "rgba(255,255,255,0.5)", fontWeight: 500, border: "1px solid rgba(255,255,255,0.10)" }}>{tag}</span>
                 ))}
               </div>
             </>
