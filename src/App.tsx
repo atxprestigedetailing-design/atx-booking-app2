@@ -369,6 +369,25 @@ export default function App() {
   const [maintTimeChecking, setMaintTimeChecking]       = useState(false);
   const [maintTimeCheckedFor, setMaintTimeCheckedFor]   = useState<{rowIndex:number;time:string}|null>(null);
 
+  // ── Toast / loading system ──
+  type Toast = { id: number; message: string; type: "loading" | "success" | "error" };
+  const [toasts, setToasts]                             = useState<Toast[]>([]);
+  const toastId                                         = useRef(0);
+
+  function showToast(message: string, type: Toast["type"] = "loading", duration?: number): number {
+    const id = ++toastId.current;
+    setToasts(prev => [...prev, { id, message, type }]);
+    if (duration) setTimeout(() => dismissToast(id), duration);
+    return id;
+  }
+  function dismissToast(id: number) {
+    setToasts(prev => prev.filter(t => t.id !== id));
+  }
+  function updateToast(id: number, message: string, type: Toast["type"], duration = 3000) {
+    setToasts(prev => prev.map(t => t.id === id ? { ...t, message, type } : t));
+    setTimeout(() => dismissToast(id), duration);
+  }
+
   const currentYear = new Date().getFullYear();
   const yearOptions = Array.from({ length: currentYear - 1995 + 1 }, (_, i) => String(currentYear - i));
 
@@ -562,6 +581,7 @@ export default function App() {
   }
 
   async function applyMaintenanceTimeUpdate(booking: Booking, newTime: string) {
+    const tid = showToast("Updating schedule — this may take a moment...", "loading");
     try {
       const res = await fetch(SCRIPT_URL, {
         method: "POST",
@@ -577,14 +597,18 @@ export default function App() {
       });
       const d = await res.json();
       if (d.success) {
-        alert(`Done! Updated ${d.updatedRows} booking${d.updatedRows !== 1 ? "s" : ""} and ${d.updatedCal} calendar event${d.updatedCal !== 1 ? "s" : ""} to ${newTime}.`);
+        updateToast(tid, `✓ Updated ${d.updatedRows} booking${d.updatedRows !== 1 ? "s" : ""} and ${d.updatedCal} calendar event${d.updatedCal !== 1 ? "s" : ""} to ${newTime}`, "success", 4000);
         setMaintTimeCheckedFor(null);
         setMaintTimeConflicts([]);
         await loadAdminBookings();
         setEditingBooking(null);
         setEditFields({});
-      } else { alert("Something went wrong: " + (d.error || "")); }
-    } catch (e) { alert("Something went wrong."); }
+      } else {
+        updateToast(tid, "Something went wrong: " + (d.error || "unknown error"), "error", 4000);
+      }
+    } catch (e) {
+      updateToast(tid, "Network error — please try again", "error", 4000);
+    }
   }
 
   async function handleSaveEdit() {
@@ -674,8 +698,8 @@ export default function App() {
   async function handleMarkPaid(booking: Booking) {
     if (processingRows.has(booking.rowIndex)) return;
     setProcessingRows(prev => new Set([...prev, booking.rowIndex]));
-    // Optimistic update
     setAdminBookings(prev => prev.map(b => b.rowIndex === booking.rowIndex ? { ...b, invoiceStatus: "paid" } : b));
+    const tid = showToast("Processing payment and sending receipt...", "loading");
     try {
       const ok = await updateBooking(booking.rowIndex, { invoiceStatus: "paid" });
       if (ok) {
@@ -683,7 +707,6 @@ export default function App() {
           ? [booking.boatSize, booking.make, booking.model].filter(Boolean).join(" ")
           : [booking.year, booking.make, booking.model].filter(Boolean).join(" ");
         const pkgLabel = booking.packageType === "basic" ? "Basic Detail" : booking.packageType === "premium" ? "Premium Detail" : booking.packageType === "exterior" ? "Exterior Only — Basic" : booking.packageType === "exteriorPremium" ? "Exterior Only — Premium" : booking.packageType === "interior" ? "Interior Only — Basic" : booking.packageType === "interiorPremium" ? "Interior Only — Premium" : booking.packageType;
-        // Send payment confirmed email — awaited so it doesn't get dropped
         try {
           const emailRes = await fetch(SCRIPT_URL, {
             method: "POST",
@@ -706,18 +729,22 @@ export default function App() {
             }),
           });
           const emailData = await emailRes.json();
-          if (!emailData.success) {
-            console.error("Payment email error:", emailData.error);
+          if (emailData.success) {
+            updateToast(tid, `✓ Payment confirmed — receipt sent to ${booking.name}`, "success", 4000);
+          } else {
+            updateToast(tid, "Marked paid but receipt email failed — check logs", "error", 5000);
           }
         } catch (emailErr) {
-          console.error("Payment confirmed email failed:", emailErr);
+          updateToast(tid, "Marked paid but receipt email failed", "error", 5000);
         }
         await loadAdminBookings();
       } else {
         setAdminBookings(prev => prev.map(b => b.rowIndex === booking.rowIndex ? { ...b, invoiceStatus: "released" } : b));
-        alert("Something went wrong.");
+        updateToast(tid, "Something went wrong — please try again", "error", 4000);
       }
-    } catch (e) { alert("Something went wrong."); }
+    } catch (e) {
+      updateToast(tid, "Network error — please try again", "error", 4000);
+    }
     finally { setProcessingRows(prev => { const n = new Set(prev); n.delete(booking.rowIndex); return n; }); }
   }
 
@@ -1503,7 +1530,7 @@ export default function App() {
                         const isSelected = selectedAdminBooking?.rowIndex === b.rowIndex;
 
                         return (
-                          <div key={i} style={{ background: b.status === "Cancelled" ? "#fef2f2" : b.status === "Skipped" ? "#f0f9ff" : "#fff", border: `1.5px solid ${b.status === "Cancelled" ? "#fca5a5" : b.status === "Skipped" ? "#7dd3fc" : isComplete ? "#e5e7eb" : isUpcoming(b.date) ? "#2563eb" : "#e5e7eb"}`, borderRadius: 14, padding: 16, opacity: b.status === "Cancelled" || b.status === "Skipped" ? 0.85 : 1 }}>
+                          <div key={i} className="booking-card" style={{ background: b.status === "Cancelled" ? "#fef2f2" : b.status === "Skipped" ? "#f0f9ff" : "#fff", border: `1.5px solid ${b.status === "Cancelled" ? "#fca5a5" : b.status === "Skipped" ? "#7dd3fc" : isComplete ? "#e5e7eb" : isUpcoming(b.date) ? "#2563eb" : "#e5e7eb"}`, borderRadius: 14, padding: 16, opacity: b.status === "Cancelled" || b.status === "Skipped" ? 0.85 : 1 }}>
                             {b.status === "Cancelled" && (
                               <div style={{ background: "#dc2626", borderRadius: 8, padding: "6px 12px", marginBottom: 10, display: "flex", alignItems: "center", gap: 8 }}>
                                 <span style={{ color: "#fff", fontWeight: 800, fontSize: "0.85rem", letterSpacing: "0.04em" }}>✕ APPOINTMENT CANCELLED</span>
@@ -1610,6 +1637,7 @@ export default function App() {
                               {!isComplete && isUpcoming(b.date) && b.status !== "Cancelled" && b.status !== "Skipped" && b.clientType === "maintenance" && (
                                 <button onClick={async () => {
                                   if (!window.confirm(`Skip ${b.name}'s maintenance on ${formatDateLabel(b.date)}? They will be notified and moved to their next scheduled date.`)) return;
+                                  const skipTid = showToast("Skipping appointment and updating calendar...", "loading");
                                   try {
                                     const vl = b.vehicle === "boat"
                                       ? [b.boatSize, b.make, b.model].filter(Boolean).join(" ")
@@ -1648,10 +1676,12 @@ export default function App() {
                                     const d = await res.json();
                                     if (d.success) {
                                       setAdminBookings(prev => prev.map(bk => bk.rowIndex === b.rowIndex ? { ...bk, status: "Skipped" } : bk));
-                                      alert(`Skipped. ${b.name} has been notified. Next appointment: ${d.nextDate || "see schedule"}.`);
+                                      updateToast(skipTid, `Skipped ✓ — ${b.name} notified. Next: ${d.nextDate || "see schedule"}`, "success", 4000);
                                       await loadAdminBookings();
-                                    } else { alert("Something went wrong: " + (d.error || "")); }
-                                  } catch (e) { alert("Something went wrong."); }
+                                    } else {
+                                      updateToast(skipTid, "Something went wrong: " + (d.error || ""), "error", 4000);
+                                    }
+                                  } catch (e) { updateToast(skipTid, "Network error — please try again", "error", 4000); }
                                 }}
                                 style={{ background: "#f0f9ff", color: "#0369a1", border: "1.5px solid #7dd3fc", borderRadius: 8, padding: "7px 14px", fontSize: "0.82rem", fontWeight: 600, cursor: "pointer" }}>
                                   ⏭ Skip Appt
@@ -2711,7 +2741,7 @@ export default function App() {
                       const thresholdNum = parseFloat(item.lowStockThreshold);
                       const hasThreshold = !isNaN(thresholdNum) && thresholdNum > 0;
                       return (
-                        <div key={item.rowIndex} style={{ background: sc.bg, border: `1px solid ${sc.border}`, borderRadius: 12, padding: "12px 16px", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" as const }}>
+                        <div key={item.rowIndex} className="inv-item" style={{ background: sc.bg, border: `1px solid ${sc.border}`, borderRadius: 12, padding: "12px 16px", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" as const }}>
                           {/* Item name + notes */}
                           <div style={{ flex: 1, minWidth: 160 }}>
                             <div style={{ fontWeight: 600, color: "#111827", fontSize: "0.9rem" }}>{item.item}</div>
@@ -2854,8 +2884,47 @@ export default function App() {
           from { stroke-dashoffset: 50; opacity: 0; }
           to   { stroke-dashoffset: 0;  opacity: 1; }
         }
-        button:active { transform: scale(0.97) !important; }
+        @keyframes toastIn {
+          from { opacity: 0; transform: translateX(60px); }
+          to   { opacity: 1; transform: translateX(0); }
+        }
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to   { transform: rotate(360deg); }
+        }
+        button { transition: background 0.15s, opacity 0.15s, transform 0.1s, box-shadow 0.15s; }
+        button:hover:not(:disabled) { filter: brightness(1.08); box-shadow: 0 2px 8px rgba(0,0,0,0.13); transform: translateY(-1px); }
+        button:active:not(:disabled) { transform: scale(0.97) translateY(0px) !important; filter: brightness(0.96); box-shadow: none; }
+        .booking-card { transition: box-shadow 0.18s, transform 0.18s, border-color 0.18s; }
+        .booking-card:hover { box-shadow: 0 4px 18px rgba(0,0,0,0.10); transform: translateY(-2px); }
+        .inv-item { transition: box-shadow 0.15s, transform 0.15s; }
+        .inv-item:hover { box-shadow: 0 2px 12px rgba(0,0,0,0.08); transform: translateY(-1px); }
+        .option-card { transition: background 0.15s, border-color 0.15s, box-shadow 0.15s, transform 0.12s; }
+        .option-card:hover { box-shadow: 0 3px 14px rgba(0,0,0,0.10); transform: translateY(-2px); }
+        input:focus, select:focus { outline: none; border-color: #2563eb !important; box-shadow: 0 0 0 3px rgba(37,99,235,0.12); }
       `}</style>
+
+      {/* Toast container */}
+      <div style={{ position: "fixed" as const, bottom: 24, right: 24, zIndex: 9999, display: "flex", flexDirection: "column" as const, gap: 10, alignItems: "flex-end" }}>
+        {toasts.map(t => (
+          <div key={t.id} style={{
+            display: "flex", alignItems: "center", gap: 10,
+            background: t.type === "error" ? "#fef2f2" : t.type === "success" ? "#f0fdf4" : "#1e293b",
+            color: t.type === "error" ? "#dc2626" : t.type === "success" ? "#065f46" : "#fff",
+            border: t.type === "error" ? "1.5px solid #fca5a5" : t.type === "success" ? "1.5px solid #6ee7b7" : "none",
+            borderRadius: 14, padding: "12px 18px", fontSize: "0.88rem", fontWeight: 600,
+            boxShadow: "0 4px 20px rgba(0,0,0,0.18)", animation: "toastIn 0.25s ease",
+            maxWidth: 320, cursor: "pointer",
+          }} onClick={() => dismissToast(t.id)}>
+            {t.type === "loading" && (
+              <div style={{ width: 16, height: 16, border: "2.5px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", borderRadius: "50%", animation: "spin 0.7s linear infinite", flexShrink: 0 }} />
+            )}
+            {t.type === "success" && <span style={{ fontSize: "1rem" }}>✓</span>}
+            {t.type === "error" && <span style={{ fontSize: "1rem" }}>✕</span>}
+            <span>{t.message}</span>
+          </div>
+        ))}
+      </div>
       <div style={S.container}>
         <SquarePopup />
         <Header />
