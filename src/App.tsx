@@ -2749,8 +2749,8 @@ export default function App() {
     const lowStockItems = inventoryItems.filter(i => isLowStock(i) || isOutOfStock(i));
 
     const stockColor = (item: { quantity: string; lowStockThreshold: string }) => {
-      if (isOutOfStock(item)) return { bg: "rgba(239,68,68,0.12)", border: "#fca5a5", badge: "#dc2626", badgeBg: "rgba(239,68,68,0.12)", label: "OUT" };
-      if (isLowStock(item))   return { bg: "#fffbeb", border: "#fcd34d", badge: "#d97706", badgeBg: "rgba(251,191,36,0.12)", label: "LOW" };
+      if (isOutOfStock(item)) return { bg: "rgba(239,68,68,0.12)", border: "rgba(239,68,68,0.4)", badge: "#f87171", badgeBg: "rgba(239,68,68,0.15)", label: "OUT" };
+      if (isLowStock(item))   return { bg: "rgba(234,179,8,0.1)", border: "rgba(234,179,8,0.45)", badge: "#fbbf24", badgeBg: "rgba(234,179,8,0.15)", label: "LOW" };
       return { bg: "rgba(255,255,255,0.03)", border: "rgba(255,255,255,0.08)", badge: "#34d399", badgeBg: "rgba(16,185,129,0.1)", label: "OK" };
     };
 
@@ -3203,7 +3203,7 @@ export default function App() {
                     style={{ ...S.optionCard, ...(clientType === "maintenance" ? S.selectedGreen : {}) }}
                     onClick={() => setClientType("maintenance")}
                   >
-                    <div style={{ ...S.optionTitle, color: clientType === "maintenance" ? "#065f46" : "#111827" }}>Maintenance Plan</div>
+                    <div style={{ ...S.optionTitle, color: clientType === "maintenance" ? "#34d399" : "#f1f5f9" }}>Maintenance Plan</div>
                     <div style={S.optionMeta}>Recurring 2-hour details to keep your vehicle in top condition. Choose bi-weekly or monthly.</div>
                   </button>
                 )}
@@ -3228,7 +3228,7 @@ export default function App() {
                       style={{ ...S.optionCard, ...(frequency === "biweekly" ? S.selectedGreen : {}), textAlign: "center" as const }}
                       onClick={() => setFrequency("biweekly")}
                     >
-                      <div style={{ ...S.optionTitle, textAlign: "center" as const, color: frequency === "biweekly" ? "#065f46" : "#111827" }}>Bi-Weekly</div>
+                      <div style={{ ...S.optionTitle, textAlign: "center" as const, color: frequency === "biweekly" ? "#34d399" : "#f1f5f9" }}>Bi-Weekly</div>
                       <div style={S.optionMeta}>Every two weeks. Good for high-use vehicles.</div>
                     </button>
                     <button
