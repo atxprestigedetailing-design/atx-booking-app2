@@ -11,7 +11,7 @@ const GOOGLE_CLIENT_ID =
   "447699234633-ivo2e1c2q843scj32k5323o2rkq6h7dp.apps.googleusercontent.com";
 
 const SCRIPT_URL =
-  "https://script.google.com/macros/s/AKfycbzJT6KyndAqvDX_fhqGbGqL90Q9XNkgWlClcl0ShnUjPSeiwfXY-rh0NdjM61d57Y_8/exec";
+  "https://script.google.com/macros/s/AKfycbwvUq-_pzgPYz1QJYOMB9OIuQQM3S4wYnwK_0jBiGQ21zGmyfVTKBXwXop7fpLRHqVCNA/exec";
 
 const TOTAL_STEPS = 9;
 const ADMIN_EMAIL = "atxprestigedetailing@gmail.com";
@@ -1816,6 +1816,59 @@ export default function App() {
                                     Cancel
                                   </button>
                                 </div>
+
+                                {/* Update all future times — maintenance only */}
+                                {b.clientType === "maintenance" && (
+                                  <div style={{ marginTop: 16, padding: "14px 16px", background: "#f0f9ff", border: "1.5px solid #7dd3fc", borderRadius: 12 }}>
+                                    <div style={{ fontWeight: 700, color: "#0369a1", fontSize: "0.88rem", marginBottom: 4 }}>Update Time for Entire Schedule</div>
+                                    <div style={{ fontSize: "0.78rem", color: "#0284c7", marginBottom: 10 }}>Changes the time on ALL future appointments and calendar events for this vehicle. Use this when the client wants a permanent time change.</div>
+                                    <div style={{ display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap" as const }}>
+                                      <div>
+                                        <div style={{ fontSize: "0.72rem", color: "#6b7280", marginBottom: 4 }}>New Time for All Future Appointments</div>
+                                        <select
+                                          id={`newTimeAll-${b.rowIndex}`}
+                                          style={{ ...S.input, padding: "8px 12px", fontSize: "0.85rem", backgroundColor: "#fff", width: "auto" }}
+                                          defaultValue={b.time}
+                                        >
+                                          {["7:00 AM","7:30 AM","8:00 AM","8:30 AM","9:00 AM","9:30 AM","10:00 AM","10:30 AM","11:00 AM","11:30 AM","12:00 PM","12:30 PM","1:00 PM","1:30 PM","2:00 PM","2:30 PM","3:00 PM","3:30 PM","4:00 PM","4:30 PM","5:00 PM","5:30 PM","6:00 PM","6:30 PM","7:00 PM"].map(t => (
+                                            <option key={t} value={t}>{t}</option>
+                                          ))}
+                                        </select>
+                                      </div>
+                                      <button
+                                        onClick={async () => {
+                                          const sel = document.getElementById(`newTimeAll-${b.rowIndex}`) as HTMLSelectElement;
+                                          const newTime = sel?.value;
+                                          if (!newTime) return;
+                                          if (!window.confirm(`Change ALL future ${b.make} ${b.model} maintenance appointments to ${newTime}? This will update your calendar too.`)) return;
+                                          try {
+                                            const res = await fetch(SCRIPT_URL, {
+                                              method: "POST",
+                                              body: JSON.stringify({
+                                                action: "updateMaintenanceTime",
+                                                customerEmail: b.email,
+                                                customerName: b.name,
+                                                customerPhone: b.phone,
+                                                make: b.make,
+                                                model: b.model,
+                                                newTime,
+                                              }),
+                                            });
+                                            const d = await res.json();
+                                            if (d.success) {
+                                              alert(`Done! Updated ${d.updatedRows} booking${d.updatedRows !== 1 ? "s" : ""} and ${d.updatedCal} calendar event${d.updatedCal !== 1 ? "s" : ""} to ${newTime}.`);
+                                              await loadAdminBookings();
+                                              setEditingBooking(null);
+                                              setEditFields({});
+                                            } else { alert("Something went wrong: " + (d.error || "")); }
+                                          } catch (e) { alert("Something went wrong."); }
+                                        }}
+                                        style={{ background: "#0369a1", color: "#fff", border: "none", borderRadius: 8, padding: "9px 16px", fontWeight: 700, fontSize: "0.85rem", cursor: "pointer" }}>
+                                        Update All Future Times
+                                      </button>
+                                    </div>
+                                  </div>
+                                )}
                               </div>
                             )}
 
