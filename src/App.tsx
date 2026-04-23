@@ -233,16 +233,16 @@ function BookingCard({ booking, upcoming, onRequestChange }: {
       : [booking.year, booking.make, booking.model].filter(Boolean).join(" ");
 
   return (
-    <div style={{ background: "#fff", border: upcoming ? "1.5px solid #2563eb" : "1px solid #e5e7eb", borderRadius: 16, padding: 18, position: "relative" as const }}>
+    <div style={{ background: "rgba(255,255,255,0.05)", border: upcoming ? "1.5px solid #2563eb" : "1px solid #e5e7eb", borderRadius: 16, padding: 18, position: "relative" as const }}>
       {upcoming && (
-        <span style={{ position: "absolute" as const, top: 14, right: 14, background: "#eff6ff", color: "#2563eb", fontSize: "0.75rem", fontWeight: 700, borderRadius: 999, padding: "3px 10px" }}>
+        <span style={{ position: "absolute" as const, top: 14, right: 14, background: "rgba(59,130,246,0.08)", color: "#2563eb", fontSize: "0.75rem", fontWeight: 700, borderRadius: 999, padding: "3px 10px" }}>
           UPCOMING
         </span>
       )}
-      <div style={{ fontSize: "1rem", fontWeight: 700, color: "#111827", marginBottom: 4 }}>
+      <div style={{ fontSize: "1rem", fontWeight: 700, color: "#f1f5f9", marginBottom: 4 }}>
         {formatDateLabel(booking.date)}{booking.time ? ` at ${booking.time}` : ""}
       </div>
-      <div style={{ fontSize: "0.92rem", color: "#6b7280", lineHeight: 1.6 }}>
+      <div style={{ fontSize: "0.92rem", color: "rgba(255,255,255,0.45)", lineHeight: 1.6 }}>
         {vehicleLabel && <div>{vehicleLabel}</div>}
         <div>{booking.packageType === "basic" ? "Basic Detail" : booking.packageType === "premium" ? "Premium Detail" : booking.packageType === "exterior" ? "Exterior Only — Basic" : booking.packageType === "interior" ? "Interior Only — Basic" : booking.packageType === "exteriorPremium" ? "Exterior Only — Premium" : booking.packageType === "interiorPremium" ? "Interior Only — Premium" : booking.packageType}</div>
         {booking.serviceType && (
@@ -252,7 +252,7 @@ function BookingCard({ booking, upcoming, onRequestChange }: {
         {booking.notes && <div>Notes: {booking.notes}</div>}
       </div>
       {booking.invoiceStatus === "released" && booking.invoiceAmount && (
-        <div style={{ marginTop: 10, background: "#fef9c3", border: "1px solid #fde047", borderRadius: 10, padding: "10px 14px", fontSize: "0.88rem", color: "#713f12" }}>
+        <div style={{ marginTop: 10, background: "rgba(251,191,36,0.1)", border: "1px solid #fde047", borderRadius: 10, padding: "10px 14px", fontSize: "0.88rem", color: "#713f12" }}>
           <span style={{ fontWeight: 700 }}>Balance due: ${booking.invoiceAmount}</span>
           {booking.invoiceNote ? ` — ${booking.invoiceNote}` : ""}
         </div>
@@ -494,6 +494,9 @@ export default function App() {
       ::-webkit-scrollbar-track { background: rgba(255,255,255,0.03); }
       ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 3px; }
       ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.22); }
+
+      /* Select options dark */
+      option { background: #0f1623; color: #f1f5f9; }
 
       /* Selection */
       ::selection { background: rgba(59,130,246,0.35); color: #fff; }
@@ -1276,9 +1279,9 @@ export default function App() {
               </div>
             </div>
 
-            <div style={{ overflowX: "auto" as const, marginBottom: 24, borderBottom: "2px solid #e5e7eb" }}>
+            <div style={{ overflowX: "auto" as const, marginBottom: 24, borderBottom: "1.5px solid rgba(255,255,255,0.08)" }}>
               <div style={{ display: "flex", gap: 0, minWidth: "max-content" }}>
-                <button onClick={() => setBookingsTab("appointments")} style={{ background: "none", border: "none", cursor: "pointer", padding: "10px 16px", fontSize: "0.9rem", fontWeight: 700, color: bookingsTab === "appointments" ? "#111827" : "#9ca3af", borderBottom: bookingsTab === "appointments" ? "3px solid #111827" : "3px solid transparent", marginBottom: -2, whiteSpace: "nowrap" as const }}>
+                <button onClick={() => setBookingsTab("appointments")} style={{ background: "none", border: "none", cursor: "pointer", padding: "10px 16px", fontSize: "0.9rem", fontWeight: 700, color: bookingsTab === "appointments" ? "#f1f5f9" : "rgba(255,255,255,0.35)", borderBottom: bookingsTab === "appointments" ? "3px solid #f1f5f9" : "3px solid transparent", marginBottom: -2, whiteSpace: "nowrap" as const }}>
                   My Appointments
                 </button>
                 {isMaintenance && (
@@ -1293,7 +1296,7 @@ export default function App() {
             </div>
 
             {bookingsLoading ? (
-              <div style={{ textAlign: "center", padding: 40, color: "#6b7280" }}>Loading your bookings...</div>
+              <div style={{ textAlign: "center", padding: 40, color: "rgba(255,255,255,0.45)" }}>Loading your bookings...</div>
             ) : (
               <>
                 {bookingsTab === "appointments" && (() => {
@@ -1303,14 +1306,14 @@ export default function App() {
                   return (
                     <>
                       {allUpcoming.length === 0 && allPast.length === 0 && (
-                        <div style={{ textAlign: "center", padding: 40, color: "#6b7280" }}>
+                        <div style={{ textAlign: "center", padding: 40, color: "rgba(255,255,255,0.45)" }}>
                           No bookings found for {googleUser?.email}.<br />
                           <button onClick={() => { setView("booking"); setStep(1); }} style={{ ...S.primary, marginTop: 16, display: "inline-block" }}>Book Your First Service</button>
                         </div>
                       )}
                       {allUpcoming.length > 0 && (
                         <>
-                          <div style={{ fontWeight: 700, color: "#374151", fontSize: "0.95rem", marginBottom: 12, textTransform: "uppercase" as const, letterSpacing: "0.04em" }}>Upcoming</div>
+                          <div style={{ fontWeight: 700, color: "rgba(255,255,255,0.7)", fontSize: "0.95rem", marginBottom: 12, textTransform: "uppercase" as const, letterSpacing: "0.04em" }}>Upcoming</div>
                           <div style={{ display: "grid", gap: 14, marginBottom: 28 }}>
                             {allUpcoming.map((b, i) => (
                               <BookingCard key={i} booking={b} upcoming onRequestChange={(b) => { setChangeTarget(b); setChangeNote(""); setChangeSubmitted(false); setView("requestChange"); }} />
@@ -1320,7 +1323,7 @@ export default function App() {
                       )}
                       {allPast.length > 0 && (
                         <>
-                          <div style={{ fontWeight: 700, color: "#9ca3af", fontSize: "0.95rem", marginBottom: 12, textTransform: "uppercase" as const, letterSpacing: "0.04em" }}>Past Services</div>
+                          <div style={{ fontWeight: 700, color: "rgba(255,255,255,0.35)", fontSize: "0.95rem", marginBottom: 12, textTransform: "uppercase" as const, letterSpacing: "0.04em" }}>Past Services</div>
                           <div style={{ display: "grid", gap: 14 }}>
                             {allPast.map((b, i) => <BookingCard key={i} booking={b} upcoming={false} onRequestChange={() => {}} />)}
                           </div>
@@ -1389,16 +1392,16 @@ export default function App() {
 
                   return (
                     <>
-                      <div style={{ background: "#ecfdf5", border: "1px solid #6ee7b7", borderRadius: 14, padding: "14px 18px", marginBottom: 20 }}>
-                        <div style={{ fontWeight: 700, color: "#065f46", marginBottom: 2 }}>Maintenance Plan — {scheduleLabel}</div>
-                        {cadence && <div style={{ fontSize: "0.88rem", color: "#047857" }}>{cadence}</div>}
-                        <div style={{ color: "#047857", fontSize: "0.88rem", marginTop: 4, lineHeight: 1.5 }}>
+                      <div style={{ background: "rgba(16,185,129,0.1)", border: "1px solid #6ee7b7", borderRadius: 14, padding: "14px 18px", marginBottom: 20 }}>
+                        <div style={{ fontWeight: 700, color: "#34d399", marginBottom: 2 }}>Maintenance Plan — {scheduleLabel}</div>
+                        {cadence && <div style={{ fontSize: "0.88rem", color: "#10b981" }}>{cadence}</div>}
+                        <div style={{ color: "#10b981", fontSize: "0.88rem", marginTop: 4, lineHeight: 1.5 }}>
                           Your schedule below shows the next 6 months of services. Contact us through My Appointments to request any changes.
                         </div>
                       </div>
 
                       {scheduleDates.length === 0 && (
-                        <div style={{ textAlign: "center", padding: 30, color: "#6b7280", fontSize: "0.9rem" }}>No upcoming services scheduled.</div>
+                        <div style={{ textAlign: "center", padding: 30, color: "rgba(255,255,255,0.45)", fontSize: "0.9rem" }}>No upcoming services scheduled.</div>
                       )}
 
                       <div style={{ display: "grid", gap: 10 }}>
@@ -1408,19 +1411,19 @@ export default function App() {
                             ? [b.boatSize, b.make, b.model].filter(Boolean).join(" ")
                             : [b.year, b.make, b.model].filter(Boolean).join(" ")) : "";
                           return (
-                            <div key={i} style={{ background: sd.booked ? "#fff" : "#f9fafb", border: sd.booked ? "1.5px solid #059669" : "1px solid #e5e7eb", borderRadius: 14, padding: "14px 16px", display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap" as const, gap: 8 }}>
+                            <div key={i} style={{ background: sd.booked ? "rgba(16,185,129,0.1)" : "rgba(255,255,255,0.03)", border: sd.booked ? "1.5px solid rgba(16,185,129,0.5)" : "1px solid rgba(255,255,255,0.07)", borderRadius: 14, padding: "14px 16px", display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap" as const, gap: 8 }}>
                               <div>
-                                <div style={{ fontWeight: 700, color: "#111827", fontSize: "0.95rem" }}>
+                                <div style={{ fontWeight: 700, color: "#f1f5f9", fontSize: "0.95rem" }}>
                                   {sd.label}{b?.time ? ` at ${b.time}` : ""}
                                 </div>
                                 {b && (
                                   <>
-                                    <div style={{ fontSize: "0.85rem", color: "#6b7280" }}>{vl && `${vl} · `}{b.packageType === "basic" ? "Basic Detail" : b.packageType === "premium" ? "Premium Detail" : b.packageType === "exterior" ? "Exterior Only — Basic" : b.packageType === "exteriorPremium" ? "Exterior Only — Premium" : b.packageType === "interior" ? "Interior Only — Basic" : b.packageType === "interiorPremium" ? "Interior Only — Premium" : b.packageType}</div>
-                                    {b.serviceType === "mobile" && b.address && <div style={{ fontSize: "0.82rem", color: "#9ca3af" }}>{b.address}</div>}
+                                    <div style={{ fontSize: "0.85rem", color: "rgba(255,255,255,0.45)" }}>{vl && `${vl} · `}{b.packageType === "basic" ? "Basic Detail" : b.packageType === "premium" ? "Premium Detail" : b.packageType === "exterior" ? "Exterior Only — Basic" : b.packageType === "exteriorPremium" ? "Exterior Only — Premium" : b.packageType === "interior" ? "Interior Only — Basic" : b.packageType === "interiorPremium" ? "Interior Only — Premium" : b.packageType}</div>
+                                    {b.serviceType === "mobile" && b.address && <div style={{ fontSize: "0.82rem", color: "rgba(255,255,255,0.35)" }}>{b.address}</div>}
                                   </>
                                 )}
                               </div>
-                              <span style={{ background: sd.booked ? "#ecfdf5" : "#f3f4f6", color: sd.booked ? "#059669" : "#9ca3af", fontSize: "0.72rem", fontWeight: 700, borderRadius: 999, padding: "3px 9px", whiteSpace: "nowrap" as const }}>
+                              <span style={{ background: sd.booked ? "#ecfdf5" : "rgba(255,255,255,0.08)", color: sd.booked ? "#059669" : "#9ca3af", fontSize: "0.72rem", fontWeight: 700, borderRadius: 999, padding: "3px 9px", whiteSpace: "nowrap" as const }}>
                                 {sd.booked ? "CONFIRMED" : "SCHEDULED"}
                               </span>
                             </div>
@@ -1445,24 +1448,24 @@ export default function App() {
                   return (
                     <>
                       {outstanding.length === 0 && paid.length === 0 && (
-                        <div style={{ textAlign: "center", padding: 40, color: "#6b7280" }}>No invoices on file yet.</div>
+                        <div style={{ textAlign: "center", padding: 40, color: "rgba(255,255,255,0.45)" }}>No invoices on file yet.</div>
                       )}
 
                       {outstanding.length > 0 && (
                         <>
-                          <div style={{ background: "#fefce8", border: "1px solid #fde047", borderRadius: 14, padding: "16px 18px", marginBottom: 20, textAlign: "center" as const }}>
+                          <div style={{ background: "rgba(251,191,36,0.12)", border: "1px solid #fde047", borderRadius: 14, padding: "16px 18px", marginBottom: 20, textAlign: "center" as const }}>
                             <div style={{ fontWeight: 700, color: "#713f12", fontSize: "1rem", marginBottom: 12 }}>Total Balance Due</div>
                             <div style={{ display: "flex", gap: 0, justifyContent: "center" }}>
                               <div style={{ flex: 1, textAlign: "center" as const, padding: "0 12px" }}>
-                                <div style={{ fontSize: "0.75rem", color: "#92400e", marginBottom: 4 }}>Venmo / Cash App</div>
-                                <div style={{ fontSize: "1.8rem", fontWeight: 900, color: "#92400e", letterSpacing: "-0.5px" }}>${totalOwed.toFixed(2)}</div>
-                                <div style={{ fontSize: "0.7rem", color: "#b45309", marginTop: 2 }}>No fee</div>
+                                <div style={{ fontSize: "0.75rem", color: "#fbbf24", marginBottom: 4 }}>Venmo / Cash App</div>
+                                <div style={{ fontSize: "1.8rem", fontWeight: 900, color: "#fbbf24", letterSpacing: "-0.5px" }}>${totalOwed.toFixed(2)}</div>
+                                <div style={{ fontSize: "0.7rem", color: "#f59e0b", marginTop: 2 }}>No fee</div>
                               </div>
                               <div style={{ width: 1, background: "#fde047", alignSelf: "stretch" }} />
                               <div style={{ flex: 1, textAlign: "center" as const, padding: "0 12px" }}>
-                                <div style={{ fontSize: "0.75rem", color: "#92400e", marginBottom: 4 }}>Square / Card (+4%)</div>
-                                <div style={{ fontSize: "1.8rem", fontWeight: 900, color: "#92400e", letterSpacing: "-0.5px" }}>${(totalOwed * 1.04).toFixed(2)}</div>
-                                <div style={{ fontSize: "0.7rem", color: "#b45309", marginTop: 2 }}>Includes fee</div>
+                                <div style={{ fontSize: "0.75rem", color: "#fbbf24", marginBottom: 4 }}>Square / Card (+4%)</div>
+                                <div style={{ fontSize: "1.8rem", fontWeight: 900, color: "#fbbf24", letterSpacing: "-0.5px" }}>${(totalOwed * 1.04).toFixed(2)}</div>
+                                <div style={{ fontSize: "0.7rem", color: "#f59e0b", marginTop: 2 }}>Includes fee</div>
                               </div>
                             </div>
                           </div>
@@ -1471,25 +1474,25 @@ export default function App() {
                             const baseAmt = parseFloat(b.invoiceAmount || "0");
                             const squareAmt = (baseAmt * 1.04).toFixed(2);
                             return (
-                            <div key={i} style={{ background: "#fff", border: "1px solid #fde047", borderRadius: 16, padding: 18, marginBottom: 14 }}>
-                              <div style={{ fontWeight: 700, color: "#111827", marginBottom: 4 }}>{formatDateLabel(b.date)} — {b.packageType === "basic" ? "Basic Detail" : b.packageType === "premium" ? "Premium Detail" : b.packageType === "exterior" ? "Exterior Only — Basic" : b.packageType === "exteriorPremium" ? "Exterior Only — Premium" : b.packageType === "interior" ? "Interior Only — Basic" : b.packageType === "interiorPremium" ? "Interior Only — Premium" : b.packageType}</div>
-                              <div style={{ fontSize: "0.9rem", color: "#6b7280", marginBottom: 10 }}>
+                            <div key={i} style={{ background: "rgba(255,255,255,0.05)", border: "1px solid #fde047", borderRadius: 16, padding: 18, marginBottom: 14 }}>
+                              <div style={{ fontWeight: 700, color: "#f1f5f9", marginBottom: 4 }}>{formatDateLabel(b.date)} — {b.packageType === "basic" ? "Basic Detail" : b.packageType === "premium" ? "Premium Detail" : b.packageType === "exterior" ? "Exterior Only — Basic" : b.packageType === "exteriorPremium" ? "Exterior Only — Premium" : b.packageType === "interior" ? "Interior Only — Basic" : b.packageType === "interiorPremium" ? "Interior Only — Premium" : b.packageType}</div>
+                              <div style={{ fontSize: "0.9rem", color: "rgba(255,255,255,0.45)", marginBottom: 10 }}>
                                 {[b.year, b.make, b.model, b.boatSize].filter(Boolean).join(" ")}
                                 {b.invoiceNote ? ` — ${b.invoiceNote}` : ""}
                               </div>
                               {/* Amount due box showing both prices + copy button */}
-                              <div style={{ background: "#fefce8", border: "1px solid #fde047", borderRadius: 12, padding: "14px 16px", marginBottom: 14 }}>
+                              <div style={{ background: "rgba(251,191,36,0.12)", border: "1px solid #fde047", borderRadius: 12, padding: "14px 16px", marginBottom: 14 }}>
                                 <div style={{ display: "flex", gap: 0, marginBottom: 12 }}>
                                   <div style={{ flex: 1, textAlign: "center" as const, padding: "0 8px" }}>
-                                    <div style={{ fontSize: "0.72rem", color: "#92400e", marginBottom: 3 }}>Venmo / Cash App</div>
-                                    <div style={{ fontSize: "1.5rem", fontWeight: 900, color: "#92400e", letterSpacing: "-0.5px" }}>${baseAmt.toFixed(2)}</div>
-                                    <div style={{ fontSize: "0.68rem", color: "#b45309", marginTop: 2 }}>No fee</div>
+                                    <div style={{ fontSize: "0.72rem", color: "#fbbf24", marginBottom: 3 }}>Venmo / Cash App</div>
+                                    <div style={{ fontSize: "1.5rem", fontWeight: 900, color: "#fbbf24", letterSpacing: "-0.5px" }}>${baseAmt.toFixed(2)}</div>
+                                    <div style={{ fontSize: "0.68rem", color: "#f59e0b", marginTop: 2 }}>No fee</div>
                                   </div>
                                   <div style={{ width: 1, background: "#fde047", alignSelf: "stretch" }} />
                                   <div style={{ flex: 1, textAlign: "center" as const, padding: "0 8px" }}>
-                                    <div style={{ fontSize: "0.72rem", color: "#92400e", marginBottom: 3 }}>Square (Card)</div>
-                                    <div style={{ fontSize: "1.5rem", fontWeight: 900, color: "#92400e", letterSpacing: "-0.5px" }}>${squareAmt}</div>
-                                    <div style={{ fontSize: "0.68rem", color: "#b45309", marginTop: 2 }}>+4% fee</div>
+                                    <div style={{ fontSize: "0.72rem", color: "#fbbf24", marginBottom: 3 }}>Square (Card)</div>
+                                    <div style={{ fontSize: "1.5rem", fontWeight: 900, color: "#fbbf24", letterSpacing: "-0.5px" }}>${squareAmt}</div>
+                                    <div style={{ fontSize: "0.68rem", color: "#f59e0b", marginTop: 2 }}>+4% fee</div>
                                   </div>
                                 </div>
                                 {/* Copy amount button */}
@@ -1532,15 +1535,15 @@ export default function App() {
                               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
                                 <div>
                                   <a href={VENMO_URL} target="_blank" rel="noopener noreferrer" style={{ display: "block", background: "#008CFF", color: "#fff", borderRadius: 10, padding: "8px 6px", textAlign: "center", textDecoration: "none", fontWeight: 700, fontSize: "0.82rem" }}>Venmo</a>
-                                  <div style={{ fontSize: "0.72rem", color: "#6b7280", textAlign: "center" as const, marginTop: 3 }}>${baseAmt.toFixed(2)}</div>
+                                  <div style={{ fontSize: "0.72rem", color: "rgba(255,255,255,0.45)", textAlign: "center" as const, marginTop: 3 }}>${baseAmt.toFixed(2)}</div>
                                 </div>
                                 <div>
                                   <a href={CASHAPP_URL} target="_blank" rel="noopener noreferrer" style={{ display: "block", background: "#00C244", color: "#fff", borderRadius: 10, padding: "8px 6px", textAlign: "center", textDecoration: "none", fontWeight: 700, fontSize: "0.82rem" }}>Cash App</a>
-                                  <div style={{ fontSize: "0.72rem", color: "#6b7280", textAlign: "center" as const, marginTop: 3 }}>${baseAmt.toFixed(2)}</div>
+                                  <div style={{ fontSize: "0.72rem", color: "rgba(255,255,255,0.45)", textAlign: "center" as const, marginTop: 3 }}>${baseAmt.toFixed(2)}</div>
                                 </div>
                                 <div>
                                   <button onClick={() => handleSquareRequest(b)} style={{ display: "block", width: "100%", background: "#111827", color: "#fff", border: "none", borderRadius: 10, padding: "8px 6px", fontWeight: 700, fontSize: "0.82rem", cursor: "pointer" }}>Card (Square)</button>
-                                  <div style={{ fontSize: "0.72rem", color: "#6b7280", textAlign: "center" as const, marginTop: 3 }}>${squareAmt}</div>
+                                  <div style={{ fontSize: "0.72rem", color: "rgba(255,255,255,0.45)", textAlign: "center" as const, marginTop: 3 }}>${squareAmt}</div>
                                 </div>
                               </div>
                             </div>
@@ -1551,17 +1554,17 @@ export default function App() {
 
                       {paid.length > 0 && (
                         <>
-                          <div style={{ fontWeight: 700, color: "#9ca3af", fontSize: "0.85rem", textTransform: "uppercase" as const, letterSpacing: "0.04em", marginTop: 16, marginBottom: 10 }}>Paid</div>
+                          <div style={{ fontWeight: 700, color: "rgba(255,255,255,0.35)", fontSize: "0.85rem", textTransform: "uppercase" as const, letterSpacing: "0.04em", marginTop: 16, marginBottom: 10 }}>Paid</div>
                           {paid.map((b, i) => (
-                            <div key={i} style={{ background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: 14, padding: 14, marginBottom: 10 }}>
+                            <div key={i} style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 14, padding: 14, marginBottom: 10 }}>
                               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                                 <div>
-                                  <div style={{ fontWeight: 600, color: "#374151", fontSize: "0.9rem" }}>{formatDateLabel(b.date)}</div>
-                                  <div style={{ fontSize: "0.85rem", color: "#9ca3af" }}>{b.packageType === "basic" ? "Basic Detail" : b.packageType === "premium" ? "Premium Detail" : b.packageType === "exterior" ? "Exterior Only — Basic" : b.packageType === "exteriorPremium" ? "Exterior Only — Premium" : b.packageType === "interior" ? "Interior Only — Basic" : b.packageType === "interiorPremium" ? "Interior Only — Premium" : b.packageType}</div>
+                                  <div style={{ fontWeight: 600, color: "rgba(255,255,255,0.7)", fontSize: "0.9rem" }}>{formatDateLabel(b.date)}</div>
+                                  <div style={{ fontSize: "0.85rem", color: "rgba(255,255,255,0.35)" }}>{b.packageType === "basic" ? "Basic Detail" : b.packageType === "premium" ? "Premium Detail" : b.packageType === "exterior" ? "Exterior Only — Basic" : b.packageType === "exteriorPremium" ? "Exterior Only — Premium" : b.packageType === "interior" ? "Interior Only — Basic" : b.packageType === "interiorPremium" ? "Interior Only — Premium" : b.packageType}</div>
                                 </div>
                                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                                  <span style={{ fontWeight: 700, color: "#374151" }}>${b.invoiceAmount}</span>
-                                  <span style={{ background: "#dcfce7", color: "#166534", fontSize: "0.72rem", fontWeight: 700, borderRadius: 999, padding: "2px 8px" }}>PAID</span>
+                                  <span style={{ fontWeight: 700, color: "rgba(255,255,255,0.7)" }}>${b.invoiceAmount}</span>
+                                  <span style={{ background: "rgba(16,185,129,0.15)", color: "#34d399", fontSize: "0.72rem", fontWeight: 700, borderRadius: 999, padding: "2px 8px" }}>PAID</span>
                                 </div>
                               </div>
                             </div>
@@ -1626,7 +1629,7 @@ export default function App() {
         {/* Toast container */}
         <div style={{ position: "fixed" as const, bottom: 24, right: 24, zIndex: 9999, display: "flex", flexDirection: "column" as const, gap: 10, alignItems: "flex-end" }}>
           {toasts.map(t => (
-            <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 10, background: t.type === "error" ? "#fef2f2" : t.type === "success" ? "#f0fdf4" : "#1e293b", color: t.type === "error" ? "#dc2626" : t.type === "success" ? "#065f46" : "#fff", border: t.type === "error" ? "1.5px solid #fca5a5" : t.type === "success" ? "1.5px solid #6ee7b7" : "none", borderRadius: 14, padding: "12px 18px", fontSize: "0.88rem", fontWeight: 600, boxShadow: "0 4px 20px rgba(0,0,0,0.18)", animation: "toastIn 0.25s ease", maxWidth: 320, cursor: "pointer" }} onClick={() => dismissToast(t.id)}>
+            <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 10, background: t.type === "error" ? "rgba(239,68,68,0.12)" : t.type === "success" ? "#f0fdf4" : "#1e293b", color: t.type === "error" ? "#dc2626" : t.type === "success" ? "#065f46" : "#fff", border: t.type === "error" ? "1.5px solid #fca5a5" : t.type === "success" ? "1.5px solid #6ee7b7" : "none", borderRadius: 14, padding: "12px 18px", fontSize: "0.88rem", fontWeight: 600, boxShadow: "0 4px 20px rgba(0,0,0,0.18)", animation: "toastIn 0.25s ease", maxWidth: 320, cursor: "pointer" }} onClick={() => dismissToast(t.id)}>
               {t.type === "loading" && <div style={{ width: 16, height: 16, border: "2.5px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", borderRadius: "50%", animation: "spin 0.7s linear infinite", flexShrink: 0 }} />}
               {t.type === "success" && <span style={{ fontSize: "1rem" }}>✓</span>}
               {t.type === "error" && <span style={{ fontSize: "1rem" }}>✕</span>}
@@ -1645,8 +1648,8 @@ export default function App() {
             </div>
 
             {/* Admin tabs */}
-            <div style={{ display: "flex", gap: 0, marginBottom: 24, borderBottom: "2px solid #e5e7eb", overflowX: "auto" as const, WebkitOverflowScrolling: "touch" as any, scrollbarWidth: "none" as any }}>
-              <button onClick={() => setAdminTab("bookings")} style={{ background: "none", border: "none", cursor: "pointer", padding: "10px 18px", fontSize: "0.95rem", fontWeight: 700, color: adminTab === "bookings" ? "#111827" : "#9ca3af", borderBottom: adminTab === "bookings" ? "3px solid #111827" : "3px solid transparent", marginBottom: -2 }}>All Bookings</button>
+            <div style={{ display: "flex", gap: 0, marginBottom: 24, borderBottom: "1.5px solid rgba(255,255,255,0.08)", overflowX: "auto" as const, WebkitOverflowScrolling: "touch" as any, scrollbarWidth: "none" as any }}>
+              <button onClick={() => setAdminTab("bookings")} style={{ background: "none", border: "none", cursor: "pointer", padding: "10px 18px", fontSize: "0.95rem", fontWeight: 700, color: adminTab === "bookings" ? "#f1f5f9" : "rgba(255,255,255,0.35)", borderBottom: adminTab === "bookings" ? "3px solid #f1f5f9" : "3px solid transparent", marginBottom: -2 }}>All Bookings</button>
               <button onClick={() => setAdminTab("invoices")} style={{ background: "none", border: "none", cursor: "pointer", padding: "10px 18px", fontSize: "0.95rem", fontWeight: 700, color: adminTab === "invoices" ? "#d97706" : "#9ca3af", borderBottom: adminTab === "invoices" ? "3px solid #d97706" : "3px solid transparent", marginBottom: -2 }}>
                 Invoices {pendingInvoices.length > 0 && <span style={{ background: "#ef4444", color: "#fff", borderRadius: 999, padding: "1px 6px", fontSize: "0.72rem", marginLeft: 4 }}>{pendingInvoices.length}</span>}
               </button>
@@ -1655,7 +1658,7 @@ export default function App() {
             </div>
 
             {adminLoading ? (
-              <div style={{ textAlign: "center", padding: 40, color: "#6b7280" }}>Loading...</div>
+              <div style={{ textAlign: "center", padding: 40, color: "rgba(255,255,255,0.45)" }}>Loading...</div>
             ) : (
               <>
                 {/* All Bookings tab */}
@@ -1664,7 +1667,7 @@ export default function App() {
                     {/* Filter bar */}
                     <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" as const }}>
                       {(["all", "upcoming", "past", "maintenance"] as const).map(f => (
-                        <button key={f} onClick={() => setAdminFilter(f)} style={{ background: adminFilter === f ? "#111827" : "#f3f4f6", color: adminFilter === f ? "#fff" : "#374151", border: "none", borderRadius: 999, padding: "6px 14px", fontSize: "0.85rem", fontWeight: 600, cursor: "pointer", textTransform: "capitalize" as const }}>
+                        <button key={f} onClick={() => setAdminFilter(f)} style={{ background: adminFilter === f ? "#111827" : "rgba(255,255,255,0.08)", color: adminFilter === f ? "#fff" : "#374151", border: "none", borderRadius: 999, padding: "6px 14px", fontSize: "0.85rem", fontWeight: 600, cursor: "pointer", textTransform: "capitalize" as const }}>
                           {f === "all" ? "All" : f === "upcoming" ? "Upcoming" : f === "past" ? "Past" : "Maintenance"}
                         </button>
                       ))}
@@ -1679,25 +1682,25 @@ export default function App() {
                       });
                       return Object.keys(grouped).length > 0 ? (
                         <div style={{ marginBottom: 20 }}>
-                          <div style={{ fontWeight: 700, color: "#374151", fontSize: "0.85rem", textTransform: "uppercase" as const, letterSpacing: "0.04em", marginBottom: 10 }}>Maintenance Schedule Overview</div>
+                          <div style={{ fontWeight: 700, color: "rgba(255,255,255,0.7)", fontSize: "0.85rem", textTransform: "uppercase" as const, letterSpacing: "0.04em", marginBottom: 10 }}>Maintenance Schedule Overview</div>
                           {Object.entries(grouped).map(([email, bookings]) => {
                             const sorted = [...bookings].sort((a, b) => a.date.localeCompare(b.date));
                             return (
-                              <div key={email} style={{ background: "#ecfdf5", border: "1px solid #6ee7b7", borderRadius: 12, padding: "14px 16px", marginBottom: 10 }}>
+                              <div key={email} style={{ background: "rgba(16,185,129,0.1)", border: "1px solid #6ee7b7", borderRadius: 12, padding: "14px 16px", marginBottom: 10 }}>
                                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap" as const, gap: 4, marginBottom: 8 }}>
                                   <div>
-                                    <div style={{ fontWeight: 700, color: "#065f46", fontSize: "0.95rem" }}>{sorted[0].name}</div>
-                                    <div style={{ fontSize: "0.82rem", color: "#047857" }}>{email}</div>
+                                    <div style={{ fontWeight: 700, color: "#34d399", fontSize: "0.95rem" }}>{sorted[0].name}</div>
+                                    <div style={{ fontSize: "0.82rem", color: "#10b981" }}>{email}</div>
                                   </div>
-                                  <span style={{ background: "#fff", border: "1px solid #6ee7b7", borderRadius: 999, padding: "2px 10px", fontSize: "0.78rem", fontWeight: 700, color: "#059669" }}>
+                                  <span style={{ background: "rgba(255,255,255,0.05)", border: "1px solid #6ee7b7", borderRadius: 999, padding: "2px 10px", fontSize: "0.78rem", fontWeight: 700, color: "#059669" }}>
                                     {sorted[0].recurringFrequency === "biweekly" ? "Bi-Weekly" : "Monthly"}
                                   </span>
                                 </div>
                                 <div style={{ display: "grid", gap: 6 }}>
                                   {sorted.map((b, i) => (
-                                    <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "#fff", borderRadius: 8, padding: "7px 12px", fontSize: "0.85rem" }}>
-                                      <span style={{ color: "#065f46", fontWeight: 600 }}>{i === 0 ? "Next: " : (i + 1) + ". "}{formatDateLabel(b.date)}{b.time ? ` at ${b.time}` : ""}</span>
-                                      <span style={{ color: "#6b7280", fontSize: "0.78rem" }}>{b.packageType === "basic" ? "Basic" : "Premium"}</span>
+                                    <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "rgba(255,255,255,0.05)", borderRadius: 8, padding: "7px 12px", fontSize: "0.85rem" }}>
+                                      <span style={{ color: "#34d399", fontWeight: 600 }}>{i === 0 ? "Next: " : (i + 1) + ". "}{formatDateLabel(b.date)}{b.time ? ` at ${b.time}` : ""}</span>
+                                      <span style={{ color: "rgba(255,255,255,0.45)", fontSize: "0.78rem" }}>{b.packageType === "basic" ? "Basic" : "Premium"}</span>
                                     </div>
                                   ))}
                                 </div>
@@ -1708,7 +1711,7 @@ export default function App() {
                       ) : null;
                     })()}
 
-                    {filtered.length === 0 && <div style={{ textAlign: "center", padding: 40, color: "#6b7280" }}>No bookings found.</div>}
+                    {filtered.length === 0 && <div style={{ textAlign: "center", padding: 40, color: "rgba(255,255,255,0.45)" }}>No bookings found.</div>}
 
                     <div style={{ display: "grid", gap: 12 }}>
                       {filtered.map((b, i) => {
@@ -1717,7 +1720,7 @@ export default function App() {
                         const isSelected = selectedAdminBooking?.rowIndex === b.rowIndex;
 
                         return (
-                          <div key={i} className="booking-card" style={{ background: b.status === "Cancelled" ? "#fef2f2" : b.status === "Skipped" ? "#f0f9ff" : "#fff", border: `1.5px solid ${b.status === "Cancelled" ? "#fca5a5" : b.status === "Skipped" ? "#7dd3fc" : isComplete ? "#e5e7eb" : isUpcoming(b.date) ? "#2563eb" : "#e5e7eb"}`, borderRadius: 14, padding: 16, opacity: b.status === "Cancelled" || b.status === "Skipped" ? 0.85 : 1 }}>
+                          <div key={i} className="booking-card" style={{ background: b.status === "Cancelled" ? "rgba(239,68,68,0.12)" : b.status === "Skipped" ? "#f0f9ff" : "#fff", border: `1.5px solid ${b.status === "Cancelled" ? "#fca5a5" : b.status === "Skipped" ? "#7dd3fc" : isComplete ? "#e5e7eb" : isUpcoming(b.date) ? "#2563eb" : "#e5e7eb"}`, borderRadius: 14, padding: 16, opacity: b.status === "Cancelled" || b.status === "Skipped" ? 0.85 : 1 }}>
                             {b.status === "Cancelled" && (
                               <div style={{ background: "#dc2626", borderRadius: 8, padding: "6px 12px", marginBottom: 10, display: "flex", alignItems: "center", gap: 8 }}>
                                 <span style={{ color: "#fff", fontWeight: 800, fontSize: "0.85rem", letterSpacing: "0.04em" }}>✕ APPOINTMENT CANCELLED</span>
@@ -1731,18 +1734,18 @@ export default function App() {
                             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8, marginBottom: 6, flexWrap: "wrap" as const }}>
                               <div>
                                 <div style={{ fontWeight: 700, color: b.status === "Cancelled" ? "#991b1b" : "#111827", fontSize: "0.95rem" }}>{b.name} — {formatDateLabel(b.date)}{b.time ? ` at ${b.time}` : ""}</div>
-                                <div style={{ fontSize: "0.85rem", color: "#6b7280" }}>{b.email} · {b.phone}</div>
-                                <div style={{ fontSize: "0.85rem", color: "#6b7280" }}>{vl} · {b.packageType === "basic" ? "Basic Detail" : b.packageType === "premium" ? "Premium Detail" : b.packageType === "exterior" ? "Exterior Only — Basic" : b.packageType === "exteriorPremium" ? "Exterior Only — Premium" : b.packageType === "interior" ? "Interior Only — Basic" : b.packageType === "interiorPremium" ? "Interior Only — Premium" : b.packageType} · ${b.hourlyRate}/hr</div>
+                                <div style={{ fontSize: "0.85rem", color: "rgba(255,255,255,0.45)" }}>{b.email} · {b.phone}</div>
+                                <div style={{ fontSize: "0.85rem", color: "rgba(255,255,255,0.45)" }}>{vl} · {b.packageType === "basic" ? "Basic Detail" : b.packageType === "premium" ? "Premium Detail" : b.packageType === "exterior" ? "Exterior Only — Basic" : b.packageType === "exteriorPremium" ? "Exterior Only — Premium" : b.packageType === "interior" ? "Interior Only — Basic" : b.packageType === "interiorPremium" ? "Interior Only — Premium" : b.packageType} · ${b.hourlyRate}/hr</div>
                                 {b.clientType === "maintenance" && <div style={{ fontSize: "0.8rem", color: "#059669", fontWeight: 600 }}>{b.recurringFrequency === "biweekly" ? "Bi-Weekly" : "Monthly"} Maintenance</div>}
-                                {b.serviceType === "mobile" && b.address && <div style={{ fontSize: "0.8rem", color: "#6b7280" }}>{b.address}</div>}
-                                {b.notes && <div style={{ fontSize: "0.8rem", color: "#9ca3af" }}>Notes: {b.notes}</div>}
+                                {b.serviceType === "mobile" && b.address && <div style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.45)" }}>{b.address}</div>}
+                                {b.notes && <div style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.35)" }}>Notes: {b.notes}</div>}
                               </div>
                               <div style={{ display: "flex", flexDirection: "column" as const, alignItems: "flex-end", gap: 4 }}>
-                                <span style={{ background: b.status === "Cancelled" ? "#fef2f2" : b.status === "Skipped" ? "#f0f9ff" : isComplete ? "#dcfce7" : isUpcoming(b.date) ? "#eff6ff" : "#f3f4f6", color: b.status === "Cancelled" ? "#dc2626" : b.status === "Skipped" ? "#0369a1" : isComplete ? "#166534" : isUpcoming(b.date) ? "#2563eb" : "#9ca3af", fontSize: "0.72rem", fontWeight: 700, borderRadius: 999, padding: "2px 8px" }}>
+                                <span style={{ background: b.status === "Cancelled" ? "rgba(239,68,68,0.12)" : b.status === "Skipped" ? "#f0f9ff" : isComplete ? "rgba(16,185,129,0.2)" : isUpcoming(b.date) ? "rgba(59,130,246,0.15)" : "rgba(255,255,255,0.08)", color: b.status === "Cancelled" ? "#dc2626" : b.status === "Skipped" ? "#0369a1" : isComplete ? "#166534" : isUpcoming(b.date) ? "#2563eb" : "#9ca3af", fontSize: "0.72rem", fontWeight: 700, borderRadius: 999, padding: "2px 8px" }}>
                                   {b.status === "Cancelled" ? "CANCELLED" : b.status === "Skipped" ? "SKIPPED" : isComplete ? "COMPLETED" : isUpcoming(b.date) ? "UPCOMING" : "PAST"}
                                 </span>
                                 {b.invoiceStatus && b.invoiceStatus !== "" && (
-                                  <span style={{ background: b.invoiceStatus === "paid" ? "#dcfce7" : b.invoiceStatus === "released" ? "#fef9c3" : "#fef3c7", color: b.invoiceStatus === "paid" ? "#166534" : "#92400e", fontSize: "0.72rem", fontWeight: 700, borderRadius: 999, padding: "2px 8px" }}>
+                                  <span style={{ background: b.invoiceStatus === "paid" ? "rgba(16,185,129,0.2)" : b.invoiceStatus === "released" ? "#fef9c3" : "#fef3c7", color: b.invoiceStatus === "paid" ? "#166534" : "#92400e", fontSize: "0.72rem", fontWeight: 700, borderRadius: 999, padding: "2px 8px" }}>
                                     {b.invoiceStatus === "pending" ? "INVOICE PENDING" : b.invoiceStatus === "released" ? `INVOICE SENT $${b.invoiceAmount}` : `PAID $${b.invoiceAmount}`}
                                   </span>
                                 )}
@@ -1752,15 +1755,15 @@ export default function App() {
                             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" as const, marginTop: 8, alignItems: "center" }}>
                               {!isComplete && b.status !== "Cancelled" && b.status !== "Skipped" && (
                                 <button onClick={() => { setSelectedAdminBooking(isSelected ? null : b); setCompleteAmount(b.hourlyRate ? String(parseFloat(b.hourlyRate) * 2) : ""); setCompleteHours(b.clientType === "maintenance" ? "2" : ""); setCompleteNote(""); setEditingBooking(null); setBillingMode("hourly"); }}
-                                  style={{ background: isSelected ? "#f3f4f6" : "#111827", color: isSelected ? "#111827" : "#fff", border: "none", borderRadius: 8, padding: "7px 14px", fontSize: "0.82rem", fontWeight: 600, cursor: "pointer" }}>
+                                  style={{ background: isSelected ? "rgba(255,255,255,0.08)" : "#111827", color: isSelected ? "#111827" : "#fff", border: "none", borderRadius: 8, padding: "7px 14px", fontSize: "0.82rem", fontWeight: 600, cursor: "pointer" }}>
                                   {isSelected ? "Cancel" : "Mark Complete"}
                                 </button>
                               )}
                               {/* Job Timer button */}
                               {!isComplete && b.status !== "Cancelled" && b.status !== "Skipped" && (
                                 timerBookingRow === b.rowIndex ? (
-                                  <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#fef3c7", border: "1px solid #f59e0b", borderRadius: 8, padding: "5px 12px" }}>
-                                    <span style={{ fontSize: "0.9rem", fontWeight: 800, color: "#92400e", fontVariantNumeric: "tabular-nums" }}>{timerDisplay(timerElapsed)}</span>
+                                  <div style={{ display: "flex", alignItems: "center", gap: 8, background: "rgba(251,191,36,0.08)", border: "1px solid #f59e0b", borderRadius: 8, padding: "5px 12px" }}>
+                                    <span style={{ fontSize: "0.9rem", fontWeight: 800, color: "#fbbf24", fontVariantNumeric: "tabular-nums" }}>{timerDisplay(timerElapsed)}</span>
                                     <button onClick={() => stopTimer(b)}
                                       style={{ background: "#dc2626", color: "#fff", border: "none", borderRadius: 6, padding: "4px 10px", fontSize: "0.78rem", fontWeight: 700, cursor: "pointer" }}>
                                       Stop & Fill
@@ -1775,7 +1778,7 @@ export default function App() {
                               )}
                               {b.status !== "Cancelled" && b.status !== "Skipped" && (
                                 <button onClick={() => { setEditingBooking(editingBooking?.rowIndex === b.rowIndex ? null : b); setEditFields({ name: b.name, phone: b.phone, email: b.email, date: b.date, time: b.time, year: b.year, make: b.make, model: b.model, boatSize: b.boatSize, packageType: b.packageType, serviceType: b.serviceType, address: b.address, notes: b.notes, clientType: b.clientType, recurringFrequency: b.recurringFrequency, addOns: b.addOns }); setSelectedAdminBooking(null); }}
-                                  style={{ background: "#f3f4f6", color: "#374151", border: "none", borderRadius: 8, padding: "7px 14px", fontSize: "0.82rem", fontWeight: 600, cursor: "pointer" }}>
+                                  style={{ background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.7)", border: "none", borderRadius: 8, padding: "7px 14px", fontSize: "0.82rem", fontWeight: 600, cursor: "pointer" }}>
                                   {editingBooking?.rowIndex === b.rowIndex ? "Cancel Edit" : "Edit"}
                                 </button>
                               )}
@@ -1816,7 +1819,7 @@ export default function App() {
                                     } else { alert("Something went wrong."); }
                                   } catch (e) { alert("Something went wrong."); }
                                 }}
-                                style={{ background: "#fef2f2", color: "#dc2626", border: "1.5px solid #fca5a5", borderRadius: 8, padding: "7px 14px", fontSize: "0.82rem", fontWeight: 600, cursor: "pointer" }}>
+                                style={{ background: "rgba(239,68,68,0.1)", color: "#dc2626", border: "1.5px solid #fca5a5", borderRadius: 8, padding: "7px 14px", fontSize: "0.82rem", fontWeight: 600, cursor: "pointer" }}>
                                   Cancel Appt
                                 </button>
                               )}
@@ -1870,7 +1873,7 @@ export default function App() {
                                     }
                                   } catch (e) { updateToast(skipTid, "Network error — please try again", "error", 4000); }
                                 }}
-                                style={{ background: "#f0f9ff", color: "#0369a1", border: "1.5px solid #7dd3fc", borderRadius: 8, padding: "7px 14px", fontSize: "0.82rem", fontWeight: 600, cursor: "pointer" }}>
+                                style={{ background: "rgba(59,130,246,0.08)", color: "#0369a1", border: "1.5px solid #7dd3fc", borderRadius: 8, padding: "7px 14px", fontSize: "0.82rem", fontWeight: 600, cursor: "pointer" }}>
                                   ⏭ Skip Appt
                                 </button>
                               )}
@@ -1878,43 +1881,43 @@ export default function App() {
 
                             {/* Edit form */}
                             {editingBooking?.rowIndex === b.rowIndex && (
-                              <div style={{ marginTop: 14, padding: 16, background: "#f9fafb", borderRadius: 12, border: "1px solid #e5e7eb" }}>
-                                <div style={{ fontWeight: 700, color: "#374151", marginBottom: 12 }}>Edit Booking</div>
+                              <div style={{ marginTop: 14, padding: 16, background: "rgba(255,255,255,0.04)", borderRadius: 12, border: "1px solid rgba(255,255,255,0.08)" }}>
+                                <div style={{ fontWeight: 700, color: "rgba(255,255,255,0.7)", marginBottom: 12 }}>Edit Booking</div>
 
                                 {/* Reschedule indicator */}
                                 {((editFields.date && editFields.date !== b.date) || (editFields.time && editFields.time !== b.time)) && (
-                                  <div style={{ background: "#fef3c7", border: "1.5px solid #f59e0b", borderRadius: 10, padding: "12px 14px", marginBottom: 14 }}>
-                                    <div style={{ fontWeight: 700, color: "#92400e", fontSize: "0.88rem", marginBottom: 4 }}>⚠ Reschedule Detected</div>
-                                    <div style={{ fontSize: "0.82rem", color: "#92400e" }}>
+                                  <div style={{ background: "rgba(251,191,36,0.08)", border: "1.5px solid #f59e0b", borderRadius: 10, padding: "12px 14px", marginBottom: 14 }}>
+                                    <div style={{ fontWeight: 700, color: "#fbbf24", fontSize: "0.88rem", marginBottom: 4 }}>⚠ Reschedule Detected</div>
+                                    <div style={{ fontSize: "0.82rem", color: "#fbbf24" }}>
                                       <span style={{ textDecoration: "line-through", opacity: 0.7 }}>{formatDateLabel(b.date)}{b.time ? ` at ${b.time}` : ""}</span>
                                       <span style={{ margin: "0 8px" }}>→</span>
                                       <strong>{formatDateLabel(editFields.date || b.date)}{(editFields.time || b.time) ? ` at ${editFields.time || b.time}` : ""}</strong>
                                     </div>
-                                    <div style={{ fontSize: "0.75rem", color: "#b45309", marginTop: 4 }}>Customer will be notified by email and SMS. Calendar will be updated.</div>
+                                    <div style={{ fontSize: "0.75rem", color: "#f59e0b", marginTop: 4 }}>Customer will be notified by email and SMS. Calendar will be updated.</div>
                                   </div>
                                 )}
 
                                 {/* Date & Time — full width with calendar picker */}
                                 <div style={{ marginBottom: 12, gridColumn: "1 / -1" }}>
-                                  <div style={{ fontSize: "0.78rem", color: "#6b7280", marginBottom: 6, fontWeight: 600 }}>Reschedule Date & Time</div>
+                                  <div style={{ fontSize: "0.78rem", color: "rgba(255,255,255,0.45)", marginBottom: 6, fontWeight: 600 }}>Reschedule Date & Time</div>
                                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
                                     <div>
-                                      <div style={{ fontSize: "0.72rem", color: "#9ca3af", marginBottom: 3 }}>New Date</div>
+                                      <div style={{ fontSize: "0.72rem", color: "rgba(255,255,255,0.35)", marginBottom: 3 }}>New Date</div>
                                       <input
                                         type="date"
-                                        style={{ width: "100%", padding: "9px 12px", fontSize: "0.85rem", border: "1.5px solid #d1d5db", borderRadius: 14, outline: "none", boxSizing: "border-box" as const, cursor: "pointer", background: "#fff", color: "#111827", fontFamily: "inherit" }}
+                                        style={{ width: "100%", padding: "9px 12px", fontSize: "0.85rem", border: "1.5px solid #d1d5db", borderRadius: 14, outline: "none", boxSizing: "border-box" as const, cursor: "pointer", background: "rgba(255,255,255,0.05)", color: "#f1f5f9", fontFamily: "inherit" }}
                                         value={editFields.date || b.date}
                                         min={new Date().toISOString().split("T")[0]}
                                         onChange={e => setEditFields(prev => ({ ...prev, date: e.target.value }))}
                                       />
                                     </div>
                                     <div>
-                                      <div style={{ fontSize: "0.72rem", color: "#9ca3af", marginBottom: 3 }}>New Time</div>
+                                      <div style={{ fontSize: "0.72rem", color: "rgba(255,255,255,0.35)", marginBottom: 3 }}>New Time</div>
                                       {(() => {
                                         const slotsForDate = allAvailableSlots.filter(s => s.date === (editFields.date || b.date));
                                         return slotsForDate.length > 0 ? (
                                           <select
-                                            style={{ ...S.input, padding: "8px 10px", fontSize: "0.85rem", backgroundColor: "#fff" }}
+                                            style={{ ...S.input, padding: "8px 10px", fontSize: "0.85rem", backgroundColor: "transparent" }}
                                             value={editFields.time || b.time}
                                             onChange={e => setEditFields(prev => ({ ...prev, time: e.target.value }))}
                                           >
@@ -1924,7 +1927,7 @@ export default function App() {
                                             ))}
                                           </select>
                                         ) : (
-                                          <div style={{ padding: "8px 10px", background: "#fef2f2", border: "1px solid #fca5a5", borderRadius: 14, fontSize: "0.82rem", color: "#dc2626" }}>
+                                          <div style={{ padding: "8px 10px", background: "rgba(239,68,68,0.1)", border: "1px solid #fca5a5", borderRadius: 14, fontSize: "0.82rem", color: "#dc2626" }}>
                                             No available slots on this date
                                           </div>
                                         );
@@ -1946,7 +1949,7 @@ export default function App() {
                                     { label: "Notes", key: "notes" },
                                   ].map(field => (
                                     <div key={field.key}>
-                                      <div style={{ fontSize: "0.78rem", color: "#6b7280", marginBottom: 3 }}>{field.label}</div>
+                                      <div style={{ fontSize: "0.78rem", color: "rgba(255,255,255,0.45)", marginBottom: 3 }}>{field.label}</div>
                                       <input
                                         style={{ ...S.input, padding: "8px 10px", fontSize: "0.85rem" }}
                                         value={(editFields as any)[field.key] || ""}
@@ -1955,8 +1958,8 @@ export default function App() {
                                     </div>
                                   ))}
                                   <div>
-                                    <div style={{ fontSize: "0.78rem", color: "#6b7280", marginBottom: 3 }}>Package</div>
-                                    <select style={{ ...S.input, padding: "8px 10px", fontSize: "0.85rem", backgroundColor: "#fff" }} value={(editFields as any).packageType || ""} onChange={e => setEditFields(prev => ({ ...prev, packageType: e.target.value }))}>
+                                    <div style={{ fontSize: "0.78rem", color: "rgba(255,255,255,0.45)", marginBottom: 3 }}>Package</div>
+                                    <select style={{ ...S.input, padding: "8px 10px", fontSize: "0.85rem", backgroundColor: "transparent" }} value={(editFields as any).packageType || ""} onChange={e => setEditFields(prev => ({ ...prev, packageType: e.target.value }))}>
                                       <option value="basic">Basic</option>
                                       <option value="premium">Premium</option>
                                       <option value="exterior">Exterior Basic</option>
@@ -1966,22 +1969,22 @@ export default function App() {
                                     </select>
                                   </div>
                                   <div>
-                                    <div style={{ fontSize: "0.78rem", color: "#6b7280", marginBottom: 3 }}>Service Type</div>
-                                    <select style={{ ...S.input, padding: "8px 10px", fontSize: "0.85rem", backgroundColor: "#fff" }} value={(editFields as any).serviceType || ""} onChange={e => setEditFields(prev => ({ ...prev, serviceType: e.target.value }))}>
+                                    <div style={{ fontSize: "0.78rem", color: "rgba(255,255,255,0.45)", marginBottom: 3 }}>Service Type</div>
+                                    <select style={{ ...S.input, padding: "8px 10px", fontSize: "0.85rem", backgroundColor: "transparent" }} value={(editFields as any).serviceType || ""} onChange={e => setEditFields(prev => ({ ...prev, serviceType: e.target.value }))}>
                                       <option value="mobile">Mobile</option>
                                       <option value="dropoff">Drop-Off</option>
                                     </select>
                                   </div>
                                   <div>
-                                    <div style={{ fontSize: "0.78rem", color: "#6b7280", marginBottom: 3 }}>Client Type</div>
-                                    <select style={{ ...S.input, padding: "8px 10px", fontSize: "0.85rem", backgroundColor: "#fff" }} value={(editFields as any).clientType || ""} onChange={e => setEditFields(prev => ({ ...prev, clientType: e.target.value }))}>
+                                    <div style={{ fontSize: "0.78rem", color: "rgba(255,255,255,0.45)", marginBottom: 3 }}>Client Type</div>
+                                    <select style={{ ...S.input, padding: "8px 10px", fontSize: "0.85rem", backgroundColor: "transparent" }} value={(editFields as any).clientType || ""} onChange={e => setEditFields(prev => ({ ...prev, clientType: e.target.value }))}>
                                       <option value="oneTime">One-Time</option>
                                       <option value="maintenance">Maintenance</option>
                                     </select>
                                   </div>
                                   <div>
-                                    <div style={{ fontSize: "0.78rem", color: "#6b7280", marginBottom: 3 }}>Frequency</div>
-                                    <select style={{ ...S.input, padding: "8px 10px", fontSize: "0.85rem", backgroundColor: "#fff" }} value={(editFields as any).recurringFrequency || ""} onChange={e => setEditFields(prev => ({ ...prev, recurringFrequency: e.target.value }))}>
+                                    <div style={{ fontSize: "0.78rem", color: "rgba(255,255,255,0.45)", marginBottom: 3 }}>Frequency</div>
+                                    <select style={{ ...S.input, padding: "8px 10px", fontSize: "0.85rem", backgroundColor: "transparent" }} value={(editFields as any).recurringFrequency || ""} onChange={e => setEditFields(prev => ({ ...prev, recurringFrequency: e.target.value }))}>
                                       <option value="">None</option>
                                       <option value="biweekly">Bi-Weekly</option>
                                       <option value="monthly">Monthly</option>
@@ -1990,14 +1993,14 @@ export default function App() {
                                 </div>
 
                                 {/* Add-Ons editor — full width */}
-                                <div style={{ marginBottom: 14, padding: "12px 14px", background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: 12 }}>
-                                  <div style={{ fontSize: "0.78rem", color: "#6b7280", marginBottom: 10, fontWeight: 600 }}>Add-On Services</div>
+                                <div style={{ marginBottom: 14, padding: "12px 14px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 12 }}>
+                                  <div style={{ fontSize: "0.78rem", color: "rgba(255,255,255,0.45)", marginBottom: 10, fontWeight: 600 }}>Add-On Services</div>
                                   <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 6 }}>
                                     {(b.vehicle === "boat" ? marineAddOnOptions : addOnOptions).map(option => {
                                       const currentAddOns = (editFields.addOns || "").split(",").map((s: string) => s.trim()).filter(Boolean);
                                       const isChecked = currentAddOns.includes(option.label);
                                       return (
-                                        <label key={option.label} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: "0.82rem", color: "#374151" }}>
+                                        <label key={option.label} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: "0.82rem", color: "rgba(255,255,255,0.7)" }}>
                                           <input
                                             type="checkbox"
                                             checked={isChecked}
@@ -2010,7 +2013,7 @@ export default function App() {
                                             }}
                                           />
                                           <span>{option.label}</span>
-                                          <span style={{ color: "#9ca3af", marginLeft: "auto" }}>{option.priceText}</span>
+                                          <span style={{ color: "rgba(255,255,255,0.35)", marginLeft: "auto" }}>{option.priceText}</span>
                                         </label>
                                       );
                                     })}
@@ -2042,10 +2045,10 @@ export default function App() {
                                   if (editFields.address && editFields.address !== b.address) changes.push({ field: "Address", from: b.address, to: editFields.address });
                                   if (changes.length === 0) return null;
                                   return (
-                                    <div style={{ marginBottom: 14, padding: "12px 14px", background: "#fffbeb", border: "1.5px solid #fcd34d", borderRadius: 12 }}>
-                                      <div style={{ fontSize: "0.78rem", fontWeight: 700, color: "#92400e", marginBottom: 8 }}>📧 Booking change email will be sent to {b.email}</div>
+                                    <div style={{ marginBottom: 14, padding: "12px 14px", background: "rgba(251,191,36,0.08)", border: "1.5px solid #fcd34d", borderRadius: 12 }}>
+                                      <div style={{ fontSize: "0.78rem", fontWeight: 700, color: "#fbbf24", marginBottom: 8 }}>📧 Booking change email will be sent to {b.email}</div>
                                       {changes.map((c, i) => (
-                                        <div key={i} style={{ fontSize: "0.78rem", color: "#78350f", marginBottom: 3 }}>
+                                        <div key={i} style={{ fontSize: "0.78rem", color: "#fcd34d", marginBottom: 3 }}>
                                           <strong>{c.field}:</strong> <span style={{ textDecoration: "line-through", opacity: 0.6 }}>{c.from}</span> → <strong>{c.to}</strong>
                                         </div>
                                       ))}
@@ -2059,7 +2062,7 @@ export default function App() {
                                     {editSaving ? "Saving..." : "Save Changes"}
                                   </button>
                                   <button onClick={() => { setEditingBooking(null); setEditFields({}); }}
-                                    style={{ background: "#f3f4f6", color: "#374151", border: "none", borderRadius: 8, padding: "9px 14px", fontWeight: 600, fontSize: "0.88rem", cursor: "pointer" }}>
+                                    style={{ background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.7)", border: "none", borderRadius: 8, padding: "9px 14px", fontWeight: 600, fontSize: "0.88rem", cursor: "pointer" }}>
                                     Cancel
                                   </button>
                                 </div>
@@ -2073,16 +2076,16 @@ export default function App() {
                                   const isClean = checkedForThis && maintTimeConflicts.length === 0;
 
                                   return (
-                                    <div style={{ marginTop: 16, padding: "14px 16px", background: "#f0f9ff", border: "1.5px solid #7dd3fc", borderRadius: 12 }}>
+                                    <div style={{ marginTop: 16, padding: "14px 16px", background: "rgba(59,130,246,0.08)", border: "1.5px solid #7dd3fc", borderRadius: 12 }}>
                                       <div style={{ fontWeight: 700, color: "#0369a1", fontSize: "0.88rem", marginBottom: 4 }}>Update Time for Entire Schedule</div>
                                       <div style={{ fontSize: "0.78rem", color: "#0284c7", marginBottom: 12 }}>Changes the time on ALL future appointments and calendar events for this vehicle. Checks for conflicts with other bookings first.</div>
 
                                       <div style={{ display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap" as const, marginBottom: 12 }}>
                                         <div>
-                                          <div style={{ fontSize: "0.72rem", color: "#6b7280", marginBottom: 4 }}>Select New Time</div>
+                                          <div style={{ fontSize: "0.72rem", color: "rgba(255,255,255,0.45)", marginBottom: 4 }}>Select New Time</div>
                                           <select
                                             id={`newTimeAll-${b.rowIndex}`}
-                                            style={{ ...S.input, padding: "8px 12px", fontSize: "0.85rem", backgroundColor: "#fff", width: "auto" }}
+                                            style={{ ...S.input, padding: "8px 12px", fontSize: "0.85rem", backgroundColor: "transparent", width: "auto" }}
                                             defaultValue={b.time}
                                             onChange={() => {
                                               // Reset conflict check when time changes
@@ -2132,21 +2135,21 @@ export default function App() {
 
                                       {/* Conflict results */}
                                       {hasConflicts && (
-                                        <div style={{ background: "#fef2f2", border: "1.5px solid #fca5a5", borderRadius: 10, padding: "12px 16px", marginBottom: 12 }}>
+                                        <div style={{ background: "rgba(239,68,68,0.1)", border: "1.5px solid #fca5a5", borderRadius: 10, padding: "12px 16px", marginBottom: 12 }}>
                                           <div style={{ fontWeight: 700, color: "#dc2626", fontSize: "0.85rem", marginBottom: 8 }}>
                                             ⚠ {maintTimeConflicts.length} conflict{maintTimeConflicts.length !== 1 ? "s" : ""} found at {selectedNewTime}
                                           </div>
-                                          <div style={{ fontSize: "0.78rem", color: "#7f1d1d", marginBottom: 8 }}>
+                                          <div style={{ fontSize: "0.78rem", color: "#fca5a5", marginBottom: 8 }}>
                                             The following existing bookings overlap with this time:
                                           </div>
                                           {maintTimeConflicts.map((c, ci) => (
-                                            <div key={ci} style={{ background: "#fff", border: "1px solid #fca5a5", borderRadius: 8, padding: "8px 12px", marginBottom: 6, fontSize: "0.82rem" }}>
-                                              <span style={{ fontWeight: 700, color: "#111827" }}>{c.dateLabel}</span>
-                                              <span style={{ color: "#6b7280" }}> — {c.clientName}</span>
-                                              <span style={{ color: "#9ca3af" }}> · {c.vehicle}</span>
+                                            <div key={ci} style={{ background: "rgba(255,255,255,0.05)", border: "1px solid #fca5a5", borderRadius: 8, padding: "8px 12px", marginBottom: 6, fontSize: "0.82rem" }}>
+                                              <span style={{ fontWeight: 700, color: "#f1f5f9" }}>{c.dateLabel}</span>
+                                              <span style={{ color: "rgba(255,255,255,0.45)" }}> — {c.clientName}</span>
+                                              <span style={{ color: "rgba(255,255,255,0.35)" }}> · {c.vehicle}</span>
                                             </div>
                                           ))}
-                                          <div style={{ fontSize: "0.75rem", color: "#9ca3af", marginTop: 8 }}>You can still apply the change — these are informational so you can decide how to handle each conflict manually.</div>
+                                          <div style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.35)", marginTop: 8 }}>You can still apply the change — these are informational so you can decide how to handle each conflict manually.</div>
                                           <button
                                             onClick={async () => {
                                               if (!window.confirm(`Apply ${selectedNewTime} to all future ${b.make} ${b.model} appointments anyway? ${maintTimeConflicts.length} conflict${maintTimeConflicts.length !== 1 ? "s" : ""} will need to be resolved manually.`)) return;
@@ -2159,9 +2162,9 @@ export default function App() {
                                       )}
 
                                       {isClean && (
-                                        <div style={{ background: "#f0fdf4", border: "1.5px solid #6ee7b7", borderRadius: 10, padding: "12px 16px", marginBottom: 12 }}>
+                                        <div style={{ background: "rgba(16,185,129,0.08)", border: "1.5px solid #6ee7b7", borderRadius: 10, padding: "12px 16px", marginBottom: 12 }}>
                                           <div style={{ fontWeight: 700, color: "#059669", fontSize: "0.85rem", marginBottom: 4 }}>✓ No conflicts — {selectedNewTime} is clear for all future dates</div>
-                                          <div style={{ fontSize: "0.78rem", color: "#047857" }}>Safe to apply. This will update all future bookings and calendar events.</div>
+                                          <div style={{ fontSize: "0.78rem", color: "#10b981" }}>Safe to apply. This will update all future bookings and calendar events.</div>
                                           <button
                                             onClick={async () => {
                                               await applyMaintenanceTimeUpdate(b, selectedNewTime);
@@ -2179,8 +2182,8 @@ export default function App() {
 
                             {/* Mark complete form */}
                             {isSelected && (
-                              <div style={{ marginTop: 14, padding: 16, background: "#f9fafb", borderRadius: 12, border: "1px solid #e5e7eb" }}>
-                                <div style={{ fontWeight: 700, color: "#374151", marginBottom: 10 }}>Confirm Service & Set Invoice</div>
+                              <div style={{ marginTop: 14, padding: 16, background: "rgba(255,255,255,0.04)", borderRadius: 12, border: "1px solid rgba(255,255,255,0.08)" }}>
+                                <div style={{ fontWeight: 700, color: "rgba(255,255,255,0.7)", marginBottom: 10 }}>Confirm Service & Set Invoice</div>
 
                                 {b.clientType !== "maintenance" ? (
                                   /* Non-maintenance: hourly or flat rate toggle */
@@ -2189,13 +2192,13 @@ export default function App() {
                                     <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
                                       <button
                                         onClick={() => { setBillingMode("hourly"); setCompleteAmount(""); setCompleteHours(""); }}
-                                        style={{ flex: 1, padding: "8px 12px", borderRadius: 8, border: billingMode === "hourly" ? "2px solid #111827" : "1.5px solid #e5e7eb", background: billingMode === "hourly" ? "#111827" : "#fff", color: billingMode === "hourly" ? "#fff" : "#374151", fontWeight: 700, fontSize: "0.82rem", cursor: "pointer" }}
+                                        style={{ flex: 1, padding: "8px 12px", borderRadius: 8, border: billingMode === "hourly" ? "2px solid #f1f5f9" : "1px solid rgba(255,255,255,0.12)", background: billingMode === "hourly" ? "rgba(255,255,255,0.15)" : "rgba(255,255,255,0.04)", color: billingMode === "hourly" ? "#fff" : "rgba(255,255,255,0.5)", fontWeight: 700, fontSize: "0.82rem", cursor: "pointer" }}
                                       >
                                         ⏱ Hourly
                                       </button>
                                       <button
                                         onClick={() => { setBillingMode("flat"); setCompleteHours(""); setCompleteAmount(""); }}
-                                        style={{ flex: 1, padding: "8px 12px", borderRadius: 8, border: billingMode === "flat" ? "2px solid #7c3aed" : "1.5px solid #e5e7eb", background: billingMode === "flat" ? "#7c3aed" : "#fff", color: billingMode === "flat" ? "#fff" : "#374151", fontWeight: 700, fontSize: "0.82rem", cursor: "pointer" }}
+                                        style={{ flex: 1, padding: "8px 12px", borderRadius: 8, border: billingMode === "flat" ? "2px solid #a78bfa" : "1px solid rgba(255,255,255,0.12)", background: billingMode === "flat" ? "rgba(139,92,246,0.3)" : "rgba(255,255,255,0.04)", color: billingMode === "flat" ? "#fff" : "rgba(255,255,255,0.5)", fontWeight: 700, fontSize: "0.82rem", cursor: "pointer" }}
                                       >
                                         💲 Flat Rate
                                       </button>
@@ -2203,12 +2206,12 @@ export default function App() {
 
                                     {billingMode === "hourly" ? (
                                       <>
-                                        <div style={{ fontSize: "0.82rem", color: "#6b7280", marginBottom: 6 }}>
+                                        <div style={{ fontSize: "0.82rem", color: "rgba(255,255,255,0.45)", marginBottom: 6 }}>
                                           Rate: <strong>${b.hourlyRate}/hr</strong> — Enter total hours to calculate invoice
                                         </div>
                                         <div style={{ display: "flex", gap: 10, flexWrap: "wrap" as const }}>
                                           <div style={{ flex: 1, minWidth: 120 }}>
-                                            <div style={{ fontSize: "0.78rem", color: "#6b7280", marginBottom: 4 }}>Hours Worked</div>
+                                            <div style={{ fontSize: "0.78rem", color: "rgba(255,255,255,0.45)", marginBottom: 4 }}>Hours Worked</div>
                                             <input
                                               style={{ ...S.input, padding: "10px 12px" }}
                                               type="number"
@@ -2225,9 +2228,9 @@ export default function App() {
                                             />
                                           </div>
                                           <div style={{ flex: 1, minWidth: 120 }}>
-                                            <div style={{ fontSize: "0.78rem", color: "#6b7280", marginBottom: 4 }}>Invoice Amount</div>
+                                            <div style={{ fontSize: "0.78rem", color: "rgba(255,255,255,0.45)", marginBottom: 4 }}>Invoice Amount</div>
                                             <input
-                                              style={{ ...S.input, padding: "10px 12px", background: "#f3f4f6", fontWeight: 700 }}
+                                              style={{ ...S.input, padding: "10px 12px", background: "rgba(255,255,255,0.06)", fontWeight: 700 }}
                                               type="number"
                                               placeholder="Auto-calculated"
                                               value={completeAmount}
@@ -2235,7 +2238,7 @@ export default function App() {
                                             />
                                           </div>
                                           <div style={{ flex: 2, minWidth: 180 }}>
-                                            <div style={{ fontSize: "0.78rem", color: "#6b7280", marginBottom: 4 }}>Note (optional)</div>
+                                            <div style={{ fontSize: "0.78rem", color: "rgba(255,255,255,0.45)", marginBottom: 4 }}>Note (optional)</div>
                                             <input style={{ ...S.input, padding: "10px 12px" }} placeholder="e.g. Boat detail, full interior" value={completeNote} onChange={e => setCompleteNote(e.target.value)} />
                                           </div>
                                         </div>
@@ -2252,7 +2255,7 @@ export default function App() {
                                         </div>
                                         <div style={{ display: "flex", gap: 10, flexWrap: "wrap" as const }}>
                                           <div style={{ flex: 1, minWidth: 140 }}>
-                                            <div style={{ fontSize: "0.78rem", color: "#6b7280", marginBottom: 4 }}>Invoice Amount ($)</div>
+                                            <div style={{ fontSize: "0.78rem", color: "rgba(255,255,255,0.45)", marginBottom: 4 }}>Invoice Amount ($)</div>
                                             <input
                                               style={{ ...S.input, padding: "10px 12px", fontWeight: 700, border: "1.5px solid #a78bfa" }}
                                               type="number"
@@ -2264,7 +2267,7 @@ export default function App() {
                                             />
                                           </div>
                                           <div style={{ flex: 2, minWidth: 180 }}>
-                                            <div style={{ fontSize: "0.78rem", color: "#6b7280", marginBottom: 4 }}>Note (optional)</div>
+                                            <div style={{ fontSize: "0.78rem", color: "rgba(255,255,255,0.45)", marginBottom: 4 }}>Note (optional)</div>
                                             <input style={{ ...S.input, padding: "10px 12px" }} placeholder="e.g. Ceramic coating consultation" value={completeNote} onChange={e => setCompleteNote(e.target.value)} />
                                           </div>
                                         </div>
@@ -2280,17 +2283,17 @@ export default function App() {
                                   /* Maintenance: fixed 2hr amount, can adjust */
                                   <div style={{ display: "flex", gap: 10, marginBottom: 10, flexWrap: "wrap" as const }}>
                                     <div style={{ flex: 1, minWidth: 120 }}>
-                                      <div style={{ fontSize: "0.82rem", color: "#6b7280", marginBottom: 4 }}>Amount ($)</div>
+                                      <div style={{ fontSize: "0.82rem", color: "rgba(255,255,255,0.45)", marginBottom: 4 }}>Amount ($)</div>
                                       <input style={{ ...S.input, padding: "10px 12px" }} type="number" placeholder="0.00" value={completeAmount} onChange={e => setCompleteAmount(e.target.value)} />
                                     </div>
                                     <div style={{ flex: 2, minWidth: 180 }}>
-                                      <div style={{ fontSize: "0.82rem", color: "#6b7280", marginBottom: 4 }}>Note (optional)</div>
+                                      <div style={{ fontSize: "0.82rem", color: "rgba(255,255,255,0.45)", marginBottom: 4 }}>Note (optional)</div>
                                       <input style={{ ...S.input, padding: "10px 12px" }} placeholder="e.g. 2 hrs at $80/hr" value={completeNote} onChange={e => setCompleteNote(e.target.value)} />
                                     </div>
                                   </div>
                                 )}
 
-                                <div style={{ fontSize: "0.8rem", color: "#9ca3af", marginBottom: 10 }}>This creates a pending invoice. You must release it from the Invoices tab before the client can see it.</div>
+                                <div style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.35)", marginBottom: 10 }}>This creates a pending invoice. You must release it from the Invoices tab before the client can see it.</div>
                                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" as const }}>
                                   <button onClick={handleMarkComplete} disabled={completeLoading || (!completeAmount && !completeHours)}
                                     style={{ background: "#059669", color: "#fff", border: "none", borderRadius: 8, padding: "9px 18px", fontWeight: 700, fontSize: "0.88rem", cursor: "pointer", opacity: completeLoading || (!completeAmount && !completeHours) ? 0.5 : 1 }}>
@@ -2311,7 +2314,7 @@ export default function App() {
                                 </div>
 
                                 {/* Photo upload — Before & After (multiple) */}
-                                <div style={{ marginTop: 14, padding: 14, background: "#f0f9ff", borderRadius: 12, border: "1px solid #bae6fd" }}>
+                                <div style={{ marginTop: 14, padding: 14, background: "rgba(59,130,246,0.08)", borderRadius: 12, border: "1px solid #bae6fd" }}>
                                   <div style={{ fontWeight: 700, color: "#0369a1", marginBottom: 10, fontSize: "0.85rem" }}>Job Photos</div>
                                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap" as const }}>
                                     {(["before", "after"] as const).map(type => (
@@ -2375,18 +2378,18 @@ export default function App() {
                   <>
                     {pendingInvoices.length > 0 && (
                       <>
-                        <div style={{ fontWeight: 700, color: "#92400e", fontSize: "0.85rem", textTransform: "uppercase" as const, letterSpacing: "0.04em", marginBottom: 10 }}>Pending Review — Not Visible to Client</div>
+                        <div style={{ fontWeight: 700, color: "#fbbf24", fontSize: "0.85rem", textTransform: "uppercase" as const, letterSpacing: "0.04em", marginBottom: 10 }}>Pending Review — Not Visible to Client</div>
                         <div style={{ display: "grid", gap: 10, marginBottom: 24 }}>
                           {pendingInvoices.map((b, i) => (
-                            <div key={i} style={{ background: "#fff", border: "1px solid #fde68a", borderRadius: 14, padding: 16 }}>
+                            <div key={i} style={{ background: "rgba(255,255,255,0.05)", border: "1px solid #fde68a", borderRadius: 14, padding: 16 }}>
                               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap" as const, gap: 8 }}>
                                 <div>
-                                  <div style={{ fontWeight: 700, color: "#111827" }}>{b.name} — {formatDateLabel(b.date)}</div>
-                                  <div style={{ fontSize: "0.85rem", color: "#6b7280" }}>{b.email}</div>
-                                  {b.invoiceNote && <div style={{ fontSize: "0.85rem", color: "#9ca3af" }}>{b.invoiceNote}</div>}
+                                  <div style={{ fontWeight: 700, color: "#f1f5f9" }}>{b.name} — {formatDateLabel(b.date)}</div>
+                                  <div style={{ fontSize: "0.85rem", color: "rgba(255,255,255,0.45)" }}>{b.email}</div>
+                                  {b.invoiceNote && <div style={{ fontSize: "0.85rem", color: "rgba(255,255,255,0.35)" }}>{b.invoiceNote}</div>}
                                 </div>
                                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                                  <span style={{ fontWeight: 800, color: "#92400e", fontSize: "1.1rem" }}>${b.invoiceAmount}</span>
+                                  <span style={{ fontWeight: 800, color: "#fbbf24", fontSize: "1.1rem" }}>${b.invoiceAmount}</span>
                                   <button onClick={() => handleReleaseInvoice(b)} disabled={processingRows.has(b.rowIndex)} style={{ background: "#111827", color: "#fff", border: "none", borderRadius: 8, padding: "7px 14px", fontWeight: 600, fontSize: "0.82rem", cursor: "pointer", opacity: processingRows.has(b.rowIndex) ? 0.5 : 1 }}>{processingRows.has(b.rowIndex) ? "Processing..." : "Release to Client"}</button>
                                 </div>
                               </div>
@@ -2398,18 +2401,18 @@ export default function App() {
 
                     {releasedInvoices.length > 0 && (
                       <>
-                        <div style={{ fontWeight: 700, color: "#374151", fontSize: "0.85rem", textTransform: "uppercase" as const, letterSpacing: "0.04em", marginBottom: 10 }}>Sent to Client — Awaiting Payment</div>
+                        <div style={{ fontWeight: 700, color: "rgba(255,255,255,0.7)", fontSize: "0.85rem", textTransform: "uppercase" as const, letterSpacing: "0.04em", marginBottom: 10 }}>Sent to Client — Awaiting Payment</div>
                         <div style={{ display: "grid", gap: 10, marginBottom: 24 }}>
                           {releasedInvoices.map((b, i) => (
-                            <div key={i} style={{ background: "#fff", border: "1px solid #fde047", borderRadius: 14, padding: 16 }}>
+                            <div key={i} style={{ background: "rgba(255,255,255,0.05)", border: "1px solid #fde047", borderRadius: 14, padding: 16 }}>
                               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap" as const, gap: 8 }}>
                                 <div>
-                                  <div style={{ fontWeight: 700, color: "#111827" }}>{b.name} — {formatDateLabel(b.date)}</div>
-                                  <div style={{ fontSize: "0.85rem", color: "#6b7280" }}>{b.email}</div>
-                                  {b.invoiceNote && <div style={{ fontSize: "0.85rem", color: "#9ca3af" }}>{b.invoiceNote}</div>}
+                                  <div style={{ fontWeight: 700, color: "#f1f5f9" }}>{b.name} — {formatDateLabel(b.date)}</div>
+                                  <div style={{ fontSize: "0.85rem", color: "rgba(255,255,255,0.45)" }}>{b.email}</div>
+                                  {b.invoiceNote && <div style={{ fontSize: "0.85rem", color: "rgba(255,255,255,0.35)" }}>{b.invoiceNote}</div>}
                                 </div>
                                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                                  <span style={{ fontWeight: 800, color: "#92400e", fontSize: "1.1rem" }}>${b.invoiceAmount}</span>
+                                  <span style={{ fontWeight: 800, color: "#fbbf24", fontSize: "1.1rem" }}>${b.invoiceAmount}</span>
                                   <button onClick={() => handleMarkPaid(b)} disabled={processingRows.has(b.rowIndex)} style={{ background: "#059669", color: "#fff", border: "none", borderRadius: 8, padding: "7px 14px", fontWeight: 600, fontSize: "0.82rem", cursor: "pointer", opacity: processingRows.has(b.rowIndex) ? 0.5 : 1 }}>{processingRows.has(b.rowIndex) ? "Processing..." : "Mark Paid"}</button>
                                 </div>
                               </div>
@@ -2421,18 +2424,18 @@ export default function App() {
 
                     {paidInvoices.length > 0 && (
                       <>
-                        <div style={{ fontWeight: 700, color: "#9ca3af", fontSize: "0.85rem", textTransform: "uppercase" as const, letterSpacing: "0.04em", marginBottom: 10 }}>Paid</div>
+                        <div style={{ fontWeight: 700, color: "rgba(255,255,255,0.35)", fontSize: "0.85rem", textTransform: "uppercase" as const, letterSpacing: "0.04em", marginBottom: 10 }}>Paid</div>
                         <div style={{ display: "grid", gap: 10 }}>
                           {paidInvoices.map((b, i) => (
-                            <div key={i} style={{ background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: 14, padding: 14 }}>
+                            <div key={i} style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 14, padding: 14 }}>
                               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                                 <div>
-                                  <div style={{ fontWeight: 600, color: "#374151" }}>{b.name} — {formatDateLabel(b.date)}</div>
-                                  <div style={{ fontSize: "0.82rem", color: "#9ca3af" }}>{b.email}</div>
+                                  <div style={{ fontWeight: 600, color: "rgba(255,255,255,0.7)" }}>{b.name} — {formatDateLabel(b.date)}</div>
+                                  <div style={{ fontSize: "0.82rem", color: "rgba(255,255,255,0.35)" }}>{b.email}</div>
                                 </div>
                                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                                  <span style={{ fontWeight: 700, color: "#374151" }}>${b.invoiceAmount}</span>
-                                  <span style={{ background: "#dcfce7", color: "#166534", fontSize: "0.72rem", fontWeight: 700, borderRadius: 999, padding: "2px 8px" }}>PAID</span>
+                                  <span style={{ fontWeight: 700, color: "rgba(255,255,255,0.7)" }}>${b.invoiceAmount}</span>
+                                  <span style={{ background: "rgba(16,185,129,0.15)", color: "#34d399", fontSize: "0.72rem", fontWeight: 700, borderRadius: 999, padding: "2px 8px" }}>PAID</span>
                                 </div>
                               </div>
                             </div>
@@ -2442,7 +2445,7 @@ export default function App() {
                     )}
 
                     {pendingInvoices.length === 0 && releasedInvoices.length === 0 && paidInvoices.length === 0 && (
-                      <div style={{ textAlign: "center", padding: 40, color: "#6b7280" }}>No invoices yet. Mark a service complete to create one.</div>
+                      <div style={{ textAlign: "center", padding: 40, color: "rgba(255,255,255,0.45)" }}>No invoices yet. Mark a service complete to create one.</div>
                     )}
                   </>
                 )}
@@ -2493,25 +2496,25 @@ export default function App() {
                           { label: "All-Time Revenue", value: `$${totalRev.toFixed(0)}`, sub: `${paid.length} jobs total`, color: "#7c3aed" },
                           { label: "Avg Job Value", value: `$${avgJob.toFixed(0)}`, sub: "per completed job", color: "#d97706" },
                         ].map((card, i) => (
-                          <div key={i} style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 16, padding: "16px 14px" }}>
-                            <div style={{ fontSize: "0.78rem", color: "#9ca3af", marginBottom: 6, fontWeight: 600, textTransform: "uppercase" as const, letterSpacing: "0.04em" }}>{card.label}</div>
+                          <div key={i} style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: "16px 14px" }}>
+                            <div style={{ fontSize: "0.78rem", color: "rgba(255,255,255,0.35)", marginBottom: 6, fontWeight: 600, textTransform: "uppercase" as const, letterSpacing: "0.04em" }}>{card.label}</div>
                             <div style={{ fontSize: "1.6rem", fontWeight: 900, color: card.color, letterSpacing: "-1px" }}>{card.value}</div>
-                            <div style={{ fontSize: "0.72rem", color: "#9ca3af", marginTop: 4 }}>{card.sub}</div>
+                            <div style={{ fontSize: "0.72rem", color: "rgba(255,255,255,0.35)", marginTop: 4 }}>{card.sub}</div>
                           </div>
                         ))}
                       </div>
 
                       {/* Bar chart */}
                       {last6.length > 0 ? (
-                        <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 16, padding: 20, marginBottom: 24 }}>
-                          <div style={{ fontWeight: 700, color: "#111827", marginBottom: 16, fontSize: "0.95rem" }}>Revenue — Last 6 Months</div>
+                        <div style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: 20, marginBottom: 24 }}>
+                          <div style={{ fontWeight: 700, color: "#f1f5f9", marginBottom: 16, fontSize: "0.95rem" }}>Revenue — Last 6 Months</div>
                           <div style={{ display: "flex", alignItems: "flex-end", gap: 8, height: 120 }}>
                             {last6.map(k => {
                               const pct = (monthlyData[k] / maxVal) * 100;
                               const isThis = k === thisMonthKey;
                               return (
                                 <div key={k} style={{ flex: 1, display: "flex", flexDirection: "column" as const, alignItems: "center", gap: 6 }}>
-                                  <div style={{ fontSize: "0.65rem", color: "#6b7280", fontWeight: 600 }}>${(monthlyData[k]/1000).toFixed(1)}k</div>
+                                  <div style={{ fontSize: "0.65rem", color: "rgba(255,255,255,0.45)", fontWeight: 600 }}>${(monthlyData[k]/1000).toFixed(1)}k</div>
                                   <div style={{ width: "100%", background: isThis ? "#059669" : "#d1fae5", borderRadius: "6px 6px 0 0", height: `${Math.max(pct, 4)}%`, transition: "height 0.3s ease" }} />
                                   <div style={{ fontSize: "0.65rem", color: isThis ? "#059669" : "#9ca3af", fontWeight: isThis ? 700 : 400 }}>{monthName(k)}</div>
                                 </div>
@@ -2520,7 +2523,7 @@ export default function App() {
                           </div>
                         </div>
                       ) : (
-                        <div style={{ textAlign: "center", padding: 40, color: "#6b7280" }}>No paid invoices yet to show revenue.</div>
+                        <div style={{ textAlign: "center", padding: 40, color: "rgba(255,255,255,0.45)" }}>No paid invoices yet to show revenue.</div>
                       )}
 
                       {/* Package breakdown */}
@@ -2533,13 +2536,13 @@ export default function App() {
                           byPkg[pkg].rev += parseFloat(b.invoiceAmount || "0");
                         });
                         return (
-                          <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 16, padding: 20 }}>
-                            <div style={{ fontWeight: 700, color: "#111827", marginBottom: 14, fontSize: "0.95rem" }}>Revenue by Service</div>
+                          <div style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: 20 }}>
+                            <div style={{ fontWeight: 700, color: "#f1f5f9", marginBottom: 14, fontSize: "0.95rem" }}>Revenue by Service</div>
                             {Object.entries(byPkg).sort((a, b) => b[1].rev - a[1].rev).map(([pkg, data], i) => (
                               <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderTop: i > 0 ? "1px solid #f3f4f6" : "none" }}>
                                 <div>
-                                  <div style={{ fontSize: "0.88rem", fontWeight: 600, color: "#374151" }}>{pkg}</div>
-                                  <div style={{ fontSize: "0.75rem", color: "#9ca3af" }}>{data.count} job{data.count !== 1 ? "s" : ""}</div>
+                                  <div style={{ fontSize: "0.88rem", fontWeight: 600, color: "rgba(255,255,255,0.7)" }}>{pkg}</div>
+                                  <div style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.35)" }}>{data.count} job{data.count !== 1 ? "s" : ""}</div>
                                 </div>
                                 <div style={{ fontWeight: 800, color: "#059669" }}>${data.rev.toFixed(0)}</div>
                               </div>
@@ -2555,22 +2558,22 @@ export default function App() {
                 {adminTab === "availability" && (
                   <>
                     {availLoading ? (
-                      <div style={{ textAlign: "center", padding: 40, color: "#6b7280" }}>Loading slots...</div>
+                      <div style={{ textAlign: "center", padding: 40, color: "rgba(255,255,255,0.45)" }}>Loading slots...</div>
                     ) : (
                       <>
                         {/* Add new slot */}
-                        <div style={{ background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: 14, padding: 16, marginBottom: 20 }}>
-                          <div style={{ fontWeight: 700, color: "#374151", marginBottom: 12, fontSize: "0.9rem" }}>Add New Slot</div>
+                        <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 14, padding: 16, marginBottom: 20 }}>
+                          <div style={{ fontWeight: 700, color: "rgba(255,255,255,0.7)", marginBottom: 12, fontSize: "0.9rem" }}>Add New Slot</div>
                           <div style={{ display: "flex", gap: 10, flexWrap: "wrap" as const, alignItems: "flex-end" }}>
                             <div>
-                              <div style={{ fontSize: "0.75rem", color: "#6b7280", marginBottom: 4 }}>Date</div>
+                              <div style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.45)", marginBottom: 4 }}>Date</div>
                               <input type="date" value={newSlotDate} onChange={e => setNewSlotDate(e.target.value)}
                                 style={{ ...S.input, padding: "8px 12px", width: "auto" }} />
                             </div>
                             <div>
-                              <div style={{ fontSize: "0.75rem", color: "#6b7280", marginBottom: 4 }}>Time</div>
+                              <div style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.45)", marginBottom: 4 }}>Time</div>
                               <select value={newSlotTime} onChange={e => setNewSlotTime(e.target.value)}
-                                style={{ ...S.input, padding: "8px 12px", width: "auto", backgroundColor: "#fff" }}>
+                                style={{ ...S.input, padding: "8px 12px", width: "auto", backgroundColor: "transparent" }}>
                                 <option value="">Select time</option>
                                 {["8:00 AM","9:00 AM","10:00 AM","11:00 AM","12:00 PM","1:00 PM","2:00 PM","3:00 PM","4:00 PM","4:30 PM","5:00 PM","6:00 PM"].map(t => (
                                   <option key={t} value={t}>{t}</option>
@@ -2590,7 +2593,7 @@ export default function App() {
                                 } catch { alert("Error adding slot"); }
                                 setAddingSlot(false);
                               }}
-                              style={{ background: "#0f0f0f", color: "#fff", border: "none", borderRadius: 10, padding: "9px 18px", fontWeight: 700, fontSize: "0.88rem", cursor: "pointer", opacity: !newSlotDate || !newSlotTime ? 0.4 : 1 }}>
+                              style={{ background: "linear-gradient(135deg, #3b82f6, #1d4ed8)", color: "#fff", border: "none", borderRadius: 10, padding: "9px 18px", fontWeight: 700, fontSize: "0.88rem", cursor: "pointer", opacity: !newSlotDate || !newSlotTime ? 0.4 : 1, boxShadow: "0 4px 16px rgba(59,130,246,0.3)" }}>
                               {addingSlot ? "Adding..." : "+ Add Slot"}
                             </button>
                           </div>
@@ -2609,10 +2612,10 @@ export default function App() {
                             return new Date(y,m-1,day) >= new Date(new Date().setHours(0,0,0,0));
                           });
                           return upcoming.length === 0 ? (
-                            <div style={{ textAlign: "center", padding: 40, color: "#6b7280" }}>No upcoming slots.</div>
+                            <div style={{ textAlign: "center", padding: 40, color: "rgba(255,255,255,0.45)" }}>No upcoming slots.</div>
                           ) : upcoming.map(date => (
                             <div key={date} style={{ marginBottom: 16 }}>
-                              <div style={{ fontSize: "0.82rem", fontWeight: 700, color: "#374151", marginBottom: 8, textTransform: "uppercase" as const, letterSpacing: "0.04em" }}>
+                              <div style={{ fontSize: "0.82rem", fontWeight: 700, color: "rgba(255,255,255,0.7)", marginBottom: 8, textTransform: "uppercase" as const, letterSpacing: "0.04em" }}>
                                 {formatDateLabel(date)}
                               </div>
                               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" as const }}>
@@ -2630,7 +2633,7 @@ export default function App() {
                                           }
                                         } catch { alert("Error toggling slot"); }
                                       }}
-                                      style={{ background: isOpen ? "#ecfdf5" : "#fef2f2", color: isOpen ? "#059669" : "#dc2626", border: `1.5px solid ${isOpen ? "#6ee7b7" : "#fca5a5"}`, borderRadius: 10, padding: "7px 14px", fontSize: "0.85rem", fontWeight: 700, cursor: "pointer" }}>
+                                      style={{ background: isOpen ? "#ecfdf5" : "rgba(239,68,68,0.12)", color: isOpen ? "#059669" : "#dc2626", border: `1.5px solid ${isOpen ? "#6ee7b7" : "#fca5a5"}`, borderRadius: 10, padding: "7px 14px", fontSize: "0.85rem", fontWeight: 700, cursor: "pointer" }}>
                                       {slot.time} {isOpen ? "✓" : "✗"}
                                     </button>
                                   );
@@ -2681,7 +2684,7 @@ export default function App() {
               <>
                 <h2 style={S.title}>Request a Change</h2>
                 <p style={S.subtitle}>Let us know what you'd like to change about this appointment.</p>
-                <div style={{ ...S.summaryCard, marginBottom: 24, background: "#f9fafb" }}>
+                <div style={{ ...S.summaryCard, marginBottom: 24, background: "rgba(255,255,255,0.04)" }}>
                   <div style={S.summaryHeading}>Appointment</div>
                   <div style={S.summaryValue}>
                     {formatDateLabel(changeTarget.date)}{changeTarget.time ? ` at ${changeTarget.time}` : ""}<br />
@@ -2746,8 +2749,8 @@ export default function App() {
     const lowStockItems = inventoryItems.filter(i => isLowStock(i) || isOutOfStock(i));
 
     const stockColor = (item: { quantity: string; lowStockThreshold: string }) => {
-      if (isOutOfStock(item)) return { bg: "#fef2f2", border: "#fca5a5", badge: "#dc2626", badgeBg: "#fef2f2", label: "OUT" };
-      if (isLowStock(item))   return { bg: "#fffbeb", border: "#fcd34d", badge: "#d97706", badgeBg: "#fefce8", label: "LOW" };
+      if (isOutOfStock(item)) return { bg: "rgba(239,68,68,0.12)", border: "#fca5a5", badge: "#dc2626", badgeBg: "rgba(239,68,68,0.12)", label: "OUT" };
+      if (isLowStock(item))   return { bg: "#fffbeb", border: "#fcd34d", badge: "#d97706", badgeBg: "rgba(251,191,36,0.12)", label: "LOW" };
       return { bg: "#fff", border: "#e5e7eb", badge: "#059669", badgeBg: "#f0fdf4", label: "OK" };
     };
 
@@ -2786,9 +2789,9 @@ export default function App() {
               const lowItems  = lowStockItems.filter(i => !isOutOfStock(i));
               if (lowStockItems.length === 0) return null;
               return (
-                <div style={{ background: "#fffbeb", border: "1.5px solid #fcd34d", borderRadius: 14, padding: "16px 18px", marginBottom: 20 }}>
+                <div style={{ background: "rgba(251,191,36,0.08)", border: "1.5px solid #fcd34d", borderRadius: 14, padding: "16px 18px", marginBottom: 20 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, flexWrap: "wrap" as const, gap: 8 }}>
-                    <div style={{ fontWeight: 700, color: "#92400e", fontSize: "0.95rem" }}>
+                    <div style={{ fontWeight: 700, color: "#fbbf24", fontSize: "0.95rem" }}>
                       ⚠ Restock Needed
                     </div>
                     <button
@@ -2805,8 +2808,8 @@ export default function App() {
                         </div>
                         {outItems.map((item, i) => (
                           <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "5px 0", borderTop: i > 0 ? "1px solid #fee2e2" : "none" }}>
-                            <span style={{ fontSize: "0.82rem", color: "#7f1d1d", fontWeight: 500 }}>{item.item}</span>
-                            <span style={{ background: "#fef2f2", color: "#dc2626", border: "1px solid #fca5a5", borderRadius: 999, padding: "1px 8px", fontSize: "0.7rem", fontWeight: 700, whiteSpace: "nowrap" as const, marginLeft: 8 }}>OUT</span>
+                            <span style={{ fontSize: "0.82rem", color: "#fca5a5", fontWeight: 500 }}>{item.item}</span>
+                            <span style={{ background: "rgba(239,68,68,0.1)", color: "#dc2626", border: "1px solid #fca5a5", borderRadius: 999, padding: "1px 8px", fontSize: "0.7rem", fontWeight: 700, whiteSpace: "nowrap" as const, marginLeft: 8 }}>OUT</span>
                           </div>
                         ))}
                       </div>
@@ -2818,12 +2821,12 @@ export default function App() {
                         </div>
                         {lowItems.slice(0, 8).map((item, i) => (
                           <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "5px 0", borderTop: i > 0 ? "1px solid #fef3c7" : "none" }}>
-                            <span style={{ fontSize: "0.82rem", color: "#78350f", fontWeight: 500 }}>{item.item}</span>
-                            <span style={{ fontSize: "0.78rem", color: "#b45309", fontWeight: 700, whiteSpace: "nowrap" as const, marginLeft: 8 }}>{item.quantity} {item.unit}</span>
+                            <span style={{ fontSize: "0.82rem", color: "#fcd34d", fontWeight: 500 }}>{item.item}</span>
+                            <span style={{ fontSize: "0.78rem", color: "#f59e0b", fontWeight: 700, whiteSpace: "nowrap" as const, marginLeft: 8 }}>{item.quantity} {item.unit}</span>
                           </div>
                         ))}
                         {lowItems.length > 8 && (
-                          <div style={{ fontSize: "0.75rem", color: "#b45309", marginTop: 6 }}>+{lowItems.length - 8} more — tap "View All" above</div>
+                          <div style={{ fontSize: "0.75rem", color: "#f59e0b", marginTop: 6 }}>+{lowItems.length - 8} more — tap "View All" above</div>
                         )}
                       </div>
                     )}
@@ -2843,7 +2846,7 @@ export default function App() {
               <div style={{ display: "flex", gap: 6 }}>
                 {(["all", "low"] as const).map(f => (
                   <button key={f} onClick={() => setInventoryFilter(f)}
-                    style={{ background: inventoryFilter === f ? "#111827" : "#f3f4f6", color: inventoryFilter === f ? "#fff" : "#374151", border: "none", borderRadius: 999, padding: "7px 14px", fontSize: "0.82rem", fontWeight: 600, cursor: "pointer" }}>
+                    style={{ background: inventoryFilter === f ? "#111827" : "rgba(255,255,255,0.08)", color: inventoryFilter === f ? "#fff" : "#374151", border: "none", borderRadius: 999, padding: "7px 14px", fontSize: "0.82rem", fontWeight: 600, cursor: "pointer" }}>
                     {f === "all" ? "All Items" : "⚠ Low / Out"}
                   </button>
                 ))}
@@ -2854,7 +2857,7 @@ export default function App() {
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap" as const, marginBottom: 20 }}>
               {CATEGORIES.map(cat => (
                 <button key={cat} onClick={() => setInvCatFilter(cat)}
-                  style={{ background: invCatFilter === cat ? "#7c3aed" : "#f3f4f6", color: invCatFilter === cat ? "#fff" : "#374151", border: "none", borderRadius: 999, padding: "5px 12px", fontSize: "0.78rem", fontWeight: 600, cursor: "pointer" }}>
+                  style={{ background: invCatFilter === cat ? "#7c3aed" : "rgba(255,255,255,0.08)", color: invCatFilter === cat ? "#fff" : "#374151", border: "none", borderRadius: 999, padding: "5px 12px", fontSize: "0.78rem", fontWeight: 600, cursor: "pointer" }}>
                   {cat}
                 </button>
               ))}
@@ -2863,38 +2866,38 @@ export default function App() {
             {/* Add item modal */}
             {addingInventoryItem && (
               <div style={{ position: "fixed" as const, inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 16 }}>
-                <div style={{ background: "#fff", borderRadius: 20, padding: 28, maxWidth: 560, width: "100%", boxShadow: "0 20px 60px rgba(0,0,0,0.2)", maxHeight: "90vh", overflowY: "auto" as const }}>
+                <div style={{ background: "rgba(255,255,255,0.05)", borderRadius: 20, padding: 28, maxWidth: 560, width: "100%", boxShadow: "0 20px 60px rgba(0,0,0,0.2)", maxHeight: "90vh", overflowY: "auto" as const }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-                    <div style={{ fontWeight: 800, color: "#111827", fontSize: "1.1rem" }}>Add New Item</div>
+                    <div style={{ fontWeight: 800, color: "#f1f5f9", fontSize: "1.1rem" }}>Add New Item</div>
                     <button onClick={() => { setAddingInventoryItem(false); setNewInventoryItem({ item: "", category: "", quantity: "", unit: "", lowStockThreshold: "", notes: "" }); }}
-                      style={{ background: "#f3f4f6", border: "none", borderRadius: 8, width: 32, height: 32, cursor: "pointer", fontSize: "1rem", color: "#374151", fontWeight: 700 }}>✕</button>
+                      style={{ background: "rgba(255,255,255,0.06)", border: "none", borderRadius: 8, width: 32, height: 32, cursor: "pointer", fontSize: "1rem", color: "rgba(255,255,255,0.7)", fontWeight: 700 }}>✕</button>
                   </div>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
                     <div style={{ gridColumn: "1 / -1" }}>
-                      <div style={{ fontSize: "0.75rem", color: "#6b7280", marginBottom: 4, fontWeight: 600 }}>Item Name *</div>
+                      <div style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.45)", marginBottom: 4, fontWeight: 600 }}>Item Name *</div>
                       <input style={{ ...S.input, padding: "10px 12px" }} placeholder="e.g. Rupes Blue Foam Pad" value={newInventoryItem.item} onChange={e => setNewInventoryItem(prev => ({ ...prev, item: e.target.value }))} autoFocus />
                     </div>
                     <div>
-                      <div style={{ fontSize: "0.75rem", color: "#6b7280", marginBottom: 4, fontWeight: 600 }}>Category</div>
-                      <select style={{ ...S.input, padding: "10px 12px", backgroundColor: "#fff" }} value={newInventoryItem.category} onChange={e => setNewInventoryItem(prev => ({ ...prev, category: e.target.value }))}>
+                      <div style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.45)", marginBottom: 4, fontWeight: 600 }}>Category</div>
+                      <select style={{ ...S.input, padding: "10px 12px", backgroundColor: "transparent" }} value={newInventoryItem.category} onChange={e => setNewInventoryItem(prev => ({ ...prev, category: e.target.value }))}>
                         <option value="">Select category</option>
                         {CATEGORIES.filter(c => c !== "All").map(c => <option key={c} value={c}>{c}</option>)}
                       </select>
                     </div>
                     <div>
-                      <div style={{ fontSize: "0.75rem", color: "#6b7280", marginBottom: 4, fontWeight: 600 }}>Unit</div>
+                      <div style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.45)", marginBottom: 4, fontWeight: 600 }}>Unit</div>
                       <input style={{ ...S.input, padding: "10px 12px" }} placeholder="e.g. each, pack, gallon" value={newInventoryItem.unit} onChange={e => setNewInventoryItem(prev => ({ ...prev, unit: e.target.value }))} />
                     </div>
                     <div>
-                      <div style={{ fontSize: "0.75rem", color: "#6b7280", marginBottom: 4, fontWeight: 600 }}>Quantity *</div>
+                      <div style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.45)", marginBottom: 4, fontWeight: 600 }}>Quantity *</div>
                       <input style={{ ...S.input, padding: "10px 12px" }} type="number" step="0.25" placeholder="e.g. 2" value={newInventoryItem.quantity} onChange={e => setNewInventoryItem(prev => ({ ...prev, quantity: e.target.value }))} />
                     </div>
                     <div>
-                      <div style={{ fontSize: "0.75rem", color: "#6b7280", marginBottom: 4, fontWeight: 600 }}>Low Stock Alert At</div>
+                      <div style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.45)", marginBottom: 4, fontWeight: 600 }}>Low Stock Alert At</div>
                       <input style={{ ...S.input, padding: "10px 12px" }} type="number" step="0.25" placeholder="e.g. 1" value={newInventoryItem.lowStockThreshold} onChange={e => setNewInventoryItem(prev => ({ ...prev, lowStockThreshold: e.target.value }))} />
                     </div>
                     <div style={{ gridColumn: "1 / -1" }}>
-                      <div style={{ fontSize: "0.75rem", color: "#6b7280", marginBottom: 4, fontWeight: 600 }}>Notes (optional)</div>
+                      <div style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.45)", marginBottom: 4, fontWeight: 600 }}>Notes (optional)</div>
                       <input style={{ ...S.input, padding: "10px 12px" }} placeholder="e.g. Pack of 10, check Amazon" value={newInventoryItem.notes} onChange={e => setNewInventoryItem(prev => ({ ...prev, notes: e.target.value }))} />
                     </div>
                   </div>
@@ -2918,7 +2921,7 @@ export default function App() {
                       {inventorySaving ? "Saving..." : "Save Item"}
                     </button>
                     <button onClick={() => { setAddingInventoryItem(false); setNewInventoryItem({ item: "", category: "", quantity: "", unit: "", lowStockThreshold: "", notes: "" }); }}
-                      style={{ background: "#f3f4f6", color: "#374151", border: "none", borderRadius: 10, padding: "12px 18px", fontWeight: 600, fontSize: "0.95rem", cursor: "pointer" }}>
+                      style={{ background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.7)", border: "none", borderRadius: 10, padding: "12px 18px", fontWeight: 600, fontSize: "0.95rem", cursor: "pointer" }}>
                       Cancel
                     </button>
                   </div>
@@ -2927,13 +2930,13 @@ export default function App() {
             )}
 
             {inventoryLoading ? (
-              <div style={{ textAlign: "center", padding: 40, color: "#6b7280" }}>Loading inventory...</div>
+              <div style={{ textAlign: "center", padding: 40, color: "rgba(255,255,255,0.45)" }}>Loading inventory...</div>
             ) : filtered.length === 0 ? (
-              <div style={{ textAlign: "center", padding: 40, color: "#6b7280" }}>No items found.</div>
+              <div style={{ textAlign: "center", padding: 40, color: "rgba(255,255,255,0.45)" }}>No items found.</div>
             ) : (
               Object.entries(grouped).sort(([a], [b]) => a.localeCompare(b)).map(([cat, items]) => (
                 <div key={cat} style={{ marginBottom: 28 }}>
-                  <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "#9ca3af", textTransform: "uppercase" as const, letterSpacing: "0.08em", marginBottom: 10, paddingBottom: 6, borderBottom: "1px solid #f3f4f6" }}>
+                  <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "rgba(255,255,255,0.35)", textTransform: "uppercase" as const, letterSpacing: "0.08em", marginBottom: 10, paddingBottom: 6, borderBottom: "1px solid #f3f4f6" }}>
                     {cat} <span style={{ fontWeight: 400 }}>({items.length})</span>
                   </div>
                   <div style={{ display: "grid", gap: 8 }}>
@@ -2947,13 +2950,13 @@ export default function App() {
                         <div key={item.rowIndex} className="inv-item" style={{ background: sc.bg, border: `1px solid ${sc.border}`, borderRadius: 12, padding: "12px 16px", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" as const }}>
                           {/* Item name + notes */}
                           <div style={{ flex: 1, minWidth: 160 }}>
-                            <div style={{ fontWeight: 600, color: "#111827", fontSize: "0.9rem" }}>{item.item}</div>
-                            {item.notes && <div style={{ fontSize: "0.75rem", color: "#9ca3af", marginTop: 2 }}>{item.notes}</div>}
+                            <div style={{ fontWeight: 600, color: "#f1f5f9", fontSize: "0.9rem" }}>{item.item}</div>
+                            {item.notes && <div style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.35)", marginTop: 2 }}>{item.notes}</div>}
                             {/* Threshold editor inline under the name */}
                             <div style={{ marginTop: 4, display: "flex", alignItems: "center", gap: 6 }}>
                               {isEditingThreshold ? (
                                 <>
-                                  <span style={{ fontSize: "0.72rem", color: "#6b7280" }}>Alert at:</span>
+                                  <span style={{ fontSize: "0.72rem", color: "rgba(255,255,255,0.45)" }}>Alert at:</span>
                                   <input
                                     type="number"
                                     step="0.25"
@@ -2982,17 +2985,17 @@ export default function App() {
                                     } catch { alert("Error."); }
                                   }} style={{ background: "#059669", color: "#fff", border: "none", borderRadius: 5, padding: "3px 8px", fontWeight: 700, fontSize: "0.72rem", cursor: "pointer" }}>✓</button>
                                   <button onClick={() => setEditingThresholdRow(null)}
-                                    style={{ background: "#f3f4f6", color: "#374151", border: "none", borderRadius: 5, padding: "3px 6px", fontSize: "0.72rem", cursor: "pointer" }}>✕</button>
+                                    style={{ background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.7)", border: "none", borderRadius: 5, padding: "3px 6px", fontSize: "0.72rem", cursor: "pointer" }}>✕</button>
                                 </>
                               ) : (
                                 <button
                                   onClick={() => { setEditingThresholdRow(item.rowIndex); setEditingThresholdVal(item.lowStockThreshold || "0"); setEditingInventoryRow(null); }}
                                   style={{ background: "none", border: "none", padding: 0, cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}
                                 >
-                                  <span style={{ fontSize: "0.72rem", color: "#9ca3af" }}>
+                                  <span style={{ fontSize: "0.72rem", color: "rgba(255,255,255,0.35)" }}>
                                     {hasThreshold ? `⚠ alert at ${item.lowStockThreshold}` : "⚠ no alert set"}
                                   </span>
-                                  <span style={{ fontSize: "0.65rem", color: "#d1d5db" }}>✏</span>
+                                  <span style={{ fontSize: "0.65rem", color: "rgba(255,255,255,0.25)" }}>✏</span>
                                 </button>
                               )}
                             </div>
@@ -3010,7 +3013,7 @@ export default function App() {
                                   style={{ ...S.input, width: 80, padding: "6px 10px", fontSize: "0.9rem", fontWeight: 700 }}
                                   autoFocus
                                 />
-                                <span style={{ fontSize: "0.82rem", color: "#6b7280" }}>{item.unit}</span>
+                                <span style={{ fontSize: "0.82rem", color: "rgba(255,255,255,0.45)" }}>{item.unit}</span>
                                 <button onClick={async () => {
                                   setInventorySaving(true);
                                   try {
@@ -3024,14 +3027,14 @@ export default function App() {
                                   setInventorySaving(false);
                                 }} style={{ background: "#059669", color: "#fff", border: "none", borderRadius: 6, padding: "5px 10px", fontWeight: 700, fontSize: "0.78rem", cursor: "pointer" }}>✓</button>
                                 <button onClick={() => setEditingInventoryRow(null)}
-                                  style={{ background: "#f3f4f6", color: "#374151", border: "none", borderRadius: 6, padding: "5px 8px", fontWeight: 600, fontSize: "0.78rem", cursor: "pointer" }}>✕</button>
+                                  style={{ background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.7)", border: "none", borderRadius: 6, padding: "5px 8px", fontWeight: 600, fontSize: "0.78rem", cursor: "pointer" }}>✕</button>
                               </div>
                             ) : (
                               <button onClick={() => { setEditingInventoryRow(item.rowIndex); setEditingInventoryVal(item.quantity); setEditingThresholdRow(null); }}
                                 style={{ background: sc.badgeBg, border: `1px solid ${sc.border}`, borderRadius: 8, padding: "5px 12px", cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>
                                 <span style={{ fontWeight: 800, fontSize: "1rem", color: sc.badge }}>{item.quantity}</span>
-                                <span style={{ fontSize: "0.78rem", color: "#6b7280" }}>{item.unit}</span>
-                                <span style={{ fontSize: "0.68rem", color: "#9ca3af" }}>✏</span>
+                                <span style={{ fontSize: "0.78rem", color: "rgba(255,255,255,0.45)" }}>{item.unit}</span>
+                                <span style={{ fontSize: "0.68rem", color: "rgba(255,255,255,0.35)" }}>✏</span>
                               </button>
                             )}
                           </div>
@@ -3046,7 +3049,7 @@ export default function App() {
                                   const d = await res.json();
                                   if (d.success) setInventoryItems(prev => prev.map(i => i.rowIndex === item.rowIndex ? { ...i, quantity: newQty } : i));
                                 } catch { console.error("Qty update failed"); }
-                              }} style={{ width: 28, height: 28, borderRadius: 6, border: "1px solid #e5e7eb", background: "#fff", cursor: "pointer", fontWeight: 700, fontSize: "1rem", color: "#374151", display: "flex", alignItems: "center", justifyContent: "center" }}>−</button>
+                              }} style={{ width: 28, height: 28, borderRadius: 6, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.05)", cursor: "pointer", fontWeight: 700, fontSize: "1rem", color: "rgba(255,255,255,0.7)", display: "flex", alignItems: "center", justifyContent: "center" }}>−</button>
                               <button onClick={async () => {
                                 const newQty = String(parseFloat(item.quantity || "0") + 1);
                                 try {
@@ -3054,7 +3057,7 @@ export default function App() {
                                   const d = await res.json();
                                   if (d.success) setInventoryItems(prev => prev.map(i => i.rowIndex === item.rowIndex ? { ...i, quantity: newQty } : i));
                                 } catch { console.error("Qty update failed"); }
-                              }} style={{ width: 28, height: 28, borderRadius: 6, border: "1px solid #e5e7eb", background: "#fff", cursor: "pointer", fontWeight: 700, fontSize: "1rem", color: "#374151", display: "flex", alignItems: "center", justifyContent: "center" }}>+</button>
+                              }} style={{ width: 28, height: 28, borderRadius: 6, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.05)", cursor: "pointer", fontWeight: 700, fontSize: "1rem", color: "rgba(255,255,255,0.7)", display: "flex", alignItems: "center", justifyContent: "center" }}>+</button>
                             </div>
                           )}
 
@@ -3102,7 +3105,7 @@ export default function App() {
         {toasts.map(t => (
           <div key={t.id} style={{
             display: "flex", alignItems: "center", gap: 10,
-            background: t.type === "error" ? "#fef2f2" : t.type === "success" ? "#f0fdf4" : "#1e293b",
+            background: t.type === "error" ? "rgba(239,68,68,0.12)" : t.type === "success" ? "#f0fdf4" : "#1e293b",
             color: t.type === "error" ? "#dc2626" : t.type === "success" ? "#065f46" : "#fff",
             border: t.type === "error" ? "1.5px solid #fca5a5" : t.type === "success" ? "1.5px solid #6ee7b7" : "none",
             borderRadius: 14, padding: "12px 18px", fontSize: "0.88rem", fontWeight: 600,
@@ -3207,17 +3210,17 @@ export default function App() {
               </div>
 
               {vehicle === "boat" && (
-                <div style={{ background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: 14, padding: "12px 16px", marginBottom: 8, fontSize: "0.9rem", color: "#6b7280" }}>
+                <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 14, padding: "12px 16px", marginBottom: 8, fontSize: "0.9rem", color: "rgba(255,255,255,0.45)" }}>
                   Maintenance plans are not available for boats. Please select One-Time Service.
                 </div>
               )}
 
               {clientType === "maintenance" && vehicle !== "boat" && (
                 <div style={{ marginTop: 4, marginBottom: 8 }}>
-                  <div style={{ background: "#fefce8", border: "1px solid #fde68a", borderRadius: 14, padding: "12px 16px", marginBottom: 16, fontSize: "0.9rem", color: "#92400e", lineHeight: 1.6 }}>
+                  <div style={{ background: "rgba(251,191,36,0.12)", border: "1px solid #fde68a", borderRadius: 14, padding: "12px 16px", marginBottom: 16, fontSize: "0.9rem", color: "#fbbf24", lineHeight: 1.6 }}>
                     To sign up for a maintenance plan, you must have had a detail with us within the last 30 days. If you have not booked yet, select One-Time Service first.
                   </div>
-                  <div style={{ fontWeight: 700, color: "#374151", fontSize: "0.95rem", marginBottom: 12, textAlign: "center" as const }}>
+                  <div style={{ fontWeight: 700, color: "rgba(255,255,255,0.7)", fontSize: "0.95rem", marginBottom: 12, textAlign: "center" as const }}>
                     How often would you like service?
                   </div>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
@@ -3258,7 +3261,7 @@ export default function App() {
               <h2 style={S.title}>Detail Package</h2>
               <p style={S.subtitle}>Choose the level of service for this appointment.</p>
               {/* ── Full Detail packages ── */}
-              <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "#9ca3af", textTransform: "uppercase" as const, letterSpacing: "0.08em", marginBottom: 10 }}>Full Detail</div>
+              <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "rgba(255,255,255,0.35)", textTransform: "uppercase" as const, letterSpacing: "0.08em", marginBottom: 10 }}>Full Detail</div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12, marginBottom: 24 }}>
                 {([
                   { id: "premium" as PackageType, label: "Premium Detail", badge: "PREMIUM", desc: "Interior + exterior with premium products & techniques.", time: !vehicle ? "" : vehicle === "boat" ? "5-8 hours avg" : "3-5 hours avg", isPremium: true },
@@ -3271,11 +3274,11 @@ export default function App() {
                       style={{ ...S.optionCard, ...(isSelected ? S.selectedCard : {}), position: "relative" as const }}>
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
                         <div style={S.optionTitle}>{option.label}</div>
-                        <span style={{ background: option.isPremium ? "#111827" : "#f3f4f6", color: option.isPremium ? "#fff" : "#6b7280", fontSize: "0.65rem", fontWeight: 800, borderRadius: 6, padding: "2px 7px", letterSpacing: "0.06em", flexShrink: 0 }}>{option.badge}</span>
+                        <span style={{ background: option.isPremium ? "#111827" : "rgba(255,255,255,0.08)", color: option.isPremium ? "#fff" : "#6b7280", fontSize: "0.65rem", fontWeight: 800, borderRadius: 6, padding: "2px 7px", letterSpacing: "0.06em", flexShrink: 0 }}>{option.badge}</span>
                       </div>
-                      <div style={{ fontSize: "1.1rem", fontWeight: 800, color: "#111827", marginBottom: 4 }}>{selectedVehicle ? `${formatCurrency(rate)}/hr` : "—"}</div>
-                      <div style={{ fontSize: "0.85rem", color: "#6b7280", marginBottom: 6 }}>{option.time}</div>
-                      <div style={{ fontSize: "0.8rem", color: "#9ca3af", lineHeight: 1.4 }}>{option.desc}</div>
+                      <div style={{ fontSize: "1.1rem", fontWeight: 800, color: "#f1f5f9", marginBottom: 4 }}>{selectedVehicle ? `${formatCurrency(rate)}/hr` : "—"}</div>
+                      <div style={{ fontSize: "0.85rem", color: "rgba(255,255,255,0.45)", marginBottom: 6 }}>{option.time}</div>
+                      <div style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.35)", lineHeight: 1.4 }}>{option.desc}</div>
                     </button>
                   );
                 })}
@@ -3284,7 +3287,7 @@ export default function App() {
               {/* ── Partial packages (non-boat only) ── */}
               {vehicle !== "boat" && (
                 <>
-                  <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "#9ca3af", textTransform: "uppercase" as const, letterSpacing: "0.08em", marginBottom: 10 }}>Partial Detail</div>
+                  <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "rgba(255,255,255,0.35)", textTransform: "uppercase" as const, letterSpacing: "0.08em", marginBottom: 10 }}>Partial Detail</div>
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
                     {([
                       { id: "exteriorPremium" as PackageType, label: "Exterior Only", badge: "PREMIUM", desc: "Exterior only, premium products.", isPremium: true  },
@@ -3299,24 +3302,24 @@ export default function App() {
                           style={{ ...S.optionCard, ...(isSelected ? S.selectedCard : {}) }}>
                           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 }}>
                             <div style={{ ...S.optionTitle, fontSize: "0.95rem" }}>{option.label}</div>
-                            <span style={{ background: option.isPremium ? "#111827" : "#f3f4f6", color: option.isPremium ? "#fff" : "#6b7280", fontSize: "0.65rem", fontWeight: 800, borderRadius: 6, padding: "2px 7px", letterSpacing: "0.06em", flexShrink: 0 }}>{option.badge}</span>
+                            <span style={{ background: option.isPremium ? "#111827" : "rgba(255,255,255,0.08)", color: option.isPremium ? "#fff" : "#6b7280", fontSize: "0.65rem", fontWeight: 800, borderRadius: 6, padding: "2px 7px", letterSpacing: "0.06em", flexShrink: 0 }}>{option.badge}</span>
                           </div>
-                          <div style={{ fontSize: "1rem", fontWeight: 800, color: "#111827", marginBottom: 4 }}>{selectedVehicle ? `${formatCurrency(rate)}/hr` : "—"}</div>
-                          <div style={{ fontSize: "0.8rem", color: "#6b7280", marginBottom: 4 }}>2 hours avg</div>
-                          <div style={{ fontSize: "0.78rem", color: "#9ca3af", lineHeight: 1.4 }}>{option.desc}</div>
+                          <div style={{ fontSize: "1rem", fontWeight: 800, color: "#f1f5f9", marginBottom: 4 }}>{selectedVehicle ? `${formatCurrency(rate)}/hr` : "—"}</div>
+                          <div style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.45)", marginBottom: 4 }}>2 hours avg</div>
+                          <div style={{ fontSize: "0.78rem", color: "rgba(255,255,255,0.35)", lineHeight: 1.4 }}>{option.desc}</div>
                         </button>
                       );
                     })}
                   </div>
                 </>
               )}
-              <div style={{ marginTop: 8, fontSize: "0.9rem", color: "#6b7280" }}>
+              <div style={{ marginTop: 8, fontSize: "0.9rem", color: "rgba(255,255,255,0.45)" }}>
                 Time estimates are based on average conditions and may vary at the time of service.
               </div>
               <div style={S.estimateBox}><div style={S.estimateLabel}>Estimate</div><div style={S.estimateValue}>{estimateText || "$ per hour"}</div></div>
               <div style={S.noteBox}>
                 To see what's included in each package, visit{" "}
-                <a href="https://ATXPrestigeDetailing.com" target="_blank" rel="noopener noreferrer" style={{ color: "#111827", textDecoration: "none", fontWeight: 600, borderBottom: "1px solid #d1d5db" }}>ATXPrestigeDetailing.com</a>
+                <a href="https://ATXPrestigeDetailing.com" target="_blank" rel="noopener noreferrer" style={{ color: "#f1f5f9", textDecoration: "none", fontWeight: 600, borderBottom: "1px solid #d1d5db" }}>ATXPrestigeDetailing.com</a>
               </div>
               <div style={S.buttonRow}>
                 <button style={S.secondary} onClick={back}>Back</button>
@@ -3455,9 +3458,9 @@ export default function App() {
                 {/* Time slots — full width, only shown after date picked */}
                 {selectedDate && (
                   <div style={{ gridColumn: "1 / -1" }}>
-                    <div style={{ fontSize: "0.78rem", fontWeight: 700, color: "#9ca3af", textTransform: "uppercase" as const, letterSpacing: "0.08em", marginBottom: 10 }}>Available Times</div>
+                    <div style={{ fontSize: "0.78rem", fontWeight: 700, color: "rgba(255,255,255,0.35)", textTransform: "uppercase" as const, letterSpacing: "0.08em", marginBottom: 10 }}>Available Times</div>
                     {availableSlots.length === 0 ? (
-                      <div style={{ color: "#b91c1c", fontSize: "0.9rem" }}>No available times for this date.</div>
+                      <div style={{ color: "#f87171", fontSize: "0.9rem" }}>No available times for this date.</div>
                     ) : (
                       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(100px, 1fr))", gap: 10 }}>
                         {availableSlots.map((slot, i) => (
@@ -3476,8 +3479,8 @@ export default function App() {
 
                 {/* Divider */}
                 {selectedDate && selectedTime && (
-                  <div style={{ gridColumn: "1 / -1", borderTop: "1px solid #e5e7eb", paddingTop: 8 }}>
-                    <div style={{ fontSize: "0.78rem", fontWeight: 700, color: "#9ca3af", textTransform: "uppercase" as const, letterSpacing: "0.08em" }}>Your Details</div>
+                  <div style={{ gridColumn: "1 / -1", borderTop: "1px solid rgba(255,255,255,0.07)", paddingTop: 8 }}>
+                    <div style={{ fontSize: "0.78rem", fontWeight: 700, color: "rgba(255,255,255,0.35)", textTransform: "uppercase" as const, letterSpacing: "0.08em" }}>Your Details</div>
                   </div>
                 )}
 
@@ -3486,28 +3489,28 @@ export default function App() {
                   <>
                     {/* Recurring schedule for maintenance */}
                     {clientType === "maintenance" && frequency && (
-                      <div style={{ gridColumn: "1 / -1", background: "#ecfdf5", border: "1px solid #6ee7b7", borderRadius: 14, padding: "14px 16px" }}>
-                        <div style={{ fontWeight: 700, color: "#065f46", marginBottom: 6, fontSize: "0.95rem" }}>Your Recurring Schedule</div>
-                        <div style={{ fontSize: "0.85rem", color: "#047857", marginBottom: 8 }}>{getCadenceLabel(selectedDate, frequency)} starting {formatDateLabel(selectedDate)}</div>
+                      <div style={{ gridColumn: "1 / -1", background: "rgba(16,185,129,0.1)", border: "1px solid #6ee7b7", borderRadius: 14, padding: "14px 16px" }}>
+                        <div style={{ fontWeight: 700, color: "#34d399", marginBottom: 6, fontSize: "0.95rem" }}>Your Recurring Schedule</div>
+                        <div style={{ fontSize: "0.85rem", color: "#10b981", marginBottom: 8 }}>{getCadenceLabel(selectedDate, frequency)} starting {formatDateLabel(selectedDate)}</div>
                         <div style={{ display: "grid", gap: 3 }}>
                           {calcRecurringDates(selectedDate, frequency, 6).map((d, i) => (
-                            <div key={i} style={{ fontSize: "0.85rem", color: "#065f46" }}>{i + 2}. {d}</div>
+                            <div key={i} style={{ fontSize: "0.85rem", color: "#34d399" }}>{i + 2}. {d}</div>
                           ))}
                         </div>
-                        <div style={{ fontSize: "0.78rem", color: "#6b7280", marginTop: 8 }}>Showing your next 6 scheduled dates. These slots will be held for you.</div>
+                        <div style={{ fontSize: "0.78rem", color: "rgba(255,255,255,0.45)", marginTop: 8 }}>Showing your next 6 scheduled dates. These slots will be held for you.</div>
                       </div>
                     )}
 
                     {/* Name */}
                     <div style={{ gridColumn: "1 / -1" }}>
-                      <label style={{ display: "block", fontSize: "0.78rem", fontWeight: 700, color: "#9ca3af", textTransform: "uppercase" as const, letterSpacing: "0.06em", marginBottom: 6 }}>Full Name</label>
+                      <label style={{ display: "block", fontSize: "0.78rem", fontWeight: 700, color: "rgba(255,255,255,0.35)", textTransform: "uppercase" as const, letterSpacing: "0.06em", marginBottom: 6 }}>Full Name</label>
                       <input style={{ ...S.input }} placeholder="Your full name" value={name} onChange={(e) => setName(e.target.value)} />
                     </div>
 
                     {/* Phone + Email — side by side on desktop, stacked on mobile */}
                     <div style={{ gridColumn: "1 / -1", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
                     <div>
-                      <label style={{ display: "block", fontSize: "0.78rem", fontWeight: 700, color: "#9ca3af", textTransform: "uppercase" as const, letterSpacing: "0.06em", marginBottom: 6 }}>Phone</label>
+                      <label style={{ display: "block", fontSize: "0.78rem", fontWeight: 700, color: "rgba(255,255,255,0.35)", textTransform: "uppercase" as const, letterSpacing: "0.06em", marginBottom: 6 }}>Phone</label>
                       <input style={S.input} placeholder="(512) 000-0000" value={phone} type="tel" inputMode="numeric"
                         onChange={(e) => {
                           const raw = e.target.value.replace(/\D/g, "").slice(0, 10);
@@ -3516,14 +3519,14 @@ export default function App() {
                         }} />
                     </div>
                     <div>
-                      <label style={{ display: "block", fontSize: "0.78rem", fontWeight: 700, color: "#9ca3af", textTransform: "uppercase" as const, letterSpacing: "0.06em", marginBottom: 6 }}>Email</label>
+                      <label style={{ display: "block", fontSize: "0.78rem", fontWeight: 700, color: "rgba(255,255,255,0.35)", textTransform: "uppercase" as const, letterSpacing: "0.06em", marginBottom: 6 }}>Email</label>
                       <input style={S.input} placeholder="your@email.com" value={email} onChange={(e) => setEmail(e.target.value)} />
                     </div>
                     </div>{/* end phone/email grid */}
 
                     {/* Vehicle details */}
                     <div style={{ gridColumn: "1 / -1" }}>
-                      <label style={{ display: "block", fontSize: "0.78rem", fontWeight: 700, color: "#9ca3af", textTransform: "uppercase" as const, letterSpacing: "0.06em", marginBottom: 10 }}>{vehicle === "boat" ? "Boat Details" : "Vehicle Details"}</label>
+                      <label style={{ display: "block", fontSize: "0.78rem", fontWeight: 700, color: "rgba(255,255,255,0.35)", textTransform: "uppercase" as const, letterSpacing: "0.06em", marginBottom: 10 }}>{vehicle === "boat" ? "Boat Details" : "Vehicle Details"}</label>
                       {vehicle === "boat" ? (
                         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 12 }}>
                           <input style={S.input} placeholder="Size (e.g. 24 ft)" value={boatSize} onChange={(e) => setBoatSize(e.target.value)} />
@@ -3585,14 +3588,14 @@ export default function App() {
                   </div>
                 </div>
                 {clientType === "maintenance" && selectedDate && frequency && (
-                  <div style={{ ...S.summaryCard, gridColumn: "1 / -1", background: "#f0fdf4", border: "1px solid #6ee7b7" }}>
+                  <div style={{ ...S.summaryCard, gridColumn: "1 / -1", background: "rgba(16,185,129,0.08)", border: "1px solid #6ee7b7" }}>
                     <div style={S.summaryHeading}>Recurring Schedule</div>
-                    <div style={{ fontSize: "0.9rem", color: "#065f46", fontWeight: 600, marginBottom: 8 }}>
+                    <div style={{ fontSize: "0.9rem", color: "#34d399", fontWeight: 600, marginBottom: 8 }}>
                       {getCadenceLabel(selectedDate, frequency)} — first service {formatDateLabel(selectedDate)}
                     </div>
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 4 }}>
                       {calcRecurringDates(selectedDate, frequency, 6).map((d, i) => (
-                        <div key={i} style={{ fontSize: "0.88rem", color: "#374151" }}>{i + 2}. {d}</div>
+                        <div key={i} style={{ fontSize: "0.88rem", color: "rgba(255,255,255,0.7)" }}>{i + 2}. {d}</div>
                       ))}
                     </div>
                   </div>
@@ -3683,14 +3686,14 @@ export default function App() {
                   </div>
                 </div>
                 {clientType === "maintenance" && selectedDate && frequency && (
-                  <div style={{ ...S.summaryCard, gridColumn: "1 / -1", background: "#f0fdf4", border: "1px solid #6ee7b7" }}>
+                  <div style={{ ...S.summaryCard, gridColumn: "1 / -1", background: "rgba(16,185,129,0.08)", border: "1px solid #6ee7b7" }}>
                     <div style={S.summaryHeading}>Recurring Schedule</div>
-                    <div style={{ fontSize: "0.9rem", color: "#065f46", fontWeight: 600, marginBottom: 8 }}>
+                    <div style={{ fontSize: "0.9rem", color: "#34d399", fontWeight: 600, marginBottom: 8 }}>
                       {getCadenceLabel(selectedDate, frequency)} — first service {formatDateLabel(selectedDate)}
                     </div>
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 4 }}>
                       {calcRecurringDates(selectedDate, frequency, 6).map((d, i) => (
-                        <div key={i} style={{ fontSize: "0.88rem", color: "#374151" }}>{i + 2}. {d}</div>
+                        <div key={i} style={{ fontSize: "0.88rem", color: "rgba(255,255,255,0.7)" }}>{i + 2}. {d}</div>
                       ))}
                     </div>
                   </div>
@@ -3704,7 +3707,7 @@ export default function App() {
                 {bookingNotes.trim() && (
                   <div style={{ ...S.summaryCard, gridColumn: "1 / -1" }}>
                     <div style={S.summaryHeading}>Notes</div>
-                    <div style={{ ...S.summaryValue, fontWeight: 400, color: "#374151", whiteSpace: "pre-wrap" as const }}>{bookingNotes}</div>
+                    <div style={{ ...S.summaryValue, fontWeight: 400, color: "rgba(255,255,255,0.7)", whiteSpace: "pre-wrap" as const }}>{bookingNotes}</div>
                   </div>
                 )}
               </div>
