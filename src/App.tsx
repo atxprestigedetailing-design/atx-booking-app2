@@ -1228,7 +1228,7 @@ export default function App() {
 
   const ProgressBar = () => (
     <div style={{ marginBottom: 28 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", color: "rgba(255,255,255,0.35)", fontSize: "0.82rem", marginBottom: 8 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", color: "rgba(255,255,255,0.45)", fontSize: "0.82rem", marginBottom: 8 }}>
         <span style={{ letterSpacing: "0.05em", textTransform: "uppercase" as const, fontSize: "0.72rem" }}>Booking</span>
         <span>Step {step} of {TOTAL_STEPS - 1}</span>
       </div>
@@ -1246,7 +1246,7 @@ export default function App() {
         <p style={{ color: "rgba(255,255,255,0.55)", fontSize: "0.95rem", lineHeight: 1.6, margin: "0 0 20px" }}>
           We received your request. We will send you a Square invoice to <strong style={{ color: "#93c5fd" }}>{squareBooking?.email}</strong> shortly so you can pay by credit or debit card.
         </p>
-        <p style={{ color: "rgba(255,255,255,0.35)", fontSize: "0.82rem", margin: "0 0 20px" }}>Note: A 4% processing fee applies to card payments.</p>
+        <p style={{ color: "rgba(255,255,255,0.45)", fontSize: "0.82rem", margin: "0 0 20px" }}>Note: A 4% processing fee applies to card payments.</p>
         <button onClick={() => { setSquarePopup(false); setSquareBooking(null); }} style={{ background: "#111827", color: "#fff", border: "none", borderRadius: 12, padding: "12px 20px", fontWeight: 700, cursor: "pointer", width: "100%" }}>Got it</button>
       </div>
     </div>
@@ -1720,20 +1720,20 @@ export default function App() {
                         const isSelected = selectedAdminBooking?.rowIndex === b.rowIndex;
 
                         return (
-                          <div key={i} className="booking-card" style={{ background: b.status === "Cancelled" ? "rgba(239,68,68,0.12)" : b.status === "Skipped" ? "#f0f9ff" : "#fff", border: `1.5px solid ${b.status === "Cancelled" ? "#fca5a5" : b.status === "Skipped" ? "#7dd3fc" : isComplete ? "#e5e7eb" : isUpcoming(b.date) ? "#2563eb" : "#e5e7eb"}`, borderRadius: 14, padding: 16, opacity: b.status === "Cancelled" || b.status === "Skipped" ? 0.85 : 1 }}>
+                          <div key={i} className="booking-card" style={{ background: b.status === "Cancelled" ? "rgba(239,68,68,0.08)" : b.status === "Skipped" ? "rgba(59,130,246,0.08)" : "rgba(255,255,255,0.04)", border: `1px solid ${b.status === "Cancelled" ? "rgba(239,68,68,0.35)" : b.status === "Skipped" ? "rgba(59,130,246,0.35)" : isComplete ? "rgba(255,255,255,0.07)" : isUpcoming(b.date) ? "rgba(59,130,246,0.45)" : "rgba(255,255,255,0.07)"}`, borderRadius: 16, padding: 16, opacity: b.status === "Cancelled" || b.status === "Skipped" ? 0.85 : 1 }}>
                             {b.status === "Cancelled" && (
-                              <div style={{ background: "#dc2626", borderRadius: 8, padding: "6px 12px", marginBottom: 10, display: "flex", alignItems: "center", gap: 8 }}>
+                              <div style={{ background: "rgba(239,68,68,0.25)", border: "1px solid rgba(239,68,68,0.4)", borderRadius: 8, padding: "6px 12px", marginBottom: 10, display: "flex", alignItems: "center", gap: 8 }}>
                                 <span style={{ color: "#fff", fontWeight: 800, fontSize: "0.85rem", letterSpacing: "0.04em" }}>✕ APPOINTMENT CANCELLED</span>
                               </div>
                             )}
                             {b.status === "Skipped" && (
-                              <div style={{ background: "#0369a1", borderRadius: 8, padding: "6px 12px", marginBottom: 10, display: "flex", alignItems: "center", gap: 8 }}>
+                              <div style={{ background: "rgba(59,130,246,0.25)", border: "1px solid rgba(59,130,246,0.4)", borderRadius: 8, padding: "6px 12px", marginBottom: 10, display: "flex", alignItems: "center", gap: 8 }}>
                                 <span style={{ color: "#fff", fontWeight: 800, fontSize: "0.85rem", letterSpacing: "0.04em" }}>⏭ MAINTENANCE SKIPPED</span>
                               </div>
                             )}
                             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8, marginBottom: 6, flexWrap: "wrap" as const }}>
                               <div>
-                                <div style={{ fontWeight: 700, color: b.status === "Cancelled" ? "#991b1b" : "#111827", fontSize: "0.95rem" }}>{b.name} — {formatDateLabel(b.date)}{b.time ? ` at ${b.time}` : ""}</div>
+                                <div style={{ fontWeight: 700, color: b.status === "Cancelled" ? "#fca5a5" : b.status === "Skipped" ? "rgba(255,255,255,0.45)" : "#f1f5f9", fontSize: "0.95rem" }}>{b.name} — {formatDateLabel(b.date)}{b.time ? ` at ${b.time}` : ""}</div>
                                 <div style={{ fontSize: "0.85rem", color: "rgba(255,255,255,0.45)" }}>{b.email} · {b.phone}</div>
                                 <div style={{ fontSize: "0.85rem", color: "rgba(255,255,255,0.45)" }}>{vl} · {b.packageType === "basic" ? "Basic Detail" : b.packageType === "premium" ? "Premium Detail" : b.packageType === "exterior" ? "Exterior Only — Basic" : b.packageType === "exteriorPremium" ? "Exterior Only — Premium" : b.packageType === "interior" ? "Interior Only — Basic" : b.packageType === "interiorPremium" ? "Interior Only — Premium" : b.packageType} · ${b.hourlyRate}/hr</div>
                                 {b.clientType === "maintenance" && <div style={{ fontSize: "0.8rem", color: "#059669", fontWeight: 600 }}>{b.recurringFrequency === "biweekly" ? "Bi-Weekly" : "Monthly"} Maintenance</div>}
@@ -1741,11 +1741,11 @@ export default function App() {
                                 {b.notes && <div style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.35)" }}>Notes: {b.notes}</div>}
                               </div>
                               <div style={{ display: "flex", flexDirection: "column" as const, alignItems: "flex-end", gap: 4 }}>
-                                <span style={{ background: b.status === "Cancelled" ? "rgba(239,68,68,0.12)" : b.status === "Skipped" ? "#f0f9ff" : isComplete ? "rgba(16,185,129,0.2)" : isUpcoming(b.date) ? "rgba(59,130,246,0.15)" : "rgba(255,255,255,0.08)", color: b.status === "Cancelled" ? "#dc2626" : b.status === "Skipped" ? "#0369a1" : isComplete ? "#166534" : isUpcoming(b.date) ? "#2563eb" : "#9ca3af", fontSize: "0.72rem", fontWeight: 700, borderRadius: 999, padding: "2px 8px" }}>
+                                <span style={{ background: b.status === "Cancelled" ? "rgba(239,68,68,0.15)" : b.status === "Skipped" ? "rgba(59,130,246,0.15)" : isComplete ? "rgba(16,185,129,0.15)" : isUpcoming(b.date) ? "rgba(59,130,246,0.15)" : "rgba(255,255,255,0.06)", color: b.status === "Cancelled" ? "#f87171" : b.status === "Skipped" ? "#93c5fd" : isComplete ? "#34d399" : isUpcoming(b.date) ? "#93c5fd" : "rgba(255,255,255,0.35)", fontSize: "0.72rem", fontWeight: 700, borderRadius: 999, padding: "2px 8px" }}>
                                   {b.status === "Cancelled" ? "CANCELLED" : b.status === "Skipped" ? "SKIPPED" : isComplete ? "COMPLETED" : isUpcoming(b.date) ? "UPCOMING" : "PAST"}
                                 </span>
                                 {b.invoiceStatus && b.invoiceStatus !== "" && (
-                                  <span style={{ background: b.invoiceStatus === "paid" ? "rgba(16,185,129,0.2)" : b.invoiceStatus === "released" ? "#fef9c3" : "#fef3c7", color: b.invoiceStatus === "paid" ? "#166534" : "#92400e", fontSize: "0.72rem", fontWeight: 700, borderRadius: 999, padding: "2px 8px" }}>
+                                  <span style={{ background: b.invoiceStatus === "paid" ? "rgba(16,185,129,0.2)" : b.invoiceStatus === "released" ? "rgba(251,191,36,0.15)" : "rgba(251,191,36,0.1)", color: b.invoiceStatus === "paid" ? "#34d399" : "#fbbf24", fontSize: "0.72rem", fontWeight: 700, borderRadius: 999, padding: "2px 8px" }}>
                                     {b.invoiceStatus === "pending" ? "INVOICE PENDING" : b.invoiceStatus === "released" ? `INVOICE SENT $${b.invoiceAmount}` : `PAID $${b.invoiceAmount}`}
                                   </span>
                                 )}
@@ -1755,7 +1755,7 @@ export default function App() {
                             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" as const, marginTop: 8, alignItems: "center" }}>
                               {!isComplete && b.status !== "Cancelled" && b.status !== "Skipped" && (
                                 <button onClick={() => { setSelectedAdminBooking(isSelected ? null : b); setCompleteAmount(b.hourlyRate ? String(parseFloat(b.hourlyRate) * 2) : ""); setCompleteHours(b.clientType === "maintenance" ? "2" : ""); setCompleteNote(""); setEditingBooking(null); setBillingMode("hourly"); }}
-                                  style={{ background: isSelected ? "rgba(255,255,255,0.08)" : "#111827", color: isSelected ? "#111827" : "#fff", border: "none", borderRadius: 8, padding: "7px 14px", fontSize: "0.82rem", fontWeight: 600, cursor: "pointer" }}>
+                                  style={{ background: isSelected ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.1)", color: "#f1f5f9", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 8, padding: "7px 14px", fontSize: "0.82rem", fontWeight: 600, cursor: "pointer" }}>
                                   {isSelected ? "Cancel" : "Mark Complete"}
                                 </button>
                               )}
@@ -2751,7 +2751,7 @@ export default function App() {
     const stockColor = (item: { quantity: string; lowStockThreshold: string }) => {
       if (isOutOfStock(item)) return { bg: "rgba(239,68,68,0.12)", border: "#fca5a5", badge: "#dc2626", badgeBg: "rgba(239,68,68,0.12)", label: "OUT" };
       if (isLowStock(item))   return { bg: "#fffbeb", border: "#fcd34d", badge: "#d97706", badgeBg: "rgba(251,191,36,0.12)", label: "LOW" };
-      return { bg: "#fff", border: "#e5e7eb", badge: "#059669", badgeBg: "#f0fdf4", label: "OK" };
+      return { bg: "rgba(255,255,255,0.03)", border: "rgba(255,255,255,0.08)", badge: "#34d399", badgeBg: "rgba(16,185,129,0.1)", label: "OK" };
     };
 
     return (
