@@ -1685,8 +1685,9 @@ export default function App() {
                                       <div style={{ fontSize: "0.72rem", color: "#9ca3af", marginBottom: 3 }}>New Date</div>
                                       <input
                                         type="date"
-                                        style={{ ...S.input, padding: "8px 10px", fontSize: "0.85rem" }}
+                                        style={{ width: "100%", padding: "9px 12px", fontSize: "0.85rem", border: "1.5px solid #d1d5db", borderRadius: 14, outline: "none", boxSizing: "border-box" as const, cursor: "pointer", background: "#fff", color: "#111827", fontFamily: "inherit" }}
                                         value={editFields.date || b.date}
+                                        min={new Date().toISOString().split("T")[0]}
                                         onChange={e => setEditFields(prev => ({ ...prev, date: e.target.value }))}
                                       />
                                     </div>
