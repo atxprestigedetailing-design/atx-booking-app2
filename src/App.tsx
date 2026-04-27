@@ -11,7 +11,7 @@ const GOOGLE_CLIENT_ID =
   "447699234633-ivo2e1c2q843scj32k5323o2rkq6h7dp.apps.googleusercontent.com";
 
 const SCRIPT_URL =
-  "https://script.google.com/macros/s/AKfycbwAUtHof33cmpV9U7FPdsrCtKLXd48JxVYIUn2IBjwGlwswi3j9vkf5VVEQKf-JVd2c9w/exec";
+  "https://script.google.com/macros/s/AKfycbwRguf8U586qxbPgkQwofyUaWzmpPKlUBRmvQ7dLcVY7bbjmubBkKOh976JD2d-PMHyYw/exec";
 
 const TOTAL_STEPS = 9;
 const ADMIN_EMAIL = "atxprestigedetailing@gmail.com";
@@ -287,6 +287,9 @@ export default function App() {
   const [completeNote, setCompleteNote]                 = useState("");
   const [completeLoading, setCompleteLoading]           = useState(false);
   const [billingMode, setBillingMode]                   = useState<"hourly" | "flat">("hourly");
+  const [editingInvoiceRow, setEditingInvoiceRow]       = useState<number | null>(null);
+  const [editInvoiceAmount, setEditInvoiceAmount]       = useState("");
+  const [editInvoiceNote, setEditInvoiceNote]           = useState("");
   const [squarePopup, setSquarePopup]                   = useState(false);
   const [squareBooking, setSquareBooking]               = useState<Booking | null>(null);
   const [copiedAmount, setCopiedAmount]                 = useState<number | null>(null);
@@ -2207,17 +2210,18 @@ export default function App() {
 
                                     {billingMode === "hourly" ? (
                                       <>
-                                        <div style={{ fontSize: "0.82rem", color: "rgba(255,255,255,0.45)", marginBottom: 6 }}>
-                                          Rate: <strong>${b.hourlyRate}/hr</strong> — Enter total hours to calculate invoice
+                                        <div style={{ fontSize: "0.82rem", color: "rgba(255,255,255,0.45)", marginBottom: 10 }}>
+                                          Rate: <strong style={{ color: "#f1f5f9" }}>${b.hourlyRate}/hr</strong> — Enter hours to calculate
                                         </div>
-                                        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" as const }}>
-                                          <div style={{ flex: 1, minWidth: 120 }}>
+                                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
+                                          <div>
                                             <div style={{ fontSize: "0.78rem", color: "rgba(255,255,255,0.45)", marginBottom: 4 }}>Hours Worked</div>
                                             <input
-                                              style={{ ...S.input, padding: "10px 12px" }}
+                                              style={{ ...S.input, padding: "12px 14px", fontSize: "1rem" }}
                                               type="number"
+                                              inputMode="decimal"
                                               step="0.5"
-                                              placeholder="e.g. 8"
+                                              placeholder="e.g. 2.5"
                                               value={completeHours}
                                               onChange={e => {
                                                 setCompleteHours(e.target.value);
@@ -2228,23 +2232,24 @@ export default function App() {
                                               }}
                                             />
                                           </div>
-                                          <div style={{ flex: 1, minWidth: 120 }}>
+                                          <div>
                                             <div style={{ fontSize: "0.78rem", color: "rgba(255,255,255,0.45)", marginBottom: 4 }}>Invoice Amount</div>
                                             <input
-                                              style={{ ...S.input, padding: "10px 12px", background: "rgba(255,255,255,0.06)", fontWeight: 700 }}
+                                              style={{ ...S.input, padding: "12px 14px", fontSize: "1rem", fontWeight: 700 }}
                                               type="number"
-                                              placeholder="Auto-calculated"
+                                              inputMode="decimal"
+                                              placeholder="Auto-calc"
                                               value={completeAmount}
                                               onChange={e => setCompleteAmount(e.target.value)}
                                             />
                                           </div>
-                                          <div style={{ flex: 2, minWidth: 180 }}>
-                                            <div style={{ fontSize: "0.78rem", color: "rgba(255,255,255,0.45)", marginBottom: 4 }}>Note (optional)</div>
-                                            <input style={{ ...S.input, padding: "10px 12px" }} placeholder="e.g. Boat detail, full interior" value={completeNote} onChange={e => setCompleteNote(e.target.value)} />
-                                          </div>
+                                        </div>
+                                        <div>
+                                          <div style={{ fontSize: "0.78rem", color: "rgba(255,255,255,0.45)", marginBottom: 4 }}>Note (optional)</div>
+                                          <input style={{ ...S.input, padding: "12px 14px" }} placeholder="e.g. Boat detail, full interior" value={completeNote} onChange={e => setCompleteNote(e.target.value)} />
                                         </div>
                                         {completeHours && completeAmount && (
-                                          <div style={{ marginTop: 8, fontSize: "0.85rem", color: "#059669", fontWeight: 600 }}>
+                                          <div style={{ marginTop: 10, padding: "8px 12px", background: "rgba(16,185,129,0.1)", border: "1px solid rgba(16,185,129,0.3)", borderRadius: 10, fontSize: "0.88rem", color: "#34d399", fontWeight: 700 }}>
                                             {completeHours} hrs × ${b.hourlyRate}/hr = ${completeAmount}
                                           </div>
                                         )}
@@ -2381,19 +2386,76 @@ export default function App() {
                       <>
                         <div style={{ fontWeight: 700, color: "#fbbf24", fontSize: "0.85rem", textTransform: "uppercase" as const, letterSpacing: "0.04em", marginBottom: 10 }}>Pending Review — Not Visible to Client</div>
                         <div style={{ display: "grid", gap: 10, marginBottom: 24 }}>
-                          {pendingInvoices.map((b, i) => (
+                        {pendingInvoices.map((b, i) => (
                             <div key={i} style={{ background: "rgba(255,255,255,0.05)", border: "1px solid #fde68a", borderRadius: 14, padding: 16 }}>
-                              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap" as const, gap: 8 }}>
+                              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap" as const, gap: 8, marginBottom: editingInvoiceRow === b.rowIndex ? 14 : 0 }}>
                                 <div>
                                   <div style={{ fontWeight: 700, color: "#f1f5f9" }}>{b.name} — {formatDateLabel(b.date)}</div>
                                   <div style={{ fontSize: "0.85rem", color: "rgba(255,255,255,0.45)" }}>{b.email}</div>
-                                  {b.invoiceNote && <div style={{ fontSize: "0.85rem", color: "rgba(255,255,255,0.35)" }}>{b.invoiceNote}</div>}
+                                  {b.invoiceNote && editingInvoiceRow !== b.rowIndex && <div style={{ fontSize: "0.82rem", color: "rgba(255,255,255,0.35)", marginTop: 2 }}>{b.invoiceNote}</div>}
                                 </div>
-                                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                                <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" as const }}>
                                   <span style={{ fontWeight: 800, color: "#fbbf24", fontSize: "1.1rem" }}>${b.invoiceAmount}</span>
-                                  <button onClick={() => handleReleaseInvoice(b)} disabled={processingRows.has(b.rowIndex)} style={{ background: "#111827", color: "#fff", border: "none", borderRadius: 8, padding: "7px 14px", fontWeight: 600, fontSize: "0.82rem", cursor: "pointer", opacity: processingRows.has(b.rowIndex) ? 0.5 : 1 }}>{processingRows.has(b.rowIndex) ? "Processing..." : "Release to Client"}</button>
+                                  <button
+                                    onClick={() => {
+                                      if (editingInvoiceRow === b.rowIndex) { setEditingInvoiceRow(null); }
+                                      else { setEditingInvoiceRow(b.rowIndex); setEditInvoiceAmount(b.invoiceAmount || ""); setEditInvoiceNote(b.invoiceNote || ""); }
+                                    }}
+                                    style={{ background: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.7)", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 8, padding: "6px 12px", fontWeight: 600, fontSize: "0.82rem", cursor: "pointer" }}>
+                                    {editingInvoiceRow === b.rowIndex ? "Cancel Edit" : "✏ Edit"}
+                                  </button>
+                                  <button onClick={() => handleReleaseInvoice(b)} disabled={processingRows.has(b.rowIndex) || editingInvoiceRow === b.rowIndex}
+                                    style={{ background: "linear-gradient(135deg, #3b82f6, #1d4ed8)", color: "#fff", border: "none", borderRadius: 8, padding: "6px 14px", fontWeight: 600, fontSize: "0.82rem", cursor: "pointer", opacity: processingRows.has(b.rowIndex) || editingInvoiceRow === b.rowIndex ? 0.4 : 1 }}>
+                                    {processingRows.has(b.rowIndex) ? "Processing..." : "Release to Client"}
+                                  </button>
                                 </div>
                               </div>
+
+                              {/* Inline edit form */}
+                              {editingInvoiceRow === b.rowIndex && (
+                                <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 12, padding: 14 }}>
+                                  <div style={{ fontSize: "0.78rem", color: "#fbbf24", fontWeight: 700, marginBottom: 10, textTransform: "uppercase" as const, letterSpacing: "0.06em" }}>Edit Invoice</div>
+                                  <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: 10, marginBottom: 12 }}>
+                                    <div>
+                                      <div style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.45)", marginBottom: 4 }}>Amount ($)</div>
+                                      <input
+                                        type="number"
+                                        inputMode="decimal"
+                                        step="0.01"
+                                        style={{ ...S.input, padding: "10px 12px", fontSize: "1rem", fontWeight: 700 }}
+                                        value={editInvoiceAmount}
+                                        onChange={e => setEditInvoiceAmount(e.target.value)}
+                                        autoFocus
+                                      />
+                                    </div>
+                                    <div>
+                                      <div style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.45)", marginBottom: 4 }}>Note (optional)</div>
+                                      <input
+                                        style={{ ...S.input, padding: "10px 12px" }}
+                                        placeholder="e.g. 2.5 hrs at $80/hr"
+                                        value={editInvoiceNote}
+                                        onChange={e => setEditInvoiceNote(e.target.value)}
+                                      />
+                                    </div>
+                                  </div>
+                                  <button
+                                    disabled={!editInvoiceAmount || processingRows.has(b.rowIndex)}
+                                    onClick={async () => {
+                                      const tid = showToast("Saving invoice...", "loading");
+                                      try {
+                                        const ok = await updateBooking(b.rowIndex, { invoiceAmount: editInvoiceAmount, invoiceNote: editInvoiceNote });
+                                        if (ok) {
+                                          setAdminBookings(prev => prev.map(bk => bk.rowIndex === b.rowIndex ? { ...bk, invoiceAmount: editInvoiceAmount, invoiceNote: editInvoiceNote } : bk));
+                                          setEditingInvoiceRow(null);
+                                          updateToast(tid, `✓ Invoice updated to $${editInvoiceAmount}`, "success", 3000);
+                                        } else { updateToast(tid, "Failed to update invoice", "error", 3000); }
+                                      } catch { updateToast(tid, "Error saving invoice", "error", 3000); }
+                                    }}
+                                    style={{ background: "#059669", color: "#fff", border: "none", borderRadius: 8, padding: "9px 18px", fontWeight: 700, fontSize: "0.88rem", cursor: "pointer", opacity: !editInvoiceAmount ? 0.5 : 1 }}>
+                                    Save Changes
+                                  </button>
+                                </div>
+                              )}
                             </div>
                           ))}
                         </div>
