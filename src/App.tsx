@@ -292,6 +292,18 @@ export default function App() {
   const [editingInvoiceRow, setEditingInvoiceRow]       = useState<number | null>(null);
   const [editInvoiceAmount, setEditInvoiceAmount]       = useState("");
   const [editInvoiceNote, setEditInvoiceNote]           = useState("");
+  const [quickBookClient, setQuickBookClient]           = useState<Booking | null>(null);
+  const [quickBookSearch, setQuickBookSearch]           = useState("");
+  const [qDate, setQDate]                               = useState("");
+  const [qTime, setQTime]                               = useState("");
+  const [qPkg, setQPkg]                                 = useState("basic");
+  const [qClientType, setQClientType]                   = useState("oneTime");
+  const [qFreq, setQFreq]                               = useState("");
+  const [qAddOns, setQAddOns]                           = useState("");
+  const [qNotes, setQNotes]                             = useState("");
+  const [qAddress, setQAddress]                         = useState("");
+  const [qServiceType, setQServiceType]                 = useState("mobile");
+  const [qSubmitting, setQSubmitting]                   = useState(false);
   const [squarePopup, setSquarePopup]                   = useState(false);
   const [squareBooking, setSquareBooking]               = useState<Booking | null>(null);
   const [copiedAmount, setCopiedAmount]                 = useState<number | null>(null);
@@ -1670,14 +1682,220 @@ export default function App() {
                 {/* All Bookings tab */}
                 {adminTab === "bookings" && (
                   <>
-                    {/* Filter bar */}
-                    <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" as const }}>
+                    {/* Filter bar + Quick Book button */}
+                    <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" as const, alignItems: "center" }}>
                       {(["all", "upcoming", "past", "maintenance"] as const).map(f => (
                         <button key={f} onClick={() => setAdminFilter(f)} style={{ background: adminFilter === f ? "#111827" : "rgba(255,255,255,0.08)", color: adminFilter === f ? "#fff" : "#374151", border: "none", borderRadius: 999, padding: "6px 14px", fontSize: "0.85rem", fontWeight: 600, cursor: "pointer", textTransform: "capitalize" as const }}>
                           {f === "all" ? "All" : f === "upcoming" ? "Upcoming" : f === "past" ? "Past" : "Maintenance"}
                         </button>
                       ))}
+                      <button
+                        onClick={() => { setQuickBookClient(null); setQuickBookSearch(""); }}
+                        style={{ ...S.primary, marginLeft: "auto", padding: "7px 16px", fontSize: "0.85rem", background: "linear-gradient(135deg, #7c3aed, #5b21b6)" }}
+                      >
+                        + Book Existing Client
+                      </button>
                     </div>
+
+                    {/* Quick Book Modal */}
+                    {quickBookClient !== null || quickBookSearch !== "" ? (() => {
+                      // Get unique clients from bookings
+                      const clientMap: Record<string, Booking> = {};
+                      adminBookings.forEach(b => {
+                        if (!clientMap[b.email] && b.name && b.email) clientMap[b.email] = b;
+                      });
+                      const clients = Object.values(clientMap).sort((a, b) => a.name.localeCompare(b.name));
+                      const filtered = quickBookSearch
+                        ? clients.filter(c => c.name.toLowerCase().includes(quickBookSearch.toLowerCase()) || c.email.toLowerCase().includes(quickBookSearch.toLowerCase()))
+                        : clients;
+
+                      return (
+                        <div style={{ background: "rgba(124,58,237,0.08)", border: "1.5px solid rgba(124,58,237,0.4)", borderRadius: 16, padding: 20, marginBottom: 20 }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+                            <div style={{ fontWeight: 700, color: "#a78bfa", fontSize: "0.95rem" }}>Book Existing Client</div>
+                            <button onClick={() => { setQuickBookSearch(""); setQuickBookClient(null); }} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.4)", cursor: "pointer", fontSize: "1.1rem" }}>✕</button>
+                          </div>
+
+                          {!quickBookClient ? (
+                            <>
+                              <input
+                                style={{ ...S.input, marginBottom: 12 }}
+                                placeholder="Search by name or email..."
+                                value={quickBookSearch}
+                                onChange={e => setQuickBookSearch(e.target.value)}
+                                autoFocus
+                              />
+                              <div style={{ display: "grid", gap: 8, maxHeight: 280, overflowY: "auto" as const }}>
+                                {filtered.map((c, i) => {
+                                  const vl = c.vehicle === "boat"
+                                    ? [c.boatSize, c.make, c.model].filter(Boolean).join(" ")
+                                    : [c.year, c.make, c.model].filter(Boolean).join(" ");
+                                  return (
+                                    <button key={i} onClick={() => {
+                                      setQuickBookClient(c);
+                                      setQPkg(c.packageType || "basic");
+                                      setQClientType(c.clientType || "oneTime");
+                                      setQFreq(c.recurringFrequency || "");
+                                      setQAddOns(c.addOns || "");
+                                      setQAddress(c.address || "");
+                                      setQServiceType(c.serviceType || "mobile");
+                                      setQDate(""); setQTime(""); setQNotes("");
+                                    }}
+                                      style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.10)", borderRadius: 12, padding: "12px 14px", cursor: "pointer", textAlign: "left" as const, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+                                      <div>
+                                        <div style={{ fontWeight: 700, color: "#f1f5f9", fontSize: "0.9rem" }}>{c.name}</div>
+                                        <div style={{ fontSize: "0.78rem", color: "rgba(255,255,255,0.45)" }}>{c.email} · {c.phone}</div>
+                                        {vl && <div style={{ fontSize: "0.78rem", color: "rgba(255,255,255,0.35)" }}>{vl}</div>}
+                                      </div>
+                                      <span style={{ color: "#a78bfa", fontSize: "0.8rem", fontWeight: 600, whiteSpace: "nowrap" as const }}>Select →</span>
+                                    </button>
+                                  );
+                                })}
+                                {filtered.length === 0 && <div style={{ color: "rgba(255,255,255,0.35)", fontSize: "0.88rem", padding: 8 }}>No clients found.</div>}
+                              </div>
+                            </>
+                          ) : (
+                            /* Client selected — show pre-filled booking form */
+                            (() => {
+                              const c = quickBookClient;
+                              const vl = c.vehicle === "boat"
+                                ? [c.boatSize, c.make, c.model].filter(Boolean).join(" ")
+                                : [c.year, c.make, c.model].filter(Boolean).join(" ");
+                              return (
+                                <div>
+                                  {/* Client summary */}
+                                  <div style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.10)", borderRadius: 12, padding: "12px 14px", marginBottom: 14, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                    <div>
+                                      <div style={{ fontWeight: 700, color: "#f1f5f9" }}>{c.name}</div>
+                                      <div style={{ fontSize: "0.82rem", color: "rgba(255,255,255,0.45)" }}>{c.email} · {c.phone}</div>
+                                      {vl && <div style={{ fontSize: "0.78rem", color: "rgba(255,255,255,0.35)" }}>{vl}</div>}
+                                    </div>
+                                    <button onClick={() => setQuickBookClient(null)} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.4)", cursor: "pointer", fontSize: "0.82rem" }}>Change</button>
+                                  </div>
+
+                                  <div style={{ fontSize: "0.78rem", color: "rgba(255,255,255,0.45)", marginBottom: 12 }}>
+                                    All client info is pre-filled. Just enter the new date, time, and service details below, then click Submit.
+                                  </div>
+
+                                  {/* New booking fields — uses top-level state */}
+                                  {(() => {
+                                    const TIMES = ["7:00 AM","7:30 AM","8:00 AM","8:30 AM","9:00 AM","9:30 AM","10:00 AM","10:30 AM","11:00 AM","11:30 AM","12:00 PM","12:30 PM","1:00 PM","1:30 PM","2:00 PM","2:30 PM","3:00 PM","3:30 PM","4:00 PM","4:30 PM","5:00 PM","5:30 PM","6:00 PM","6:30 PM","7:00 PM"];
+                                    return (
+                                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                                        <div>
+                                          <div style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.45)", marginBottom: 4 }}>Date *</div>
+                                          <input type="date" style={{ ...S.input, padding: "9px 12px" }} value={qDate} min={new Date().toISOString().split("T")[0]} onChange={e => setQDate(e.target.value)} />
+                                        </div>
+                                        <div>
+                                          <div style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.45)", marginBottom: 4 }}>Time *</div>
+                                          <select style={{ ...S.input, padding: "9px 12px", backgroundColor: "transparent" }} value={qTime} onChange={e => setQTime(e.target.value)}>
+                                            <option value="">Select time</option>
+                                            {TIMES.map(t => <option key={t} value={t}>{t}</option>)}
+                                          </select>
+                                        </div>
+                                        <div>
+                                          <div style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.45)", marginBottom: 4 }}>Package</div>
+                                          <select style={{ ...S.input, padding: "9px 12px", backgroundColor: "transparent" }} value={qPkg} onChange={e => setQPkg(e.target.value)}>
+                                            <option value="basic">Basic Detail</option>
+                                            <option value="premium">Premium Detail</option>
+                                            <option value="exterior">Exterior Only — Basic</option>
+                                            <option value="exteriorPremium">Exterior Only — Premium</option>
+                                            <option value="interior">Interior Only — Basic</option>
+                                            <option value="interiorPremium">Interior Only — Premium</option>
+                                          </select>
+                                        </div>
+                                        <div>
+                                          <div style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.45)", marginBottom: 4 }}>Service Type</div>
+                                          <select style={{ ...S.input, padding: "9px 12px", backgroundColor: "transparent" }} value={qServiceType} onChange={e => setQServiceType(e.target.value)}>
+                                            <option value="mobile">Mobile</option>
+                                            <option value="dropoff">Drop-Off</option>
+                                          </select>
+                                        </div>
+                                        <div>
+                                          <div style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.45)", marginBottom: 4 }}>Client Type</div>
+                                          <select style={{ ...S.input, padding: "9px 12px", backgroundColor: "transparent" }} value={qClientType} onChange={e => setQClientType(e.target.value)}>
+                                            <option value="oneTime">One-Time</option>
+                                            <option value="maintenance">Maintenance</option>
+                                          </select>
+                                        </div>
+                                        {qClientType === "maintenance" && (
+                                          <div>
+                                            <div style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.45)", marginBottom: 4 }}>Frequency</div>
+                                            <select style={{ ...S.input, padding: "9px 12px", backgroundColor: "transparent" }} value={qFreq} onChange={e => setQFreq(e.target.value)}>
+                                              <option value="">Select</option>
+                                              <option value="biweekly">Bi-Weekly</option>
+                                              <option value="monthly">Monthly</option>
+                                            </select>
+                                          </div>
+                                        )}
+                                        <div style={{ gridColumn: "1 / -1" }}>
+                                          <div style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.45)", marginBottom: 4 }}>Address</div>
+                                          <input style={{ ...S.input, padding: "9px 12px" }} placeholder="Service address" value={qAddress} onChange={e => setQAddress(e.target.value)} />
+                                        </div>
+                                        <div style={{ gridColumn: "1 / -1" }}>
+                                          <div style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.45)", marginBottom: 4 }}>Add-Ons (optional)</div>
+                                          <input style={{ ...S.input, padding: "9px 12px" }} placeholder="e.g. Headlight Restoration, Steam Cleaning" value={qAddOns} onChange={e => setQAddOns(e.target.value)} />
+                                        </div>
+                                        <div style={{ gridColumn: "1 / -1" }}>
+                                          <div style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.45)", marginBottom: 4 }}>Notes (optional)</div>
+                                          <input style={{ ...S.input, padding: "9px 12px" }} placeholder="Any special instructions" value={qNotes} onChange={e => setQNotes(e.target.value)} />
+                                        </div>
+                                        <div style={{ gridColumn: "1 / -1" }}>
+                                          <button
+                                            disabled={!qDate || !qTime || qSubmitting}
+                                            onClick={async () => {
+                                              setQSubmitting(true);
+                                              const tid = showToast("Creating booking...", "loading");
+                                              try {
+                                                const vOpts = vehicleOptions.find(v => v.id === c.vehicle);
+                                                const isPremium = qPkg === "premium" || qPkg === "exteriorPremium" || qPkg === "interiorPremium";
+                                                const rate = vOpts ? (isPremium ? vOpts.premiumRate : vOpts.basicRate) : parseFloat(c.hourlyRate || "80");
+                                                const res = await fetch(SCRIPT_URL, {
+                                                  method: "POST",
+                                                  body: JSON.stringify({
+                                                    action: "bookAppointment",
+                                                    name: c.name, phone: c.phone, email: c.email,
+                                                    date: qDate, displayDate: qDate, time: qTime,
+                                                    year: c.year, make: c.make, model: c.model,
+                                                    boatSize: c.boatSize, vehicle: c.vehicle,
+                                                    packageType: qPkg, hourlyRate: rate,
+                                                    addOns: qAddOns, addOnEstimate: 0,
+                                                    serviceType: qServiceType, address: qAddress,
+                                                    street: "", city: "", state: "", zip: "",
+                                                    placeId: "", lat: "", lng: "",
+                                                    avgTime: "", notes: qNotes,
+                                                    clientType: qClientType,
+                                                    recurringFrequency: qFreq,
+                                                  }),
+                                                });
+                                                const d = await res.json();
+                                                if (d.success) {
+                                                  updateToast(tid, `✓ Booking created for ${c.name}`, "success", 4000);
+                                                  setQuickBookClient(null); setQuickBookSearch("");
+                                                  setQDate(""); setQTime(""); setQNotes(""); setQAddOns("");
+                                                  await loadAdminBookings();
+                                                } else {
+                                                  updateToast(tid, "Failed: " + (d.error || "unknown error"), "error", 4000);
+                                                }
+                                              } catch (e) {
+                                                updateToast(tid, "Network error — please try again", "error", 4000);
+                                              }
+                                              setQSubmitting(false);
+                                            }}
+                                            style={{ width: "100%", background: "linear-gradient(135deg, #7c3aed, #5b21b6)", color: "#fff", border: "none", borderRadius: 10, padding: "12px", fontWeight: 700, fontSize: "0.95rem", cursor: "pointer", opacity: !qDate || !qTime ? 0.5 : 1 }}>
+                                            {qSubmitting ? "Creating..." : `Submit Booking for ${c.name}`}
+                                          </button>
+                                        </div>
+                                      </div>
+                                    );
+                                  })()}
+                                </div>
+                              );
+                            })()
+                          )}
+                        </div>
+                      );
+                    })() : null}
                     {/* Maintenance schedule summary — all upcoming grouped by client */}
                     {adminFilter === "maintenance" && (() => {
                       const futureMain = adminBookings.filter(b => b.clientType === "maintenance" && isUpcoming(b.date) && b.status !== "Completed" && b.status !== "Cancelled" && b.status !== "Skipped");
