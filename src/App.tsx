@@ -295,6 +295,10 @@ export default function App() {
   const [quickBookClient, setQuickBookClient]           = useState<Booking | null>(null);
   const [quickBookSearch, setQuickBookSearch]           = useState("");
   const [quickBookOpen, setQuickBookOpen]               = useState(false);
+  const [qCalMonth, setQCalMonth]                       = useState(() => new Date().getMonth());
+  const [qCalYear, setQCalYear]                         = useState(() => new Date().getFullYear());
+  const [qAddOnList, setQAddOnList]                     = useState<AddOn[]>([]);
+  const qAddressRef                                     = useRef<HTMLInputElement>(null);
   const [qDate, setQDate]                               = useState("");
   const [qTime, setQTime]                               = useState("");
   const [qPkg, setQPkg]                                 = useState("basic");
@@ -1049,6 +1053,20 @@ export default function App() {
   }, [step, serviceType]);
 
   useEffect(() => {
+    if (!quickBookClient || !qAddressRef.current) return;
+    if (!window.google?.maps?.places) return;
+    const ac = new window.google.maps.places.Autocomplete(qAddressRef.current, {
+      types: ["address"], componentRestrictions: { country: "us" },
+      fields: ["formatted_address"],
+    });
+    const listener = ac.addListener("place_changed", () => {
+      const place = ac.getPlace();
+      if (place?.formatted_address) setQAddress(place.formatted_address);
+    });
+    return () => { if (listener) window.google.maps.event.removeListener(listener); };
+  }, [quickBookClient]);
+
+  useEffect(() => {
     fetchAllAvailability().then((slots) => {
       setAllAvailableSlots(slots);
       const dates = [...new Set(slots.map((s) => s.date))];
@@ -1774,122 +1792,199 @@ export default function App() {
                                     <button onClick={() => setQuickBookClient(null)} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.4)", cursor: "pointer", fontSize: "0.82rem" }}>Change</button>
                                   </div>
 
-                                  <div style={{ fontSize: "0.78rem", color: "rgba(255,255,255,0.45)", marginBottom: 12 }}>
-                                    All client info is pre-filled. Just enter the new date, time, and service details below, then click Submit.
+                                  <div style={{ fontSize: "0.78rem", color: "rgba(255,255,255,0.45)", marginBottom: 14 }}>
+                                    Client info pre-filled. Pick a date, time, and service details.
                                   </div>
 
-                                  {/* New booking fields — uses top-level state */}
-                                  {(() => {
-                                    const TIMES = ["7:00 AM","7:30 AM","8:00 AM","8:30 AM","9:00 AM","9:30 AM","10:00 AM","10:30 AM","11:00 AM","11:30 AM","12:00 PM","12:30 PM","1:00 PM","1:30 PM","2:00 PM","2:30 PM","3:00 PM","3:30 PM","4:00 PM","4:30 PM","5:00 PM","5:30 PM","6:00 PM","6:30 PM","7:00 PM"];
+                                  {/* Calendar */}
+                                  <div style={{ background: "rgba(0,0,0,0.3)", borderRadius: 16, padding: "18px 14px", marginBottom: 14 }}>
+                                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+                                      <button onClick={() => { const d = new Date(qCalYear, qCalMonth - 1, 1); setQCalMonth(d.getMonth()); setQCalYear(d.getFullYear()); }} style={{ background: "rgba(255,255,255,0.08)", border: "none", borderRadius: 8, width: 32, height: 32, cursor: "pointer", color: "#fff", fontSize: "1rem" }}>‹</button>
+                                      <span style={{ fontWeight: 700, color: "#fff", fontSize: "0.9rem" }}>{new Date(qCalYear, qCalMonth).toLocaleDateString("en-US", { month: "long", year: "numeric" })}</span>
+                                      <button onClick={() => { const d = new Date(qCalYear, qCalMonth + 1, 1); setQCalMonth(d.getMonth()); setQCalYear(d.getFullYear()); }} style={{ background: "rgba(255,255,255,0.08)", border: "none", borderRadius: 8, width: 32, height: 32, cursor: "pointer", color: "#fff", fontSize: "1rem" }}>›</button>
+                                    </div>
+                                    <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 2, marginBottom: 6 }}>
+                                      {["S","M","T","W","T","F","S"].map((d, i) => <div key={i} style={{ textAlign: "center" as const, fontSize: "0.68rem", color: "rgba(255,255,255,0.35)", fontWeight: 700, padding: "2px 0" }}>{d}</div>)}
+                                    </div>
+                                    <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 3 }}>
+                                      {(() => {
+                                        const firstDay = new Date(qCalYear, qCalMonth, 1).getDay();
+                                        const daysInMonth = new Date(qCalYear, qCalMonth + 1, 0).getDate();
+                                        const today2 = new Date(); today2.setHours(0,0,0,0);
+                                        const cells = [];
+                                        for (let i = 0; i < firstDay; i++) cells.push(<div key={`e${i}`} />);
+                                        for (let d = 1; d <= daysInMonth; d++) {
+                                          const ds = `${qCalYear}-${String(qCalMonth + 1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
+                                          const isAvail = availableDates.includes(ds);
+                                          const isPast = new Date(qCalYear, qCalMonth, d) < today2;
+                                          const isSel = qDate === ds;
+                                          cells.push(
+                                            <button key={d} disabled={!isAvail || isPast}
+                                              onClick={() => { setQDate(ds); setQTime(""); }}
+                                              style={{ height: 34, borderRadius: 8, border: "none", background: isSel ? "#fff" : isAvail && !isPast ? "rgba(255,255,255,0.1)" : "transparent", color: isSel ? "#111" : isAvail && !isPast ? "#fff" : "rgba(255,255,255,0.18)", fontSize: "0.82rem", fontWeight: isSel ? 800 : 500, cursor: isAvail && !isPast ? "pointer" : "default" }}>{d}</button>
+                                          );
+                                        }
+                                        return cells;
+                                      })()}
+                                    </div>
+                                  </div>
+
+                                  {/* Time slots */}
+                                  {qDate && (() => {
+                                    const slots = allAvailableSlots.filter(s => s.date === qDate);
                                     return (
-                                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                                        <div>
-                                          <div style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.45)", marginBottom: 4 }}>Date *</div>
-                                          <input type="date" style={{ ...S.input, padding: "9px 12px" }} value={qDate} min={new Date().toISOString().split("T")[0]} onChange={e => setQDate(e.target.value)} />
-                                        </div>
-                                        <div>
-                                          <div style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.45)", marginBottom: 4 }}>Time *</div>
-                                          <select style={{ ...S.input, padding: "9px 12px", backgroundColor: "transparent" }} value={qTime} onChange={e => setQTime(e.target.value)}>
-                                            <option value="">Select time</option>
-                                            {TIMES.map(t => <option key={t} value={t}>{t}</option>)}
-                                          </select>
-                                        </div>
-                                        <div>
-                                          <div style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.45)", marginBottom: 4 }}>Package</div>
-                                          <select style={{ ...S.input, padding: "9px 12px", backgroundColor: "transparent" }} value={qPkg} onChange={e => setQPkg(e.target.value)}>
-                                            <option value="basic">Basic Detail</option>
-                                            <option value="premium">Premium Detail</option>
-                                            <option value="exterior">Exterior Only — Basic</option>
-                                            <option value="exteriorPremium">Exterior Only — Premium</option>
-                                            <option value="interior">Interior Only — Basic</option>
-                                            <option value="interiorPremium">Interior Only — Premium</option>
-                                          </select>
-                                        </div>
-                                        <div>
-                                          <div style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.45)", marginBottom: 4 }}>Service Type</div>
-                                          <select style={{ ...S.input, padding: "9px 12px", backgroundColor: "transparent" }} value={qServiceType} onChange={e => setQServiceType(e.target.value)}>
-                                            <option value="mobile">Mobile</option>
-                                            <option value="dropoff">Drop-Off</option>
-                                          </select>
-                                        </div>
-                                        <div>
-                                          <div style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.45)", marginBottom: 4 }}>Client Type</div>
-                                          <select style={{ ...S.input, padding: "9px 12px", backgroundColor: "transparent" }} value={qClientType} onChange={e => setQClientType(e.target.value)}>
-                                            <option value="oneTime">One-Time</option>
-                                            <option value="maintenance">Maintenance</option>
-                                          </select>
-                                        </div>
-                                        {qClientType === "maintenance" && (
-                                          <div>
-                                            <div style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.45)", marginBottom: 4 }}>Frequency</div>
-                                            <select style={{ ...S.input, padding: "9px 12px", backgroundColor: "transparent" }} value={qFreq} onChange={e => setQFreq(e.target.value)}>
-                                              <option value="">Select</option>
-                                              <option value="biweekly">Bi-Weekly</option>
-                                              <option value="monthly">Monthly</option>
-                                            </select>
-                                          </div>
-                                        )}
-                                        <div style={{ gridColumn: "1 / -1" }}>
-                                          <div style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.45)", marginBottom: 4 }}>Address</div>
-                                          <input style={{ ...S.input, padding: "9px 12px" }} placeholder="Service address" value={qAddress} onChange={e => setQAddress(e.target.value)} />
-                                        </div>
-                                        <div style={{ gridColumn: "1 / -1" }}>
-                                          <div style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.45)", marginBottom: 4 }}>Add-Ons (optional)</div>
-                                          <input style={{ ...S.input, padding: "9px 12px" }} placeholder="e.g. Headlight Restoration, Steam Cleaning" value={qAddOns} onChange={e => setQAddOns(e.target.value)} />
-                                        </div>
-                                        <div style={{ gridColumn: "1 / -1" }}>
-                                          <div style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.45)", marginBottom: 4 }}>Notes (optional)</div>
-                                          <input style={{ ...S.input, padding: "9px 12px" }} placeholder="Any special instructions" value={qNotes} onChange={e => setQNotes(e.target.value)} />
-                                        </div>
-                                        <div style={{ gridColumn: "1 / -1" }}>
-                                          <button
-                                            disabled={!qDate || !qTime || qSubmitting}
-                                            onClick={async () => {
-                                              setQSubmitting(true);
-                                              const tid = showToast("Creating booking...", "loading");
-                                              try {
-                                                const vOpts = vehicleOptions.find(v => v.id === c.vehicle);
-                                                const isPremium = qPkg === "premium" || qPkg === "exteriorPremium" || qPkg === "interiorPremium";
-                                                const rate = vOpts ? (isPremium ? vOpts.premiumRate : vOpts.basicRate) : parseFloat(c.hourlyRate || "80");
-                                                const res = await fetch(SCRIPT_URL, {
-                                                  method: "POST",
-                                                  body: JSON.stringify({
-                                                    action: "bookAppointment",
-                                                    name: c.name, phone: c.phone, email: c.email,
-                                                    date: qDate, displayDate: qDate, time: qTime,
-                                                    year: c.year, make: c.make, model: c.model,
-                                                    boatSize: c.boatSize, vehicle: c.vehicle,
-                                                    packageType: qPkg, hourlyRate: rate,
-                                                    addOns: qAddOns, addOnEstimate: 0,
-                                                    serviceType: qServiceType, address: qAddress,
-                                                    street: "", city: "", state: "", zip: "",
-                                                    placeId: "", lat: "", lng: "",
-                                                    avgTime: "", notes: qNotes,
-                                                    clientType: qClientType,
-                                                    recurringFrequency: qFreq,
-                                                  }),
-                                                });
-                                                const d = await res.json();
-                                                if (d.success) {
-                                                  updateToast(tid, `✓ Booking created for ${c.name}`, "success", 4000);
-                                                  setQuickBookOpen(false); setQuickBookClient(null); setQuickBookSearch("");
-                                                  setQDate(""); setQTime(""); setQNotes(""); setQAddOns("");
-                                                  await loadAdminBookings();
-                                                } else {
-                                                  updateToast(tid, "Failed: " + (d.error || "unknown error"), "error", 4000);
-                                                }
-                                              } catch (e) {
-                                                updateToast(tid, "Network error — please try again", "error", 4000);
-                                              }
-                                              setQSubmitting(false);
-                                            }}
-                                            style={{ width: "100%", background: "linear-gradient(135deg, #7c3aed, #5b21b6)", color: "#fff", border: "none", borderRadius: 10, padding: "12px", fontWeight: 700, fontSize: "0.95rem", cursor: "pointer", opacity: !qDate || !qTime ? 0.5 : 1 }}>
-                                            {qSubmitting ? "Creating..." : `Submit Booking for ${c.name}`}
-                                          </button>
-                                        </div>
+                                      <div style={{ marginBottom: 14 }}>
+                                        <div style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.45)", marginBottom: 8, textTransform: "uppercase" as const, letterSpacing: "0.06em" }}>Available Times — {formatDateLabel(qDate)}</div>
+                                        {slots.length === 0
+                                          ? <div style={{ color: "#f87171", fontSize: "0.85rem" }}>No available times for this date.</div>
+                                          : <div style={{ display: "flex", gap: 8, flexWrap: "wrap" as const }}>
+                                              {slots.map((s, i) => (
+                                                <button key={i} onClick={() => setQTime(s.time)}
+                                                  style={{ padding: "9px 14px", borderRadius: 10, border: qTime === s.time ? "2px solid #fff" : "1px solid rgba(255,255,255,0.15)", background: qTime === s.time ? "#fff" : "rgba(255,255,255,0.07)", color: qTime === s.time ? "#111" : "#fff", fontSize: "0.88rem", fontWeight: 700, cursor: "pointer" }}>
+                                                  {s.time}
+                                                </button>
+                                              ))}
+                                            </div>
+                                        }
                                       </div>
                                     );
                                   })()}
+
+                                  {/* Service fields */}
+                                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
+                                    <div>
+                                      <div style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.45)", marginBottom: 4 }}>Package</div>
+                                      <select style={{ ...S.input, padding: "9px 12px", backgroundColor: "transparent" }} value={qPkg} onChange={e => setQPkg(e.target.value)}>
+                                        <option value="basic">Basic Detail</option>
+                                        <option value="premium">Premium Detail</option>
+                                        <option value="exterior">Exterior Only — Basic</option>
+                                        <option value="exteriorPremium">Exterior Only — Premium</option>
+                                        <option value="interior">Interior Only — Basic</option>
+                                        <option value="interiorPremium">Interior Only — Premium</option>
+                                      </select>
+                                    </div>
+                                    <div>
+                                      <div style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.45)", marginBottom: 4 }}>Service Type</div>
+                                      <select style={{ ...S.input, padding: "9px 12px", backgroundColor: "transparent" }} value={qServiceType} onChange={e => setQServiceType(e.target.value)}>
+                                        <option value="mobile">Mobile</option>
+                                        <option value="dropoff">Drop-Off</option>
+                                      </select>
+                                    </div>
+                                    <div>
+                                      <div style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.45)", marginBottom: 4 }}>Client Type</div>
+                                      <select style={{ ...S.input, padding: "9px 12px", backgroundColor: "transparent" }} value={qClientType} onChange={e => setQClientType(e.target.value)}>
+                                        <option value="oneTime">One-Time</option>
+                                        <option value="maintenance">Maintenance</option>
+                                      </select>
+                                    </div>
+                                    {qClientType === "maintenance" && (
+                                      <div>
+                                        <div style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.45)", marginBottom: 4 }}>Frequency</div>
+                                        <select style={{ ...S.input, padding: "9px 12px", backgroundColor: "transparent" }} value={qFreq} onChange={e => setQFreq(e.target.value)}>
+                                          <option value="">Select</option>
+                                          <option value="biweekly">Bi-Weekly</option>
+                                          <option value="monthly">Monthly</option>
+                                        </select>
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  {/* Address with autocomplete */}
+                                  {qServiceType === "mobile" && (
+                                    <div style={{ marginBottom: 10 }}>
+                                      <div style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.45)", marginBottom: 4 }}>Service Address</div>
+                                      <input
+                                        ref={qAddressRef}
+                                        style={{ ...S.input, padding: "9px 12px" }}
+                                        placeholder="Start typing address..."
+                                        value={qAddress}
+                                        onChange={e => setQAddress(e.target.value)}
+                                      />
+                                    </div>
+                                  )}
+
+                                  {/* Add-ons with checkboxes + price calc */}
+                                  <div style={{ marginBottom: 10 }}>
+                                    <div style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.45)", marginBottom: 8, textTransform: "uppercase" as const, letterSpacing: "0.06em" }}>Add-On Services</div>
+                                    <div style={{ display: "grid", gap: 6 }}>
+                                      {(c.vehicle === "boat" ? marineAddOnOptions : addOnOptions).map(opt => {
+                                        const checked = qAddOnList.includes(opt.label as AddOn);
+                                        return (
+                                          <label key={opt.label} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: checked ? "rgba(59,130,246,0.1)" : "rgba(255,255,255,0.04)", border: `1px solid ${checked ? "rgba(59,130,246,0.4)" : "rgba(255,255,255,0.08)"}`, borderRadius: 10, padding: "9px 12px", cursor: "pointer" }}>
+                                            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                                              <input type="checkbox" checked={checked} style={{ accentColor: "#3b82f6", width: 15, height: 15 }}
+                                                onChange={() => setQAddOnList(prev => checked ? prev.filter(a => a !== opt.label) : [...prev, opt.label as AddOn])} />
+                                              <span style={{ fontSize: "0.85rem", color: "#f1f5f9" }}>{opt.label}</span>
+                                            </div>
+                                            <span style={{ fontSize: "0.82rem", color: "#93c5fd", fontWeight: 700 }}>{opt.priceText}</span>
+                                          </label>
+                                        );
+                                      })}
+                                    </div>
+                                    {qAddOnList.length > 0 && (() => {
+                                      const all = [...addOnOptions, ...marineAddOnOptions];
+                                      const total = qAddOnList.reduce((s, a) => s + (all.find(o => o.label === a)?.fixedPrice ?? 0), 0);
+                                      return total > 0 ? (
+                                        <div style={{ marginTop: 8, fontSize: "0.82rem", color: "#34d399", fontWeight: 600 }}>
+                                          Add-on estimate: ${total} (consultation items priced separately)
+                                        </div>
+                                      ) : null;
+                                    })()}
+                                  </div>
+
+                                  {/* Notes */}
+                                  <div style={{ marginBottom: 14 }}>
+                                    <div style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.45)", marginBottom: 4 }}>Notes (optional)</div>
+                                    <input style={{ ...S.input, padding: "9px 12px" }} placeholder="Any special instructions" value={qNotes} onChange={e => setQNotes(e.target.value)} />
+                                  </div>
+
+                                  {/* Submit */}
+                                  <button
+                                    disabled={!qDate || !qTime || qSubmitting}
+                                    onClick={async () => {
+                                      setQSubmitting(true);
+                                      const tid = showToast("Creating booking...", "loading");
+                                      try {
+                                        const vOpts = vehicleOptions.find(v => v.id === c.vehicle);
+                                        const isPremium = qPkg === "premium" || qPkg === "exteriorPremium" || qPkg === "interiorPremium";
+                                        const rate = vOpts ? (isPremium ? vOpts.premiumRate : vOpts.basicRate) : parseFloat(c.hourlyRate || "80");
+                                        const all2 = [...addOnOptions, ...marineAddOnOptions];
+                                        const addOnEst = qAddOnList.reduce((s, a) => s + (all2.find(o => o.label === a)?.fixedPrice ?? 0), 0);
+                                        const res = await fetch(SCRIPT_URL, {
+                                          method: "POST",
+                                          body: JSON.stringify({
+                                            action: "bookAppointment",
+                                            name: c.name, phone: c.phone, email: c.email,
+                                            date: qDate, displayDate: qDate, time: qTime,
+                                            year: c.year, make: c.make, model: c.model,
+                                            boatSize: c.boatSize, vehicle: c.vehicle,
+                                            packageType: qPkg, hourlyRate: rate,
+                                            addOns: qAddOnList.join(", "), addOnEstimate: addOnEst,
+                                            serviceType: qServiceType, address: qAddress,
+                                            street: "", city: "", state: "", zip: "",
+                                            placeId: "", lat: "", lng: "",
+                                            avgTime: "", notes: qNotes,
+                                            clientType: qClientType,
+                                            recurringFrequency: qFreq,
+                                          }),
+                                        });
+                                        const d = await res.json();
+                                        if (d.success) {
+                                          updateToast(tid, `✓ Booking created for ${c.name}`, "success", 4000);
+                                          setQuickBookOpen(false); setQuickBookClient(null); setQuickBookSearch("");
+                                          setQDate(""); setQTime(""); setQNotes(""); setQAddOnList([]); setQAddOns("");
+                                          await loadAdminBookings();
+                                        } else {
+                                          updateToast(tid, "Failed: " + (d.error || "unknown error"), "error", 4000);
+                                        }
+                                      } catch (e) {
+                                        updateToast(tid, "Network error — please try again", "error", 4000);
+                                      }
+                                      setQSubmitting(false);
+                                    }}
+                                    style={{ width: "100%", background: "linear-gradient(135deg, #7c3aed, #5b21b6)", color: "#fff", border: "none", borderRadius: 10, padding: "13px", fontWeight: 700, fontSize: "0.95rem", cursor: "pointer", opacity: !qDate || !qTime ? 0.5 : 1 }}>
+                                    {qSubmitting ? "Creating..." : `Submit Booking for ${c.name}`}
+                                  </button>
                                 </div>
                               );
                             })()
