@@ -304,7 +304,6 @@ export default function App() {
   const [qPkg, setQPkg]                                 = useState("basic");
   const [qClientType, setQClientType]                   = useState("oneTime");
   const [qFreq, setQFreq]                               = useState("");
-  const [qAddOns, setQAddOns]                           = useState("");
   const [qNotes, setQNotes]                             = useState("");
   const [qAddress, setQAddress]                         = useState("");
   const [qServiceType, setQServiceType]                 = useState("mobile");
@@ -1755,7 +1754,7 @@ export default function App() {
                                       setQPkg(c.packageType || "basic");
                                       setQClientType(c.clientType || "oneTime");
                                       setQFreq(c.recurringFrequency || "");
-                                      setQAddOns(c.addOns || "");
+                                      setQAddOnList([]);
                                       setQAddress(c.address || "");
                                       setQServiceType(c.serviceType || "mobile");
                                       setQDate(""); setQTime(""); setQNotes("");
@@ -1972,7 +1971,7 @@ export default function App() {
                                         if (d.success) {
                                           updateToast(tid, `✓ Booking created for ${c.name}`, "success", 4000);
                                           setQuickBookOpen(false); setQuickBookClient(null); setQuickBookSearch("");
-                                          setQDate(""); setQTime(""); setQNotes(""); setQAddOnList([]); setQAddOns("");
+                                          setQDate(""); setQTime(""); setQNotes(""); setQAddOnList([]);
                                           await loadAdminBookings();
                                         } else {
                                           updateToast(tid, "Failed: " + (d.error || "unknown error"), "error", 4000);
