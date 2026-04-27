@@ -294,6 +294,7 @@ export default function App() {
   const [editInvoiceNote, setEditInvoiceNote]           = useState("");
   const [quickBookClient, setQuickBookClient]           = useState<Booking | null>(null);
   const [quickBookSearch, setQuickBookSearch]           = useState("");
+  const [quickBookOpen, setQuickBookOpen]               = useState(false);
   const [qDate, setQDate]                               = useState("");
   const [qTime, setQTime]                               = useState("");
   const [qPkg, setQPkg]                                 = useState("basic");
@@ -1690,7 +1691,7 @@ export default function App() {
                         </button>
                       ))}
                       <button
-                        onClick={() => { setQuickBookClient(null); setQuickBookSearch(""); }}
+                        onClick={() => { setQuickBookOpen(true); setQuickBookClient(null); setQuickBookSearch(""); }}
                         style={{ ...S.primary, marginLeft: "auto", padding: "7px 16px", fontSize: "0.85rem", background: "linear-gradient(135deg, #7c3aed, #5b21b6)" }}
                       >
                         + Book Existing Client
@@ -1698,7 +1699,7 @@ export default function App() {
                     </div>
 
                     {/* Quick Book Modal */}
-                    {quickBookClient !== null || quickBookSearch !== "" ? (() => {
+                    {quickBookOpen ? (() => {
                       // Get unique clients from bookings
                       const clientMap: Record<string, Booking> = {};
                       adminBookings.forEach(b => {
@@ -1713,7 +1714,7 @@ export default function App() {
                         <div style={{ background: "rgba(124,58,237,0.08)", border: "1.5px solid rgba(124,58,237,0.4)", borderRadius: 16, padding: 20, marginBottom: 20 }}>
                           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
                             <div style={{ fontWeight: 700, color: "#a78bfa", fontSize: "0.95rem" }}>Book Existing Client</div>
-                            <button onClick={() => { setQuickBookSearch(""); setQuickBookClient(null); }} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.4)", cursor: "pointer", fontSize: "1.1rem" }}>✕</button>
+                            <button onClick={() => { setQuickBookOpen(false); setQuickBookSearch(""); setQuickBookClient(null); }} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.4)", cursor: "pointer", fontSize: "1.1rem" }}>✕</button>
                           </div>
 
                           {!quickBookClient ? (
@@ -1871,7 +1872,7 @@ export default function App() {
                                                 const d = await res.json();
                                                 if (d.success) {
                                                   updateToast(tid, `✓ Booking created for ${c.name}`, "success", 4000);
-                                                  setQuickBookClient(null); setQuickBookSearch("");
+                                                  setQuickBookOpen(false); setQuickBookClient(null); setQuickBookSearch("");
                                                   setQDate(""); setQTime(""); setQNotes(""); setQAddOns("");
                                                   await loadAdminBookings();
                                                 } else {
