@@ -42,7 +42,8 @@ type AddOn =
   | "Gelcoat Polishing"
   | "Wet Sanding"
   | "Interior Deep Extraction"
-  | "Sealant & Protection Upgrade";
+  | "Sealant & Protection Upgrade"
+  | "Engine Compartment Detail";
 
 type GoogleUser = {
   name: string;
@@ -88,12 +89,13 @@ const vehicleOptions = [
 ];
 
 const addOnOptions: { label: AddOn; priceText: string; fixedPrice?: number }[] = [
-  { label: "Headlight Restoration", priceText: "$150", fixedPrice: 150 },
-  { label: "Stain Removal",         priceText: "Need consultation" },
-  { label: "Paint Correction",      priceText: "Need consultation" },
-  { label: "Pet Hair Removal",      priceText: "$60",  fixedPrice: 60  },
-  { label: "Steam Cleaning",        priceText: "$60",  fixedPrice: 60  },
-  { label: "Ceramic Coating",       priceText: "Need consultation" },
+  { label: "Headlight Restoration",    priceText: "$150", fixedPrice: 150 },
+  { label: "Stain Removal",            priceText: "Need consultation" },
+  { label: "Paint Correction",         priceText: "Need consultation" },
+  { label: "Pet Hair Removal",         priceText: "$60",  fixedPrice: 60  },
+  { label: "Steam Cleaning",           priceText: "$60",  fixedPrice: 60  },
+  { label: "Ceramic Coating",          priceText: "Need consultation" },
+  { label: "Engine Compartment Detail",priceText: "$75",  fixedPrice: 75  },
 ];
 
 const marineAddOnOptions: { label: AddOn; priceText: string; fixedPrice?: number }[] = [
