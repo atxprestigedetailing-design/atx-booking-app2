@@ -2882,7 +2882,8 @@ export default function App() {
                     const rate = parseFloat(b.hourlyRate || "0");
                     const isMaint = b.clientType === "maintenance";
                     const isBoat = b.vehicle === "boat";
-                    const hrs = isMaint ? 2 : isBoat ? 4 : 3;
+                    const isPartial = b.packageType === "exterior" || b.packageType === "interior" || b.packageType === "exteriorPremium" || b.packageType === "interiorPremium";
+                    const hrs = isMaint ? 2 : isBoat ? 4 : isPartial ? 2 : 3;
                     return s + (rate * hrs);
                   }, 0);
 
@@ -3026,7 +3027,8 @@ export default function App() {
                                 const rate = parseFloat(b.hourlyRate || "0");
                                 const isMaint = b.clientType === "maintenance";
                                 const isBoat = b.vehicle === "boat";
-                                const hrs = isMaint ? 2 : isBoat ? 4 : 3;
+                                const isPartial = b.packageType === "exterior" || b.packageType === "interior" || b.packageType === "exteriorPremium" || b.packageType === "interiorPremium";
+                                const hrs = isMaint ? 2 : isBoat ? 4 : isPartial ? 2 : 3;
                                 const est = rate * hrs;
                                 const vl = b.vehicle === "boat" ? [b.boatSize, b.make, b.model].filter(Boolean).join(" ") : [b.year, b.make, b.model].filter(Boolean).join(" ");
                                 return (
