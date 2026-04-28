@@ -402,6 +402,8 @@ export default function App() {
     } catch { return null; }
   });
   const [googleScriptLoaded, setGoogleScriptLoaded]     = useState(false);
+  const [splashDone, setSplashDone]                     = useState(false);
+  const [splashPhase, setSplashPhase]                   = useState(0); // 0=logo, 1=tagline, 2=fadeout
   const [view, setView]                                 = useState<"booking" | "myBookings" | "requestChange" | "admin" | "balance" | "inventory">("booking");
   const [adminTab, setAdminTab]                         = useState<"bookings" | "invoices" | "revenue" | "availability">("bookings");
   const [adminBookings, setAdminBookings]               = useState<Booking[]>([]);
@@ -490,6 +492,14 @@ export default function App() {
   const [addressSelected, setAddressSelected]           = useState(false);
   const [makeOptions, setMakeOptions]                   = useState<string[]>([]);
   const [modelOptions, setModelOptions]                 = useState<string[]>([]);
+
+  // ── Splash screen sequencing ──
+  useEffect(() => {
+    const t1 = setTimeout(() => setSplashPhase(1), 900);   // tagline appears
+    const t2 = setTimeout(() => setSplashPhase(2), 2200);  // fade out begins
+    const t3 = setTimeout(() => setSplashDone(true), 3000); // app takes over
+    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
+  }, []);
 
   // ── Global styles injected once into <head> so they apply on ALL views ──
   useEffect(() => {
@@ -1416,6 +1426,139 @@ export default function App() {
   ) : null;
 
   // MY BOOKINGS VIEW
+  // ── SPLASH SCREEN ──────────────────────────────────────────────────────────
+  if (!splashDone) {
+    return (
+      <div style={{
+        position: "fixed" as const, inset: 0,
+        background: "#080c12",
+        display: "flex", flexDirection: "column" as const,
+        alignItems: "center", justifyContent: "center",
+        zIndex: 9999, fontFamily: '"Outfit", sans-serif',
+        opacity: splashPhase === 2 ? 0 : 1,
+        transition: "opacity 0.8s cubic-bezier(0.4,0,0.2,1)",
+        overflow: "hidden",
+      }}>
+        <style>{`
+          @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;700;900&display=swap');
+          @keyframes splashOrb1 {
+            0%,100% { transform: translate(0,0) scale(1); }
+            50% { transform: translate(80px,-60px) scale(1.15); }
+          }
+          @keyframes splashOrb2 {
+            0%,100% { transform: translate(0,0) scale(1); }
+            50% { transform: translate(-60px,80px) scale(1.1); }
+          }
+          @keyframes splashOrb3 {
+            0%,100% { transform: translate(0,0) scale(1); }
+            50% { transform: translate(40px,60px) scale(1.2); }
+          }
+          @keyframes logoReveal {
+            0% { opacity: 0; transform: scale(0.6) translateY(20px); filter: blur(12px); }
+            60% { opacity: 1; transform: scale(1.05) translateY(-4px); filter: blur(0); }
+            100% { opacity: 1; transform: scale(1) translateY(0); filter: blur(0); }
+          }
+          @keyframes ringExpand {
+            0% { transform: scale(0.5); opacity: 0.8; }
+            100% { transform: scale(2.2); opacity: 0; }
+          }
+          @keyframes taglineSlide {
+            0% { opacity: 0; transform: translateY(16px) letterSpacing(0.3em); }
+            100% { opacity: 1; transform: translateY(0); }
+          }
+          @keyframes shimmerSweep {
+            0% { background-position: -200% 0; }
+            100% { background-position: 200% 0; }
+          }
+          @keyframes dotPulse {
+            0%,100% { opacity: 0.3; transform: scaleY(0.6); }
+            50% { opacity: 1; transform: scaleY(1); }
+          }
+          @keyframes borderGlow {
+            0%,100% { box-shadow: 0 0 30px rgba(59,130,246,0.3), 0 0 60px rgba(59,130,246,0.1); }
+            50% { box-shadow: 0 0 50px rgba(59,130,246,0.6), 0 0 100px rgba(59,130,246,0.2); }
+          }
+        `}</style>
+
+        {/* Animated orbs */}
+        <div style={{ position: "absolute" as const, inset: 0, overflow: "hidden", pointerEvents: "none" }}>
+          <div style={{ position: "absolute", width: 700, height: 700, top: "-200px", right: "-150px", borderRadius: "50%", background: "radial-gradient(circle, rgba(30,64,175,0.5) 0%, transparent 70%)", filter: "blur(60px)", animation: "splashOrb1 8s ease-in-out infinite" }} />
+          <div style={{ position: "absolute", width: 600, height: 600, bottom: "-150px", left: "-200px", borderRadius: "50%", background: "radial-gradient(circle, rgba(14,116,144,0.45) 0%, transparent 70%)", filter: "blur(60px)", animation: "splashOrb2 10s ease-in-out infinite" }} />
+          <div style={{ position: "absolute", width: 400, height: 400, top: "35%", left: "35%", borderRadius: "50%", background: "radial-gradient(circle, rgba(91,33,182,0.4) 0%, transparent 70%)", filter: "blur(50px)", animation: "splashOrb3 12s ease-in-out infinite" }} />
+          {/* Grid overlay */}
+          <div style={{ position: "absolute", inset: 0, backgroundImage: "linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px)", backgroundSize: "60px 60px" }} />
+        </div>
+
+        {/* Expanding ring */}
+        <div style={{ position: "absolute", width: 220, height: 220, borderRadius: "50%", border: "1px solid rgba(59,130,246,0.5)", animation: "ringExpand 1.8s cubic-bezier(0.2,0,0.8,1) 0.3s both" }} />
+        <div style={{ position: "absolute", width: 220, height: 220, borderRadius: "50%", border: "1px solid rgba(59,130,246,0.3)", animation: "ringExpand 1.8s cubic-bezier(0.2,0,0.8,1) 0.6s both" }} />
+
+        {/* Logo container */}
+        <div style={{
+          position: "relative",
+          width: 120, height: 120,
+          borderRadius: "50%",
+          background: "rgba(255,255,255,0.06)",
+          border: "1.5px solid rgba(255,255,255,0.15)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          animation: "logoReveal 0.9s cubic-bezier(0.16,1,0.3,1) both, borderGlow 3s ease-in-out 1s infinite",
+          backdropFilter: "blur(20px)",
+          marginBottom: 32,
+        }}>
+          <img src={logo} alt="ATX Prestige" style={{ width: 90, height: 90, objectFit: "contain" as const }} />
+        </div>
+
+        {/* Brand name with shimmer */}
+        <div style={{
+          fontSize: "clamp(2rem, 6vw, 3rem)",
+          fontWeight: 900,
+          letterSpacing: "-2px",
+          marginBottom: 12,
+          background: "linear-gradient(90deg, rgba(255,255,255,0.4) 0%, #ffffff 30%, rgba(255,255,255,0.9) 60%, #93c5fd 80%, rgba(255,255,255,0.4) 100%)",
+          backgroundSize: "200% 100%",
+          WebkitBackgroundClip: "text",
+          WebkitTextFillColor: "transparent",
+          backgroundClip: "text",
+          animation: "shimmerSweep 2.5s linear 0.5s infinite",
+        }}>
+          ATX Prestige
+        </div>
+
+        {/* Tagline */}
+        <div style={{
+          fontSize: "clamp(0.85rem, 2.5vw, 1rem)",
+          fontWeight: 400,
+          letterSpacing: "0.22em",
+          textTransform: "uppercase" as const,
+          color: "rgba(255,255,255,0.45)",
+          opacity: splashPhase >= 1 ? 1 : 0,
+          transform: splashPhase >= 1 ? "translateY(0)" : "translateY(12px)",
+          transition: "opacity 0.7s ease, transform 0.7s ease",
+          marginBottom: 48,
+        }}>
+          Detailing
+        </div>
+
+        {/* Loading bars */}
+        <div style={{
+          display: "flex", gap: 6, alignItems: "flex-end",
+          opacity: splashPhase >= 1 ? 1 : 0,
+          transition: "opacity 0.5s ease 0.3s",
+        }}>
+          {[0, 1, 2, 3, 4].map(i => (
+            <div key={i} style={{
+              width: 4,
+              height: 20 + (i % 3) * 8,
+              borderRadius: 999,
+              background: i === 2 ? "#3b82f6" : i === 1 || i === 3 ? "rgba(59,130,246,0.6)" : "rgba(59,130,246,0.3)",
+              animation: `dotPulse 0.9s ease-in-out ${i * 0.12}s infinite`,
+            }} />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   if (view === "myBookings") {
     return (
       <div style={S.page}>
