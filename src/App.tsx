@@ -11,7 +11,7 @@ const GOOGLE_CLIENT_ID =
   "447699234633-ivo2e1c2q843scj32k5323o2rkq6h7dp.apps.googleusercontent.com";
 
 const SCRIPT_URL =
-  "https://script.google.com/macros/s/AKfycbwAUtHof33cmpV9U7FPdsrCtKLXd48JxVYIUn2IBjwGlwswi3j9vkf5VVEQKf-JVd2c9w/exec";
+  "https://script.google.com/macros/s/AKfycbytLuNWR4QH9hKKFrGbwuFP3XsLU9r4daZn4XT0A4qOlJ5tjOZ2R0vE4gSuyhpWiUg5xA/exec";
 
 const TOTAL_STEPS = 9;
 const ADMIN_EMAIL = "atxprestigedetailing@gmail.com";
@@ -3111,6 +3111,11 @@ export default function App() {
 
                   // Projected income from upcoming bookings (using hourly rate × avg hours)
                   const projectedIncome = upcoming.reduce((s, b) => {
+                    if (b.packageType === "custom") {
+                      // Extract flat price from notes: "Custom job: PPF Removal — $575..."
+                      const match = (b.notes || "").match(/\$(\d+(\.\d+)?)/);
+                      return s + (match ? parseFloat(match[1]) : 0);
+                    }
                     const rate = parseFloat(b.hourlyRate || "0");
                     const isMaint = b.clientType === "maintenance";
                     const isBoat = b.vehicle === "boat";
@@ -3256,22 +3261,31 @@ export default function App() {
                             <div style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.35)", marginBottom: 12 }}>Based on hourly rate × estimated hours (2hr maintenance, 3hr auto, 4hr boat). Actual may vary.</div>
                             <div style={{ display: "grid", gap: 6 }}>
                               {upcoming.slice(0, 8).map((b, i) => {
-                                const rate = parseFloat(b.hourlyRate || "0");
-                                const isMaint = b.clientType === "maintenance";
-                                const isBoat = b.vehicle === "boat";
-                                const isPartial = b.packageType === "exterior" || b.packageType === "interior" || b.packageType === "exteriorPremium" || b.packageType === "interiorPremium";
-                                const hrs = isMaint ? 2 : isBoat ? 4 : isPartial ? 2 : 3;
-                                const est = rate * hrs;
+                                const isCustom = b.packageType === "custom";
+                                let est = 0;
+                                if (isCustom) {
+                                  const match = (b.notes || "").match(/\$(\d+(\.\d+)?)/);
+                                  est = match ? parseFloat(match[1]) : 0;
+                                } else {
+                                  const rate = parseFloat(b.hourlyRate || "0");
+                                  const isMaint = b.clientType === "maintenance";
+                                  const isBoat = b.vehicle === "boat";
+                                  const isPartial = b.packageType === "exterior" || b.packageType === "interior" || b.packageType === "exteriorPremium" || b.packageType === "interiorPremium";
+                                  const hrs = isMaint ? 2 : isBoat ? 4 : isPartial ? 2 : 3;
+                                  est = rate * hrs;
+                                }
                                 const vl = b.vehicle === "boat" ? [b.boatSize, b.make, b.model].filter(Boolean).join(" ") : [b.year, b.make, b.model].filter(Boolean).join(" ");
                                 return (
-                                  <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "rgba(255,255,255,0.04)", borderRadius: 10, padding: "8px 12px", fontSize: "0.82rem" }}>
+                                  <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: isCustom ? "rgba(124,58,237,0.08)" : "rgba(255,255,255,0.04)", borderRadius: 10, padding: "8px 12px", fontSize: "0.82rem", border: isCustom ? "1px solid rgba(124,58,237,0.25)" : "none" }}>
                                     <div>
                                       <span style={{ fontWeight: 600, color: "#f1f5f9" }}>{b.name}</span>
                                       <span style={{ color: "rgba(255,255,255,0.4)", margin: "0 6px" }}>·</span>
                                       <span style={{ color: "rgba(255,255,255,0.4)" }}>{formatDateLabel(b.date)}</span>
                                     </div>
                                     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                                      <span style={{ color: "rgba(255,255,255,0.35)", fontSize: "0.75rem" }}>{vl}</span>
+                                      <span style={{ color: isCustom ? "#a78bfa" : "rgba(255,255,255,0.35)", fontSize: "0.75rem" }}>
+                                        {isCustom ? `⚡ ${b.addOns || "Custom Job"}` : vl}
+                                      </span>
                                       <span style={{ fontWeight: 700, color: "#67e8f9" }}>${est.toFixed(0)}</span>
                                     </div>
                                   </div>
