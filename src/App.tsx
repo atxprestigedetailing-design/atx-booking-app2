@@ -1844,10 +1844,15 @@ export default function App() {
 
                     {/* Quick Book Modal */}
                     {quickBookOpen ? (() => {
-                      // Get unique clients from bookings
+                      // Get unique client+vehicle combinations so multi-vehicle clients show all their vehicles
                       const clientMap: Record<string, Booking> = {};
                       adminBookings.forEach(b => {
-                        if (!clientMap[b.email] && b.name && b.email) clientMap[b.email] = b;
+                        if (!b.name) return;
+                        const vehicleKey = b.vehicle === "boat"
+                          ? [b.boatSize, b.make, b.model].filter(Boolean).join(" ")
+                          : [b.year, b.make, b.model].filter(Boolean).join(" ");
+                        const key = `${b.email || b.name}__${vehicleKey}`;
+                        if (!clientMap[key]) clientMap[key] = b;
                       });
                       const clients = Object.values(clientMap).sort((a, b) => a.name.localeCompare(b.name));
                       const filtered = quickBookSearch
