@@ -1,5 +1,5 @@
 import logo from "./assets/logo.png";
-import { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
 
 declare global {
   interface Window {
@@ -11,7 +11,7 @@ const GOOGLE_CLIENT_ID =
   "447699234633-ivo2e1c2q843scj32k5323o2rkq6h7dp.apps.googleusercontent.com";
 
 const SCRIPT_URL =
-  "https://script.google.com/macros/s/AKfycbwixBU9A2_TySzoIOuSSuK98Ol6a3qxuGY91lEwMVfAYP-2l8sG8xZTs-JcwA5nQFQpxA/exec";
+  "https://script.google.com/macros/s/AKfycbytLuNWR4QH9hKKFrGbwuFP3XsLU9r4daZn4XT0A4qOlJ5tjOZ2R0vE4gSuyhpWiUg5xA/exec";
 
 const TOTAL_STEPS = 9;
 const ADMIN_EMAIL = "atxprestigedetailing@gmail.com";
@@ -75,6 +75,7 @@ type Booking = {
   photosLink: string;
   beforePhotoUrl: string;
   afterPhotoUrl: string;
+  invoiceLink: string;
   name: string;
   phone: string;
   email: string;
@@ -234,8 +235,31 @@ function BookingCard({ booking, upcoming, onRequestChange }: {
       ? [booking.boatSize, booking.make, booking.model].filter(Boolean).join(" ")
       : [booking.year, booking.make, booking.model].filter(Boolean).join(" ");
 
-  const hasPhotos = booking.photosLink || booking.beforePhotoUrl || booking.afterPhotoUrl;
+  const hasPhotos = booking.beforePhotoUrl || booking.afterPhotoUrl;
   const isCompleted = booking.status === "Completed" || booking.invoiceStatus === "paid";
+  const [showPhotos, setShowPhotos] = React.useState(false);
+  const [loadedImgs, setLoadedImgs] = React.useState<Record<string, boolean>>({});
+
+  const beforeUrls = booking.beforePhotoUrl ? booking.beforePhotoUrl.split(",").map(u => u.trim()).filter(Boolean) : [];
+  const afterUrls  = booking.afterPhotoUrl  ? booking.afterPhotoUrl.split(",").map(u => u.trim()).filter(Boolean) : [];
+
+  // Convert thumbnail URLs to full-size for download (sz=w400 → sz=w1600)
+  const fullSizeUrl = (url: string) => url.replace("sz=w400", "sz=w1600");
+
+  async function downloadPhoto(url: string, label: string) {
+    try {
+      const full = fullSizeUrl(url);
+      const res = await fetch(full);
+      const blob = await res.blob();
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = label + ".jpg";
+      a.click();
+      URL.revokeObjectURL(a.href);
+    } catch {
+      window.open(fullSizeUrl(url), "_blank");
+    }
+  }
 
   return (
     <div style={{ background: "rgba(255,255,255,0.05)", border: upcoming ? "1px solid rgba(59,130,246,0.45)" : "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: 18, position: "relative" as const }}>
@@ -256,17 +280,21 @@ function BookingCard({ booking, upcoming, onRequestChange }: {
         {booking.addOns && <div>Add-Ons: {booking.addOns}</div>}
         {booking.notes && <div>Notes: {booking.notes}</div>}
       </div>
+
       {booking.invoiceStatus === "released" && booking.invoiceAmount && (
         <div style={{ marginTop: 10, background: "rgba(251,191,36,0.1)", border: "1px solid rgba(251,191,36,0.3)", borderRadius: 10, padding: "10px 14px", fontSize: "0.88rem", color: "#fbbf24" }}>
           <span style={{ fontWeight: 700 }}>Balance due: ${booking.invoiceAmount}</span>
           {booking.invoiceNote ? ` — ${booking.invoiceNote}` : ""}
         </div>
       )}
+
       {booking.invoiceStatus === "paid" && (
         <div style={{ marginTop: 10, background: "rgba(16,185,129,0.1)", border: "1px solid rgba(16,185,129,0.25)", borderRadius: 10, padding: "8px 14px", fontSize: "0.82rem", color: "#34d399", fontWeight: 600 }}>
           ✓ Paid ${booking.invoiceAmount}
         </div>
       )}
+
+      {/* Action buttons */}
       <div style={{ display: "flex", gap: 8, marginTop: 14, flexWrap: "wrap" as const }}>
         {upcoming && (
           <button onClick={() => onRequestChange(booking)} style={{ background: "rgba(255,255,255,0.08)", color: "#f1f5f9", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 10, padding: "9px 16px", fontSize: "0.9rem", fontWeight: 600, cursor: "pointer" }}>
@@ -274,12 +302,92 @@ function BookingCard({ booking, upcoming, onRequestChange }: {
           </button>
         )}
         {isCompleted && hasPhotos && (
-          <a href={booking.photosLink || "#"} target="_blank" rel="noopener noreferrer"
-            style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "rgba(59,130,246,0.12)", color: "#93c5fd", border: "1px solid rgba(59,130,246,0.3)", borderRadius: 10, padding: "9px 16px", fontSize: "0.9rem", fontWeight: 600, cursor: "pointer", textDecoration: "none" }}>
-            📸 View Gallery
+          <button onClick={() => setShowPhotos(p => !p)}
+            style={{ display: "inline-flex", alignItems: "center", gap: 6, background: showPhotos ? "rgba(59,130,246,0.25)" : "rgba(59,130,246,0.12)", color: "#93c5fd", border: "1px solid rgba(59,130,246,0.3)", borderRadius: 10, padding: "9px 16px", fontSize: "0.9rem", fontWeight: 600, cursor: "pointer" }}>
+            📸 {showPhotos ? "Hide Photos" : `View Photos (${beforeUrls.length + afterUrls.length})`}
+          </button>
+        )}
+        {isCompleted && booking.invoiceLink && (
+          <a href={booking.invoiceLink} target="_blank" rel="noopener noreferrer"
+            style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "rgba(16,185,129,0.1)", color: "#34d399", border: "1px solid rgba(16,185,129,0.3)", borderRadius: 10, padding: "9px 16px", fontSize: "0.9rem", fontWeight: 600, cursor: "pointer", textDecoration: "none" }}>
+            🧾 Download Invoice
           </a>
         )}
       </div>
+
+      {/* Inline photo gallery */}
+      {showPhotos && hasPhotos && (
+        <div style={{ marginTop: 16, background: "rgba(0,0,0,0.3)", borderRadius: 14, padding: 16 }}>
+          {beforeUrls.length > 0 && (
+            <div style={{ marginBottom: afterUrls.length > 0 ? 16 : 0 }}>
+              <div style={{ fontSize: "0.72rem", fontWeight: 700, color: "rgba(255,255,255,0.35)", textTransform: "uppercase" as const, letterSpacing: "0.08em", marginBottom: 10 }}>
+                Before ({beforeUrls.length})
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(100px, 1fr))", gap: 8 }}>
+                {beforeUrls.map((url, i) => (
+                  <div key={i} style={{ position: "relative" as const, borderRadius: 10, overflow: "hidden", aspectRatio: "1", background: "rgba(255,255,255,0.06)" }}>
+                    {!loadedImgs[url] && (
+                      <div style={{ position: "absolute" as const, inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        <div style={{ width: 20, height: 20, border: "2px solid rgba(255,255,255,0.15)", borderTopColor: "#93c5fd", borderRadius: "50%", animation: "spin 0.7s linear infinite" }} />
+                      </div>
+                    )}
+                    <img
+                      src={url}
+                      loading="lazy"
+                      onLoad={() => setLoadedImgs(p => ({ ...p, [url]: true }))}
+                      style={{ width: "100%", height: "100%", objectFit: "cover" as const, display: "block", opacity: loadedImgs[url] ? 1 : 0, transition: "opacity 0.3s ease", cursor: "pointer" }}
+                      onClick={() => window.open(fullSizeUrl(url), "_blank")}
+                    />
+                    <button
+                      onClick={() => downloadPhoto(url, `before_${i + 1}`)}
+                      style={{ position: "absolute" as const, bottom: 4, right: 4, background: "rgba(0,0,0,0.65)", border: "none", borderRadius: 6, width: 26, height: 26, cursor: "pointer", color: "#fff", fontSize: "0.7rem", display: "flex", alignItems: "center", justifyContent: "center" }}
+                      title="Download">⬇</button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {afterUrls.length > 0 && (
+            <div>
+              <div style={{ fontSize: "0.72rem", fontWeight: 700, color: "rgba(255,255,255,0.35)", textTransform: "uppercase" as const, letterSpacing: "0.08em", marginBottom: 10 }}>
+                After ({afterUrls.length})
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(100px, 1fr))", gap: 8 }}>
+                {afterUrls.map((url, i) => (
+                  <div key={i} style={{ position: "relative" as const, borderRadius: 10, overflow: "hidden", aspectRatio: "1", background: "rgba(255,255,255,0.06)" }}>
+                    {!loadedImgs[url] && (
+                      <div style={{ position: "absolute" as const, inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        <div style={{ width: 20, height: 20, border: "2px solid rgba(255,255,255,0.15)", borderTopColor: "#34d399", borderRadius: "50%", animation: "spin 0.7s linear infinite" }} />
+                      </div>
+                    )}
+                    <img
+                      src={url}
+                      loading="lazy"
+                      onLoad={() => setLoadedImgs(p => ({ ...p, [url]: true }))}
+                      style={{ width: "100%", height: "100%", objectFit: "cover" as const, display: "block", opacity: loadedImgs[url] ? 1 : 0, transition: "opacity 0.3s ease", cursor: "pointer" }}
+                      onClick={() => window.open(fullSizeUrl(url), "_blank")}
+                    />
+                    <button
+                      onClick={() => downloadPhoto(url, `after_${i + 1}`)}
+                      style={{ position: "absolute" as const, bottom: 4, right: 4, background: "rgba(0,0,0,0.65)", border: "none", borderRadius: 6, width: 26, height: 26, cursor: "pointer", color: "#fff", fontSize: "0.7rem", display: "flex", alignItems: "center", justifyContent: "center" }}
+                      title="Download">⬇</button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {/* Download all */}
+          {(beforeUrls.length + afterUrls.length) > 1 && (
+            <button
+              onClick={() => {
+                [...beforeUrls.map((u,i) => ({u, label:`before_${i+1}`})), ...afterUrls.map((u,i) => ({u, label:`after_${i+1}`}))].forEach(({u, label}) => downloadPhoto(u, label));
+              }}
+              style={{ marginTop: 12, width: "100%", background: "rgba(59,130,246,0.15)", color: "#93c5fd", border: "1px solid rgba(59,130,246,0.3)", borderRadius: 10, padding: "10px", fontWeight: 700, fontSize: "0.85rem", cursor: "pointer" }}>
+              ⬇ Download All {beforeUrls.length + afterUrls.length} Photos
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -934,6 +1042,7 @@ export default function App() {
               photosLink: (booking as any).photosLink || "",
               beforePhotoUrl: (booking as any).beforePhotoUrl || "",
               afterPhotoUrl: (booking as any).afterPhotoUrl || "",
+              invoiceLink: (booking as any).invoiceLink || "",
             }),
           });
           const emailData = await emailRes.json();
@@ -2704,6 +2813,76 @@ export default function App() {
                                 </div>
                               </div>
                             )}
+
+                            {/* Admin photo gallery + invoice download */}
+                            {isComplete && (b.beforePhotoUrl || b.afterPhotoUrl || b.invoiceLink) && (() => {
+                              const bUrls = b.beforePhotoUrl ? b.beforePhotoUrl.split(",").map((u: string) => u.trim()).filter(Boolean) : [];
+                              const aUrls = b.afterPhotoUrl  ? b.afterPhotoUrl.split(",").map((u: string) => u.trim()).filter(Boolean) : [];
+                              const fullSize = (url: string) => url.replace("sz=w400", "sz=w1600");
+                              const dlPhoto = async (url: string, label: string) => {
+                                try {
+                                  const res = await fetch(fullSize(url));
+                                  const blob = await res.blob();
+                                  const a = document.createElement("a");
+                                  a.href = URL.createObjectURL(blob);
+                                  a.download = label + ".jpg";
+                                  a.click();
+                                  URL.revokeObjectURL(a.href);
+                                } catch { window.open(fullSize(url), "_blank"); }
+                              };
+                              return (
+                                <div style={{ marginTop: 14, padding: 14, background: "rgba(59,130,246,0.06)", borderRadius: 12, border: "1px solid rgba(59,130,246,0.2)" }}>
+                                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, flexWrap: "wrap" as const, gap: 8 }}>
+                                    <div style={{ fontWeight: 700, color: "#93c5fd", fontSize: "0.85rem" }}>
+                                      📸 Job Photos {bUrls.length + aUrls.length > 0 ? `(${bUrls.length + aUrls.length})` : ""}
+                                    </div>
+                                    <div style={{ display: "flex", gap: 8 }}>
+                                      {(bUrls.length + aUrls.length) > 1 && (
+                                        <button onClick={() => { [...bUrls.map((u: string, i: number) => ({u, label:`before_${i+1}`})), ...aUrls.map((u: string, i: number) => ({u, label:`after_${i+1}`}))].forEach(({u, label}) => dlPhoto(u, label)); }}
+                                          style={{ background: "rgba(59,130,246,0.2)", color: "#93c5fd", border: "1px solid rgba(59,130,246,0.3)", borderRadius: 8, padding: "5px 12px", fontSize: "0.78rem", fontWeight: 700, cursor: "pointer" }}>
+                                          ⬇ Download All
+                                        </button>
+                                      )}
+                                      {b.invoiceLink && (
+                                        <a href={b.invoiceLink} target="_blank" rel="noopener noreferrer"
+                                          style={{ background: "rgba(16,185,129,0.15)", color: "#34d399", border: "1px solid rgba(16,185,129,0.3)", borderRadius: 8, padding: "5px 12px", fontSize: "0.78rem", fontWeight: 700, cursor: "pointer", textDecoration: "none" }}>
+                                          🧾 Invoice PDF
+                                        </a>
+                                      )}
+                                    </div>
+                                  </div>
+                                  {bUrls.length > 0 && (
+                                    <div style={{ marginBottom: aUrls.length > 0 ? 12 : 0 }}>
+                                      <div style={{ fontSize: "0.68rem", fontWeight: 700, color: "rgba(255,255,255,0.3)", textTransform: "uppercase" as const, letterSpacing: "0.08em", marginBottom: 6 }}>Before ({bUrls.length})</div>
+                                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(80px, 1fr))", gap: 6 }}>
+                                        {bUrls.map((url: string, i: number) => (
+                                          <div key={i} style={{ position: "relative" as const, borderRadius: 8, overflow: "hidden", aspectRatio: "1", background: "rgba(255,255,255,0.05)" }}>
+                                            <img src={url} loading="lazy" style={{ width: "100%", height: "100%", objectFit: "cover" as const, display: "block", cursor: "pointer" }} onClick={() => window.open(fullSize(url), "_blank")} />
+                                            <button onClick={() => dlPhoto(url, `before_${i+1}`)} style={{ position: "absolute" as const, bottom: 3, right: 3, background: "rgba(0,0,0,0.65)", border: "none", borderRadius: 5, width: 22, height: 22, cursor: "pointer", color: "#fff", fontSize: "0.65rem", display: "flex", alignItems: "center", justifyContent: "center" }}>⬇</button>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+                                  {aUrls.length > 0 && (
+                                    <div>
+                                      <div style={{ fontSize: "0.68rem", fontWeight: 700, color: "rgba(255,255,255,0.3)", textTransform: "uppercase" as const, letterSpacing: "0.08em", marginBottom: 6 }}>After ({aUrls.length})</div>
+                                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(80px, 1fr))", gap: 6 }}>
+                                        {aUrls.map((url: string, i: number) => (
+                                          <div key={i} style={{ position: "relative" as const, borderRadius: 8, overflow: "hidden", aspectRatio: "1", background: "rgba(255,255,255,0.05)" }}>
+                                            <img src={url} loading="lazy" style={{ width: "100%", height: "100%", objectFit: "cover" as const, display: "block", cursor: "pointer" }} onClick={() => window.open(fullSize(url), "_blank")} />
+                                            <button onClick={() => dlPhoto(url, `after_${i+1}`)} style={{ position: "absolute" as const, bottom: 3, right: 3, background: "rgba(0,0,0,0.65)", border: "none", borderRadius: 5, width: 22, height: 22, cursor: "pointer", color: "#fff", fontSize: "0.65rem", display: "flex", alignItems: "center", justifyContent: "center" }}>⬇</button>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+                                  {bUrls.length + aUrls.length === 0 && !b.invoiceLink && (
+                                    <div style={{ fontSize: "0.82rem", color: "rgba(255,255,255,0.35)" }}>No photos uploaded yet for this job.</div>
+                                  )}
+                                </div>
+                              );
+                            })()}
                           </div>
                         );
                       })}
