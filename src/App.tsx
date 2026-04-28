@@ -11,7 +11,7 @@ const GOOGLE_CLIENT_ID =
   "447699234633-ivo2e1c2q843scj32k5323o2rkq6h7dp.apps.googleusercontent.com";
 
 const SCRIPT_URL =
-  "https://script.google.com/macros/s/AKfycbwRguf8U586qxbPgkQwofyUaWzmpPKlUBRmvQ7dLcVY7bbjmubBkKOh976JD2d-PMHyYw/exec";
+  "https://script.google.com/macros/s/AKfycbwixBU9A2_TySzoIOuSSuK98Ol6a3qxuGY91lEwMVfAYP-2l8sG8xZTs-JcwA5nQFQpxA/exec";
 
 const TOTAL_STEPS = 9;
 const ADMIN_EMAIL = "atxprestigedetailing@gmail.com";
@@ -234,10 +234,13 @@ function BookingCard({ booking, upcoming, onRequestChange }: {
       ? [booking.boatSize, booking.make, booking.model].filter(Boolean).join(" ")
       : [booking.year, booking.make, booking.model].filter(Boolean).join(" ");
 
+  const hasPhotos = booking.photosLink || booking.beforePhotoUrl || booking.afterPhotoUrl;
+  const isCompleted = booking.status === "Completed" || booking.invoiceStatus === "paid";
+
   return (
-    <div style={{ background: "rgba(255,255,255,0.05)", border: upcoming ? "1.5px solid #2563eb" : "1px solid #e5e7eb", borderRadius: 16, padding: 18, position: "relative" as const }}>
+    <div style={{ background: "rgba(255,255,255,0.05)", border: upcoming ? "1px solid rgba(59,130,246,0.45)" : "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: 18, position: "relative" as const }}>
       {upcoming && (
-        <span style={{ position: "absolute" as const, top: 14, right: 14, background: "rgba(59,130,246,0.08)", color: "#2563eb", fontSize: "0.75rem", fontWeight: 700, borderRadius: 999, padding: "3px 10px" }}>
+        <span style={{ position: "absolute" as const, top: 14, right: 14, background: "rgba(59,130,246,0.15)", color: "#93c5fd", fontSize: "0.75rem", fontWeight: 700, borderRadius: 999, padding: "3px 10px", border: "1px solid rgba(59,130,246,0.3)" }}>
           UPCOMING
         </span>
       )}
@@ -254,16 +257,29 @@ function BookingCard({ booking, upcoming, onRequestChange }: {
         {booking.notes && <div>Notes: {booking.notes}</div>}
       </div>
       {booking.invoiceStatus === "released" && booking.invoiceAmount && (
-        <div style={{ marginTop: 10, background: "rgba(251,191,36,0.1)", border: "1px solid #fde047", borderRadius: 10, padding: "10px 14px", fontSize: "0.88rem", color: "#713f12" }}>
+        <div style={{ marginTop: 10, background: "rgba(251,191,36,0.1)", border: "1px solid rgba(251,191,36,0.3)", borderRadius: 10, padding: "10px 14px", fontSize: "0.88rem", color: "#fbbf24" }}>
           <span style={{ fontWeight: 700 }}>Balance due: ${booking.invoiceAmount}</span>
           {booking.invoiceNote ? ` — ${booking.invoiceNote}` : ""}
         </div>
       )}
-      {upcoming && (
-        <button onClick={() => onRequestChange(booking)} style={{ marginTop: 14, background: "#111827", color: "#fff", border: "none", borderRadius: 10, padding: "9px 16px", fontSize: "0.9rem", fontWeight: 600, cursor: "pointer" }}>
-          Request a Change
-        </button>
+      {booking.invoiceStatus === "paid" && (
+        <div style={{ marginTop: 10, background: "rgba(16,185,129,0.1)", border: "1px solid rgba(16,185,129,0.25)", borderRadius: 10, padding: "8px 14px", fontSize: "0.82rem", color: "#34d399", fontWeight: 600 }}>
+          ✓ Paid ${booking.invoiceAmount}
+        </div>
       )}
+      <div style={{ display: "flex", gap: 8, marginTop: 14, flexWrap: "wrap" as const }}>
+        {upcoming && (
+          <button onClick={() => onRequestChange(booking)} style={{ background: "rgba(255,255,255,0.08)", color: "#f1f5f9", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 10, padding: "9px 16px", fontSize: "0.9rem", fontWeight: 600, cursor: "pointer" }}>
+            Request a Change
+          </button>
+        )}
+        {isCompleted && hasPhotos && (
+          <a href={booking.photosLink || "#"} target="_blank" rel="noopener noreferrer"
+            style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "rgba(59,130,246,0.12)", color: "#93c5fd", border: "1px solid rgba(59,130,246,0.3)", borderRadius: 10, padding: "9px 16px", fontSize: "0.9rem", fontWeight: 600, cursor: "pointer", textDecoration: "none" }}>
+            📸 View Gallery
+          </a>
+        )}
+      </div>
     </div>
   );
 }
@@ -2831,6 +2847,7 @@ export default function App() {
                 {/* ── REVENUE TAB ── */}
                 {adminTab === "revenue" && (() => {
                   const paid = adminBookings.filter(b => b.invoiceStatus === "paid" && b.invoiceAmount);
+                  const upcoming = adminBookings.filter(b => b.status === "Booked" && isUpcoming(b.date));
                   const now = new Date();
                   const thisMonth = now.getMonth();
                   const thisYear = now.getFullYear();
@@ -2852,12 +2869,40 @@ export default function App() {
                   const lastMonthKey = `${thisMonth === 0 ? thisYear - 1 : thisYear}-${String(thisMonth === 0 ? 12 : thisMonth).padStart(2,"0")}`;
                   const thisMonthRev = monthlyData[thisMonthKey] || 0;
                   const lastMonthRev = monthlyData[lastMonthKey] || 0;
+                  const momChange = lastMonthRev > 0 ? ((thisMonthRev - lastMonthRev) / lastMonthRev * 100) : 0;
                   const totalRev = paid.reduce((s, b) => s + parseFloat(b.invoiceAmount || "0"), 0);
                   const avgJob = paid.length > 0 ? totalRev / paid.length : 0;
                   const thisMonthJobs = paid.filter(b => {
                     const [y, m] = (b.date || "").split("-").map(Number);
                     return y === thisYear && m === thisMonth + 1;
                   }).length;
+
+                  // Projected income from upcoming bookings (using hourly rate × avg hours)
+                  const projectedIncome = upcoming.reduce((s, b) => {
+                    const rate = parseFloat(b.hourlyRate || "0");
+                    const isMaint = b.clientType === "maintenance";
+                    const isBoat = b.vehicle === "boat";
+                    const hrs = isMaint ? 2 : isBoat ? 4 : 3;
+                    return s + (rate * hrs);
+                  }, 0);
+
+                  // Top clients by revenue
+                  const clientRev: Record<string, { name: string; email: string; total: number; jobs: number }> = {};
+                  paid.forEach(b => {
+                    if (!clientRev[b.email]) clientRev[b.email] = { name: b.name, email: b.email, total: 0, jobs: 0 };
+                    clientRev[b.email].total += parseFloat(b.invoiceAmount || "0");
+                    clientRev[b.email].jobs++;
+                  });
+                  const topClients = Object.values(clientRev).sort((a, b) => b.total - a.total).slice(0, 5);
+
+                  // Package breakdown
+                  const byPkg: Record<string, { count: number; rev: number }> = {};
+                  paid.forEach(b => {
+                    const pkg = b.packageType === "basic" ? "Basic Detail" : b.packageType === "premium" ? "Premium Detail" : b.packageType === "exterior" ? "Exterior Basic" : b.packageType === "exteriorPremium" ? "Exterior Premium" : b.packageType === "interior" ? "Interior Basic" : b.packageType === "interiorPremium" ? "Interior Premium" : b.packageType || "Other";
+                    if (!byPkg[pkg]) byPkg[pkg] = { count: 0, rev: 0 };
+                    byPkg[pkg].count++;
+                    byPkg[pkg].rev += parseFloat(b.invoiceAmount || "0");
+                  });
 
                   const monthName = (key: string) => {
                     const [y, m] = key.split("-").map(Number);
@@ -2867,24 +2912,33 @@ export default function App() {
                   return (
                     <>
                       {/* KPI cards */}
-                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 28 }}>
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12, marginBottom: 20 }}>
                         {[
-                          { label: "This Month", value: `$${thisMonthRev.toFixed(0)}`, sub: lastMonthRev > 0 ? `vs $${lastMonthRev.toFixed(0)} last month` : "first month", color: "#059669" },
-                          { label: "Jobs This Month", value: String(thisMonthJobs), sub: "completed & paid", color: "#2563eb" },
-                          { label: "All-Time Revenue", value: `$${totalRev.toFixed(0)}`, sub: `${paid.length} jobs total`, color: "#7c3aed" },
-                          { label: "Avg Job Value", value: `$${avgJob.toFixed(0)}`, sub: "per completed job", color: "#d97706" },
+                          {
+                            label: "This Month",
+                            value: `$${thisMonthRev.toFixed(0)}`,
+                            sub: lastMonthRev > 0
+                              ? `${momChange >= 0 ? "▲" : "▼"} ${Math.abs(momChange).toFixed(0)}% vs last month`
+                              : "first month",
+                            color: "#059669",
+                            subColor: momChange >= 0 ? "#34d399" : "#f87171",
+                          },
+                          { label: "Jobs This Month", value: String(thisMonthJobs), sub: "completed & paid", color: "#2563eb", subColor: undefined },
+                          { label: "All-Time Revenue", value: `$${totalRev.toFixed(0)}`, sub: `${paid.length} jobs total`, color: "#7c3aed", subColor: undefined },
+                          { label: "Avg Job Value", value: `$${avgJob.toFixed(0)}`, sub: "per completed job", color: "#d97706", subColor: undefined },
+                          { label: "Projected Income", value: `$${projectedIncome.toFixed(0)}`, sub: `${upcoming.length} upcoming booking${upcoming.length !== 1 ? "s" : ""}`, color: "#0891b2", subColor: "#67e8f9" },
                         ].map((card, i) => (
                           <div key={i} style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: "16px 14px" }}>
-                            <div style={{ fontSize: "0.78rem", color: "rgba(255,255,255,0.35)", marginBottom: 6, fontWeight: 600, textTransform: "uppercase" as const, letterSpacing: "0.04em" }}>{card.label}</div>
-                            <div style={{ fontSize: "1.6rem", fontWeight: 900, color: card.color, letterSpacing: "-1px" }}>{card.value}</div>
-                            <div style={{ fontSize: "0.72rem", color: "rgba(255,255,255,0.35)", marginTop: 4 }}>{card.sub}</div>
+                            <div style={{ fontSize: "0.72rem", color: "rgba(255,255,255,0.35)", marginBottom: 6, fontWeight: 600, textTransform: "uppercase" as const, letterSpacing: "0.04em" }}>{card.label}</div>
+                            <div style={{ fontSize: "1.5rem", fontWeight: 900, color: card.color, letterSpacing: "-1px" }}>{card.value}</div>
+                            <div style={{ fontSize: "0.72rem", color: card.subColor || "rgba(255,255,255,0.35)", marginTop: 4 }}>{card.sub}</div>
                           </div>
                         ))}
                       </div>
 
                       {/* Bar chart */}
                       {last6.length > 0 ? (
-                        <div style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: 20, marginBottom: 24 }}>
+                        <div style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: 20, marginBottom: 16 }}>
                           <div style={{ fontWeight: 700, color: "#f1f5f9", marginBottom: 16, fontSize: "0.95rem" }}>Revenue — Last 6 Months</div>
                           <div style={{ display: "flex", alignItems: "flex-end", gap: 8, height: 120 }}>
                             {last6.map(k => {
@@ -2892,42 +2946,110 @@ export default function App() {
                               const isThis = k === thisMonthKey;
                               return (
                                 <div key={k} style={{ flex: 1, display: "flex", flexDirection: "column" as const, alignItems: "center", gap: 6 }}>
-                                  <div style={{ fontSize: "0.65rem", color: "rgba(255,255,255,0.45)", fontWeight: 600 }}>${(monthlyData[k]/1000).toFixed(1)}k</div>
-                                  <div style={{ width: "100%", background: isThis ? "#059669" : "#d1fae5", borderRadius: "6px 6px 0 0", height: `${Math.max(pct, 4)}%`, transition: "height 0.3s ease" }} />
-                                  <div style={{ fontSize: "0.65rem", color: isThis ? "#059669" : "#9ca3af", fontWeight: isThis ? 700 : 400 }}>{monthName(k)}</div>
+                                  <div style={{ fontSize: "0.65rem", color: "rgba(255,255,255,0.45)", fontWeight: 600 }}>${monthlyData[k] >= 1000 ? (monthlyData[k]/1000).toFixed(1)+"k" : monthlyData[k].toFixed(0)}</div>
+                                  <div style={{ width: "100%", background: isThis ? "linear-gradient(180deg,#059669,#047857)" : "rgba(16,185,129,0.3)", borderRadius: "6px 6px 0 0", height: `${Math.max(pct, 4)}%`, transition: "height 0.4s ease", boxShadow: isThis ? "0 0 12px rgba(5,150,105,0.4)" : "none" }} />
+                                  <div style={{ fontSize: "0.65rem", color: isThis ? "#34d399" : "rgba(255,255,255,0.35)", fontWeight: isThis ? 700 : 400 }}>{monthName(k)}</div>
                                 </div>
                               );
                             })}
                           </div>
                         </div>
                       ) : (
-                        <div style={{ textAlign: "center", padding: 40, color: "rgba(255,255,255,0.45)" }}>No paid invoices yet to show revenue.</div>
+                        <div style={{ textAlign: "center", padding: 40, color: "rgba(255,255,255,0.45)" }}>No paid invoices yet.</div>
                       )}
 
-                      {/* Package breakdown */}
-                      {paid.length > 0 && (() => {
-                        const byPkg: Record<string, {count: number; rev: number}> = {};
-                        paid.forEach(b => {
-                          const pkg = b.packageType === "basic" ? "Basic Detail" : b.packageType === "premium" ? "Premium Detail" : b.packageType === "exterior" ? "Exterior Basic" : b.packageType === "exteriorPremium" ? "Exterior Premium" : b.packageType === "interior" ? "Interior Basic" : b.packageType === "interiorPremium" ? "Interior Premium" : b.packageType || "Other";
-                          if (!byPkg[pkg]) byPkg[pkg] = { count: 0, rev: 0 };
-                          byPkg[pkg].count++;
-                          byPkg[pkg].rev += parseFloat(b.invoiceAmount || "0");
-                        });
-                        return (
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16, marginBottom: 0 }}>
+
+                        {/* Top clients */}
+                        {topClients.length > 0 && (
+                          <div style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: 20 }}>
+                            <div style={{ fontWeight: 700, color: "#f1f5f9", marginBottom: 14, fontSize: "0.95rem" }}>Top Clients by Revenue</div>
+                            {topClients.map((c, i) => {
+                              const barPct = topClients[0].total > 0 ? (c.total / topClients[0].total) * 100 : 0;
+                              const medals = ["🥇","🥈","🥉","4.","5."];
+                              return (
+                                <div key={i} style={{ marginBottom: i < topClients.length - 1 ? 14 : 0 }}>
+                                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                      <span style={{ fontSize: "0.9rem" }}>{medals[i]}</span>
+                                      <div>
+                                        <div style={{ fontWeight: 700, color: "#f1f5f9", fontSize: "0.88rem" }}>{c.name}</div>
+                                        <div style={{ fontSize: "0.72rem", color: "rgba(255,255,255,0.35)" }}>{c.jobs} job{c.jobs !== 1 ? "s" : ""}</div>
+                                      </div>
+                                    </div>
+                                    <div style={{ fontWeight: 800, color: "#34d399", fontSize: "0.95rem" }}>${c.total.toFixed(0)}</div>
+                                  </div>
+                                  <div style={{ height: 4, background: "rgba(255,255,255,0.06)", borderRadius: 999, overflow: "hidden" }}>
+                                    <div style={{ height: "100%", width: `${barPct}%`, background: i === 0 ? "linear-gradient(90deg,#059669,#34d399)" : "rgba(16,185,129,0.4)", borderRadius: 999, transition: "width 0.5s ease" }} />
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+
+                        {/* Package breakdown */}
+                        {paid.length > 0 && (
                           <div style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: 20 }}>
                             <div style={{ fontWeight: 700, color: "#f1f5f9", marginBottom: 14, fontSize: "0.95rem" }}>Revenue by Service</div>
-                            {Object.entries(byPkg).sort((a, b) => b[1].rev - a[1].rev).map(([pkg, data], i) => (
-                              <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderTop: i > 0 ? "1px solid #f3f4f6" : "none" }}>
-                                <div>
-                                  <div style={{ fontSize: "0.88rem", fontWeight: 600, color: "rgba(255,255,255,0.7)" }}>{pkg}</div>
-                                  <div style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.35)" }}>{data.count} job{data.count !== 1 ? "s" : ""}</div>
+                            {Object.entries(byPkg).sort((a, b) => b[1].rev - a[1].rev).map(([pkg, data], i) => {
+                              const maxPkg = Math.max(...Object.values(byPkg).map(v => v.rev));
+                              const pct = maxPkg > 0 ? (data.rev / maxPkg) * 100 : 0;
+                              return (
+                                <div key={i} style={{ marginBottom: i < Object.keys(byPkg).length - 1 ? 12 : 0 }}>
+                                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                                    <div>
+                                      <div style={{ fontSize: "0.85rem", fontWeight: 600, color: "rgba(255,255,255,0.7)" }}>{pkg}</div>
+                                      <div style={{ fontSize: "0.72rem", color: "rgba(255,255,255,0.35)" }}>{data.count} job{data.count !== 1 ? "s" : ""}</div>
+                                    </div>
+                                    <div style={{ fontWeight: 800, color: "#3b82f6" }}>${data.rev.toFixed(0)}</div>
+                                  </div>
+                                  <div style={{ height: 4, background: "rgba(255,255,255,0.06)", borderRadius: 999, overflow: "hidden" }}>
+                                    <div style={{ height: "100%", width: `${pct}%`, background: "linear-gradient(90deg,#3b82f6,#60a5fa)", borderRadius: 999, transition: "width 0.5s ease" }} />
+                                  </div>
                                 </div>
-                                <div style={{ fontWeight: 800, color: "#059669" }}>${data.rev.toFixed(0)}</div>
-                              </div>
-                            ))}
+                              );
+                            })}
                           </div>
-                        );
-                      })()}
+                        )}
+
+                        {/* Projected income breakdown */}
+                        {upcoming.length > 0 && (
+                          <div style={{ background: "rgba(8,145,178,0.08)", border: "1px solid rgba(8,145,178,0.3)", borderRadius: 16, padding: 20, gridColumn: "1 / -1" }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+                              <div style={{ fontWeight: 700, color: "#67e8f9", fontSize: "0.95rem" }}>Projected Income from Upcoming Bookings</div>
+                              <div style={{ fontWeight: 900, color: "#0891b2", fontSize: "1.3rem" }}>${projectedIncome.toFixed(0)}</div>
+                            </div>
+                            <div style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.35)", marginBottom: 12 }}>Based on hourly rate × estimated hours (2hr maintenance, 3hr auto, 4hr boat). Actual may vary.</div>
+                            <div style={{ display: "grid", gap: 6 }}>
+                              {upcoming.slice(0, 8).map((b, i) => {
+                                const rate = parseFloat(b.hourlyRate || "0");
+                                const isMaint = b.clientType === "maintenance";
+                                const isBoat = b.vehicle === "boat";
+                                const hrs = isMaint ? 2 : isBoat ? 4 : 3;
+                                const est = rate * hrs;
+                                const vl = b.vehicle === "boat" ? [b.boatSize, b.make, b.model].filter(Boolean).join(" ") : [b.year, b.make, b.model].filter(Boolean).join(" ");
+                                return (
+                                  <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "rgba(255,255,255,0.04)", borderRadius: 10, padding: "8px 12px", fontSize: "0.82rem" }}>
+                                    <div>
+                                      <span style={{ fontWeight: 600, color: "#f1f5f9" }}>{b.name}</span>
+                                      <span style={{ color: "rgba(255,255,255,0.4)", margin: "0 6px" }}>·</span>
+                                      <span style={{ color: "rgba(255,255,255,0.4)" }}>{formatDateLabel(b.date)}</span>
+                                    </div>
+                                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                                      <span style={{ color: "rgba(255,255,255,0.35)", fontSize: "0.75rem" }}>{vl}</span>
+                                      <span style={{ fontWeight: 700, color: "#67e8f9" }}>${est.toFixed(0)}</span>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                              {upcoming.length > 8 && (
+                                <div style={{ fontSize: "0.78rem", color: "rgba(255,255,255,0.35)", textAlign: "center" as const, padding: "4px 0" }}>+{upcoming.length - 8} more upcoming bookings</div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     </>
                   );
                 })()}
