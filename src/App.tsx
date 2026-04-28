@@ -11,7 +11,7 @@ const GOOGLE_CLIENT_ID =
   "447699234633-ivo2e1c2q843scj32k5323o2rkq6h7dp.apps.googleusercontent.com";
 
 const SCRIPT_URL =
-  "https://script.google.com/macros/s/AKfycbytLuNWR4QH9hKKFrGbwuFP3XsLU9r4daZn4XT0A4qOlJ5tjOZ2R0vE4gSuyhpWiUg5xA/exec";
+  "https://script.google.com/macros/s/AKfycbwAUtHof33cmpV9U7FPdsrCtKLXd48JxVYIUn2IBjwGlwswi3j9vkf5VVEQKf-JVd2c9w/exec";
 
 const TOTAL_STEPS = 9;
 const ADMIN_EMAIL = "atxprestigedetailing@gmail.com";
@@ -432,6 +432,8 @@ export default function App() {
   const [qAddress, setQAddress]                         = useState("");
   const [qServiceType, setQServiceType]                 = useState("mobile");
   const [qSubmitting, setQSubmitting]                   = useState(false);
+  const [qCustomService, setQCustomService]             = useState("");
+  const [qCustomPrice, setQCustomPrice]                 = useState("");
   const [squarePopup, setSquarePopup]                   = useState(false);
   const [squareBooking, setSquareBooking]               = useState<Booking | null>(null);
   const [copiedAmount, setCopiedAmount]                 = useState<number | null>(null);
@@ -1856,7 +1858,7 @@ export default function App() {
                         <div style={{ background: "rgba(124,58,237,0.08)", border: "1.5px solid rgba(124,58,237,0.4)", borderRadius: 16, padding: 20, marginBottom: 20 }}>
                           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
                             <div style={{ fontWeight: 700, color: "#a78bfa", fontSize: "0.95rem" }}>Book Existing Client</div>
-                            <button onClick={() => { setQuickBookOpen(false); setQuickBookSearch(""); setQuickBookClient(null); }} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.4)", cursor: "pointer", fontSize: "1.1rem" }}>✕</button>
+                            <button onClick={() => { setQuickBookOpen(false); setQuickBookSearch(""); setQuickBookClient(null); setQCustomService(""); setQCustomPrice(""); }} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.4)", cursor: "pointer", fontSize: "1.1rem" }}>✕</button>
                           </div>
 
                           {!quickBookClient ? (
@@ -1976,19 +1978,53 @@ export default function App() {
 
                                   {/* Service fields */}
                                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
-                                    <div>
-                                      <div style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.45)", marginBottom: 4 }}>Package</div>
-                                      <select style={{ ...S.input, padding: "9px 12px", backgroundColor: "transparent" }} value={qPkg} onChange={e => setQPkg(e.target.value)}>
+                                    <div style={{ gridColumn: "1 / -1" }}>
+                                      <div style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.45)", marginBottom: 4 }}>Service Type</div>
+                                      <select style={{ ...S.input, padding: "9px 12px", backgroundColor: "transparent" }} value={qPkg} onChange={e => { setQPkg(e.target.value); setQCustomService(""); setQCustomPrice(""); }}>
                                         <option value="basic">Basic Detail</option>
                                         <option value="premium">Premium Detail</option>
                                         <option value="exterior">Exterior Only — Basic</option>
                                         <option value="exteriorPremium">Exterior Only — Premium</option>
                                         <option value="interior">Interior Only — Basic</option>
                                         <option value="interiorPremium">Interior Only — Premium</option>
+                                        <option value="custom">⚡ Custom Job</option>
                                       </select>
                                     </div>
+
+                                    {/* Custom job fields */}
+                                    {qPkg === "custom" && (
+                                      <>
+                                        <div style={{ gridColumn: "1 / -1" }}>
+                                          <div style={{ fontSize: "0.75rem", color: "#a78bfa", marginBottom: 4, fontWeight: 700 }}>Service Name *</div>
+                                          <input
+                                            style={{ ...S.input, padding: "9px 12px", border: "1.5px solid rgba(124,58,237,0.5)" }}
+                                            placeholder="e.g. PPF Removal, Engine Bay Clean, Odor Treatment"
+                                            value={qCustomService}
+                                            onChange={e => setQCustomService(e.target.value)}
+                                          />
+                                        </div>
+                                        <div style={{ gridColumn: "1 / -1" }}>
+                                          <div style={{ fontSize: "0.75rem", color: "#a78bfa", marginBottom: 4, fontWeight: 700 }}>Flat Price ($) *</div>
+                                          <input
+                                            style={{ ...S.input, padding: "9px 12px", border: "1.5px solid rgba(124,58,237,0.5)", fontWeight: 700, fontSize: "1rem" }}
+                                            type="number"
+                                            inputMode="decimal"
+                                            step="0.01"
+                                            placeholder="e.g. 350"
+                                            value={qCustomPrice}
+                                            onChange={e => setQCustomPrice(e.target.value)}
+                                          />
+                                          {qCustomPrice && (
+                                            <div style={{ marginTop: 6, fontSize: "0.82rem", color: "#a78bfa", fontWeight: 600 }}>
+                                              Flat rate: ${parseFloat(qCustomPrice).toFixed(2)} — invoice will be set automatically
+                                            </div>
+                                          )}
+                                        </div>
+                                      </>
+                                    )}
+
                                     <div>
-                                      <div style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.45)", marginBottom: 4 }}>Service Type</div>
+                                      <div style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.45)", marginBottom: 4 }}>Location</div>
                                       <select style={{ ...S.input, padding: "9px 12px", backgroundColor: "transparent" }} value={qServiceType} onChange={e => setQServiceType(e.target.value)}>
                                         <option value="mobile">Mobile</option>
                                         <option value="dropoff">Drop-Off</option>
@@ -2027,7 +2063,8 @@ export default function App() {
                                     </div>
                                   )}
 
-                                  {/* Add-ons with checkboxes + price calc */}
+                                  {/* Add-ons — hidden for custom jobs */}
+                                  {qPkg !== "custom" && (
                                   <div style={{ marginBottom: 10 }}>
                                     <div style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.45)", marginBottom: 8, textTransform: "uppercase" as const, letterSpacing: "0.06em" }}>Add-On Services</div>
                                     <div style={{ display: "grid", gap: 6 }}>
@@ -2055,6 +2092,7 @@ export default function App() {
                                       ) : null;
                                     })()}
                                   </div>
+                                  )}
 
                                   {/* Notes */}
                                   <div style={{ marginBottom: 14 }}>
@@ -2064,14 +2102,15 @@ export default function App() {
 
                                   {/* Submit */}
                                   <button
-                                    disabled={!qDate || !qTime || qSubmitting}
+                                    disabled={!qDate || !qTime || qSubmitting || (qPkg === "custom" && (!qCustomService.trim() || !qCustomPrice))}
                                     onClick={async () => {
                                       setQSubmitting(true);
                                       const tid = showToast("Creating booking...", "loading");
                                       try {
+                                        const isCustom = qPkg === "custom";
                                         const vOpts = vehicleOptions.find(v => v.id === c.vehicle);
                                         const isPremium = qPkg === "premium" || qPkg === "exteriorPremium" || qPkg === "interiorPremium";
-                                        const rate = vOpts ? (isPremium ? vOpts.premiumRate : vOpts.basicRate) : parseFloat(c.hourlyRate || "80");
+                                        const rate = isCustom ? 0 : (vOpts ? (isPremium ? vOpts.premiumRate : vOpts.basicRate) : parseFloat(c.hourlyRate || "80"));
                                         const all2 = [...addOnOptions, ...marineAddOnOptions];
                                         const addOnEst = qAddOnList.reduce((s, a) => s + (all2.find(o => o.label === a)?.fixedPrice ?? 0), 0);
                                         const res = await fetch(SCRIPT_URL, {
@@ -2082,21 +2121,24 @@ export default function App() {
                                             date: qDate, displayDate: qDate, time: qTime,
                                             year: c.year, make: c.make, model: c.model,
                                             boatSize: c.boatSize, vehicle: c.vehicle,
-                                            packageType: qPkg, hourlyRate: rate,
-                                            addOns: qAddOnList.join(", "), addOnEstimate: addOnEst,
+                                            packageType: isCustom ? "custom" : qPkg,
+                                            hourlyRate: rate,
+                                            addOns: isCustom ? qCustomService : qAddOnList.join(", "),
+                                            addOnEstimate: isCustom ? parseFloat(qCustomPrice) : addOnEst,
                                             serviceType: qServiceType, address: qAddress,
                                             street: "", city: "", state: "", zip: "",
                                             placeId: "", lat: "", lng: "",
-                                            avgTime: "", notes: qNotes,
+                                            avgTime: "", notes: isCustom ? `Custom job: ${qCustomService} — $${qCustomPrice}${qNotes ? ". " + qNotes : ""}` : qNotes,
                                             clientType: qClientType,
                                             recurringFrequency: qFreq,
                                           }),
                                         });
                                         const d = await res.json();
                                         if (d.success) {
-                                          updateToast(tid, `✓ Booking created for ${c.name}`, "success", 4000);
+                                          updateToast(tid, `✓ ${isCustom ? "Custom job" : "Booking"} created for ${c.name}`, "success", 4000);
                                           setQuickBookOpen(false); setQuickBookClient(null); setQuickBookSearch("");
                                           setQDate(""); setQTime(""); setQNotes(""); setQAddOnList([]);
+                                          setQCustomService(""); setQCustomPrice("");
                                           await loadAdminBookings();
                                         } else {
                                           updateToast(tid, "Failed: " + (d.error || "unknown error"), "error", 4000);
@@ -2106,8 +2148,8 @@ export default function App() {
                                       }
                                       setQSubmitting(false);
                                     }}
-                                    style={{ width: "100%", background: "linear-gradient(135deg, #7c3aed, #5b21b6)", color: "#fff", border: "none", borderRadius: 10, padding: "13px", fontWeight: 700, fontSize: "0.95rem", cursor: "pointer", opacity: !qDate || !qTime ? 0.5 : 1 }}>
-                                    {qSubmitting ? "Creating..." : `Submit Booking for ${c.name}`}
+                                    style={{ width: "100%", background: qPkg === "custom" ? "linear-gradient(135deg, #7c3aed, #5b21b6)" : "linear-gradient(135deg, #7c3aed, #5b21b6)", color: "#fff", border: "none", borderRadius: 10, padding: "13px", fontWeight: 700, fontSize: "0.95rem", cursor: "pointer", opacity: !qDate || !qTime || (qPkg === "custom" && (!qCustomService.trim() || !qCustomPrice)) ? 0.5 : 1 }}>
+                                    {qSubmitting ? "Creating..." : qPkg === "custom" ? `Book Custom Job for ${c.name}` : `Submit Booking for ${c.name}`}
                                   </button>
                                 </div>
                               );
@@ -2179,7 +2221,7 @@ export default function App() {
                               <div>
                                 <div style={{ fontWeight: 700, color: b.status === "Cancelled" ? "#fca5a5" : b.status === "Skipped" ? "rgba(255,255,255,0.45)" : "#f1f5f9", fontSize: "0.95rem" }}>{b.name} — {formatDateLabel(b.date)}{b.time ? ` at ${b.time}` : ""}</div>
                                 <div style={{ fontSize: "0.85rem", color: "rgba(255,255,255,0.45)" }}>{b.email} · {b.phone}</div>
-                                <div style={{ fontSize: "0.85rem", color: "rgba(255,255,255,0.45)" }}>{vl} · {b.packageType === "basic" ? "Basic Detail" : b.packageType === "premium" ? "Premium Detail" : b.packageType === "exterior" ? "Exterior Only — Basic" : b.packageType === "exteriorPremium" ? "Exterior Only — Premium" : b.packageType === "interior" ? "Interior Only — Basic" : b.packageType === "interiorPremium" ? "Interior Only — Premium" : b.packageType} · ${b.hourlyRate}/hr</div>
+                                <div style={{ fontSize: "0.85rem", color: "rgba(255,255,255,0.45)" }}>{vl} · {b.packageType === "basic" ? "Basic Detail" : b.packageType === "premium" ? "Premium Detail" : b.packageType === "exterior" ? "Exterior Only — Basic" : b.packageType === "exteriorPremium" ? "Exterior Only — Premium" : b.packageType === "interior" ? "Interior Only — Basic" : b.packageType === "interiorPremium" ? "Interior Only — Premium" : b.packageType === "custom" ? `⚡ Custom: ${b.addOns || "Custom Job"}` : b.packageType} · {b.packageType === "custom" ? "Flat rate" : `$${b.hourlyRate}/hr`}</div>
                                 {b.clientType === "maintenance" && <div style={{ fontSize: "0.8rem", color: "#059669", fontWeight: 600 }}>{b.recurringFrequency === "biweekly" ? "Bi-Weekly" : "Monthly"} Maintenance</div>}
                                 {b.serviceType === "mobile" && b.address && <div style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.45)" }}>{b.address}</div>}
                                 {b.addOns && <div style={{ fontSize: "0.8rem", color: "#93c5fd" }}>Add-Ons: {b.addOns}</div>}
@@ -2199,7 +2241,7 @@ export default function App() {
 
                             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" as const, marginTop: 8, alignItems: "center" }}>
                               {!isComplete && b.status !== "Cancelled" && b.status !== "Skipped" && (
-                                <button onClick={() => { setSelectedAdminBooking(isSelected ? null : b); setCompleteAmount(b.hourlyRate ? String(parseFloat(b.hourlyRate) * 2) : ""); setCompleteHours(b.clientType === "maintenance" ? "2" : ""); setCompleteNote(""); setEditingBooking(null); setBillingMode("hourly"); }}
+                                <button onClick={() => { setSelectedAdminBooking(isSelected ? null : b); setEditingBooking(null); if (b.packageType === "custom") { setBillingMode("flat"); setCompleteAmount(""); setCompleteNote(b.addOns || ""); setCompleteHours(""); } else { setBillingMode("hourly"); setCompleteAmount(b.hourlyRate ? String(parseFloat(b.hourlyRate) * 2) : ""); setCompleteHours(b.clientType === "maintenance" ? "2" : ""); setCompleteNote(""); } }}
                                   style={{ background: isSelected ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.1)", color: "#f1f5f9", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 8, padding: "7px 14px", fontSize: "0.82rem", fontWeight: 600, cursor: "pointer" }}>
                                   {isSelected ? "Cancel" : "Mark Complete"}
                                 </button>
@@ -2215,7 +2257,7 @@ export default function App() {
                                     </button>
                                   </div>
                                 ) : (
-                                  <button onClick={() => { startTimer(b.rowIndex); setSelectedAdminBooking(b); setCompleteHours(""); setCompleteAmount(""); setCompleteNote(""); setEditingBooking(null); setBillingMode("hourly"); }}
+                                  <button onClick={() => { startTimer(b.rowIndex); setSelectedAdminBooking(b); setEditingBooking(null); if (b.packageType === "custom") { setBillingMode("flat"); setCompleteAmount(""); setCompleteNote(b.addOns || ""); setCompleteHours(""); } else { setBillingMode("hourly"); setCompleteHours(""); setCompleteAmount(""); setCompleteNote(""); } }}
                                     style={{ background: "#059669", color: "#fff", border: "none", borderRadius: 8, padding: "7px 14px", fontSize: "0.82rem", fontWeight: 600, cursor: "pointer" }}>
                                     ▶ Start Timer
                                   </button>
@@ -2629,6 +2671,11 @@ export default function App() {
                             {isSelected && (
                               <div style={{ marginTop: 14, padding: 16, background: "rgba(255,255,255,0.04)", borderRadius: 12, border: "1px solid rgba(255,255,255,0.08)" }}>
                                 <div style={{ fontWeight: 700, color: "rgba(255,255,255,0.7)", marginBottom: 10 }}>Confirm Service & Set Invoice</div>
+                                {b.packageType === "custom" && (
+                                  <div style={{ background: "rgba(124,58,237,0.12)", border: "1.5px solid rgba(124,58,237,0.4)", borderRadius: 10, padding: "10px 14px", marginBottom: 12, fontSize: "0.85rem", color: "#a78bfa" }}>
+                                    ⚡ <strong>Custom Job:</strong> {b.addOns || "Custom Service"} — enter the final amount below.
+                                  </div>
+                                )}
 
                                 {b.clientType !== "maintenance" ? (
                                   /* Non-maintenance: hourly or flat rate toggle */
