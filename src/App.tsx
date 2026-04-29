@@ -1485,44 +1485,43 @@ export default function App() {
           <div style={{ position: "absolute", inset: 0, backgroundImage: "linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px)", backgroundSize: "60px 60px" }} />
         </div>
 
-        {/* Expanding rings — centered on the logo */}
-        <div style={{ position: "absolute", width: 200, height: 200, borderRadius: "50%", border: "1px solid rgba(59,130,246,0.5)", animation: "ringExpand 1.8s cubic-bezier(0.2,0,0.8,1) 0.3s both", marginBottom: 140 }} />
-        <div style={{ position: "absolute", width: 200, height: 200, borderRadius: "50%", border: "1px solid rgba(59,130,246,0.3)", animation: "ringExpand 1.8s cubic-bezier(0.2,0,0.8,1) 0.6s both", marginBottom: 140 }} />
+        {/* Expanding rings */}
+        <div style={{ position: "absolute", width: 180, height: 180, borderRadius: "50%", border: "1px solid rgba(59,130,246,0.5)", animation: "ringExpand 1.8s cubic-bezier(0.2,0,0.8,1) 0.3s both" }} />
+        <div style={{ position: "absolute", width: 180, height: 180, borderRadius: "50%", border: "1px solid rgba(59,130,246,0.3)", animation: "ringExpand 1.8s cubic-bezier(0.2,0,0.8,1) 0.6s both" }} />
 
         {/* All content in a single centered column */}
-        <div style={{ display: "flex", flexDirection: "column" as const, alignItems: "center", gap: 0, position: "relative", zIndex: 1, width: "100%", maxWidth: 480 }}>
+        <div style={{ display: "flex", flexDirection: "column" as const, alignItems: "center", position: "relative", zIndex: 1, width: "100%", padding: "0 40px", boxSizing: "border-box" as const }}>
 
           {/* Logo */}
           <div style={{
-            width: 110, height: 110,
+            width: 100, height: 100,
             borderRadius: "50%",
             background: "rgba(255,255,255,0.06)",
             border: "1.5px solid rgba(255,255,255,0.15)",
             display: "flex", alignItems: "center", justifyContent: "center",
             animation: "logoReveal 0.9s cubic-bezier(0.16,1,0.3,1) both, borderGlow 3s ease-in-out 1s infinite",
             backdropFilter: "blur(20px)",
-            marginBottom: 28,
+            marginBottom: 24,
             flexShrink: 0,
           }}>
-            <img src={logo} alt="ATX Prestige" style={{ width: 85, height: 85, objectFit: "contain" as const }} />
+            <img src={logo} alt="ATX Prestige" style={{ width: 78, height: 78, objectFit: "contain" as const }} />
           </div>
 
-          {/* Brand name */}
+          {/* Brand name — single line, won't clip */}
           <div style={{
-            fontSize: "clamp(2rem, 10vw, 3rem)",
+            fontSize: "min(11vw, 56px)",
             fontWeight: 900,
             letterSpacing: "-1px",
-            lineHeight: 1.1,
-            marginBottom: 12,
-            background: "linear-gradient(90deg, rgba(255,255,255,0.4) 0%, #ffffff 30%, rgba(255,255,255,0.9) 60%, #93c5fd 80%, rgba(255,255,255,0.4) 100%)",
+            lineHeight: 1.05,
+            marginBottom: 10,
+            background: "linear-gradient(90deg, rgba(255,255,255,0.5) 0%, #ffffff 40%, #93c5fd 70%, rgba(255,255,255,0.5) 100%)",
             backgroundSize: "200% 100%",
             WebkitBackgroundClip: "text",
             WebkitTextFillColor: "transparent",
             backgroundClip: "text",
             animation: "shimmerSweep 2.5s linear 0.5s infinite",
             textAlign: "center" as const,
-            width: "100%",
-            overflow: "visible",
+            whiteSpace: "nowrap" as const,
           }}>
             ATX Prestige
           </div>
