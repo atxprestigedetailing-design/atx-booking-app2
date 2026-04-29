@@ -1468,10 +1468,7 @@ export default function App() {
 
           {/* Orbit ring SVG */}
           <svg style={{ position:"absolute", inset:0, width:"100%", height:"100%", overflow:"visible", pointerEvents:"none" }} viewBox="0 0 480 480">
-            <circle cx="240" cy="240" r="236" fill="none" stroke="rgba(59,130,246,0.06)" strokeWidth="1" strokeDasharray="4 10" />
-            <circle cx="240" cy="240" r="236" fill="none" stroke="rgba(59,130,246,0.4)" strokeWidth="2"
-              strokeDasharray="100 1408" strokeLinecap="round"
-              style={{ animation:"trackDash 2.4s linear infinite", transformOrigin:"240px 240px" }} />
+            <circle cx="240" cy="240" r="236" fill="none" stroke="rgba(59,130,246,0.06)" strokeWidth="1" strokeDasharray="3 12" />
           </svg>
 
           {/* Car orbit: div anchored to center, rotates, car is offset by radius */}
@@ -1486,6 +1483,9 @@ export default function App() {
             <div style={{ position:"absolute", transform:"translateX(236px)", transformOrigin:"0 0", animation:"counterOrbit 2.4s linear infinite" }}>
               {/* Drift skew wrapper */}
               <div style={{ transform:"skewX(-10deg)" }}>
+                {/* Glow trail behind car */}
+                <div style={{ position:"absolute", left:-40, top:-4, width:36, height:18, borderRadius:"50%", background:"rgba(59,130,246,0.25)", filter:"blur(8px)", transform:"scaleX(2)" }} />
+                <div style={{ position:"absolute", left:-24, top:-2, width:20, height:14, borderRadius:"50%", background:"rgba(59,130,246,0.15)", filter:"blur(6px)" }} />
                 {/* Smoke clouds */}
                 <div style={{ position:"absolute", left:-12, top:0, width:22, height:16, borderRadius:"50%", background:"rgba(160,160,200,0.6)", filter:"blur(6px)", animation:"smoke1 0.5s ease-out infinite" }} />
                 <div style={{ position:"absolute", left:-18, top:7, width:17, height:13, borderRadius:"50%", background:"rgba(140,140,190,0.45)", filter:"blur(7px)", animation:"smoke2 0.5s ease-out 0.17s infinite" }} />
