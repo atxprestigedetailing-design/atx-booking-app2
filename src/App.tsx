@@ -1485,26 +1485,28 @@ export default function App() {
           <div style={{ position: "absolute", inset: 0, backgroundImage: "linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px)", backgroundSize: "60px 60px" }} />
         </div>
 
-        {/* Expanding rings */}
-        <div style={{ position: "absolute", width: 180, height: 180, borderRadius: "50%", border: "1px solid rgba(59,130,246,0.5)", animation: "ringExpand 1.8s cubic-bezier(0.2,0,0.8,1) 0.3s both" }} />
-        <div style={{ position: "absolute", width: 180, height: 180, borderRadius: "50%", border: "1px solid rgba(59,130,246,0.3)", animation: "ringExpand 1.8s cubic-bezier(0.2,0,0.8,1) 0.6s both" }} />
-
         {/* All content in a single centered column */}
-        <div style={{ display: "flex", flexDirection: "column" as const, alignItems: "center", position: "relative", zIndex: 1, width: "100%", padding: "0 40px", boxSizing: "border-box" as const }}>
+        <div style={{ display: "flex", flexDirection: "column" as const, alignItems: "center", position: "relative", zIndex: 1, width: "100%", padding: "0 40px", boxSizing: "border-box" as const, marginTop: "-40px" }}>
 
-          {/* Logo */}
-          <div style={{
-            width: 100, height: 100,
-            borderRadius: "50%",
-            background: "rgba(255,255,255,0.06)",
-            border: "1.5px solid rgba(255,255,255,0.15)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            animation: "logoReveal 0.9s cubic-bezier(0.16,1,0.3,1) both, borderGlow 3s ease-in-out 1s infinite",
-            backdropFilter: "blur(20px)",
-            marginBottom: 24,
-            flexShrink: 0,
-          }}>
-            <img src={logo} alt="ATX Prestige" style={{ width: 78, height: 78, objectFit: "contain" as const }} />
+          {/* Logo with ring effect built in */}
+          <div style={{ position: "relative" as const, marginBottom: 28, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            {/* Rings anchored to logo */}
+            <div style={{ position: "absolute", width: 130, height: 130, borderRadius: "50%", border: "1px solid rgba(59,130,246,0.6)", animation: "ringExpand 1.8s cubic-bezier(0.2,0,0.8,1) 0.3s both", pointerEvents: "none" }} />
+            <div style={{ position: "absolute", width: 130, height: 130, borderRadius: "50%", border: "1px solid rgba(59,130,246,0.35)", animation: "ringExpand 1.8s cubic-bezier(0.2,0,0.8,1) 0.55s both", pointerEvents: "none" }} />
+            <div style={{
+              width: 100, height: 100,
+              borderRadius: "50%",
+              background: "rgba(255,255,255,0.06)",
+              border: "1.5px solid rgba(255,255,255,0.15)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              animation: "logoReveal 0.9s cubic-bezier(0.16,1,0.3,1) both, borderGlow 3s ease-in-out 1s infinite",
+              backdropFilter: "blur(20px)",
+              flexShrink: 0,
+              position: "relative" as const,
+              zIndex: 1,
+            }}>
+              <img src={logo} alt="ATX Prestige" style={{ width: 78, height: 78, objectFit: "contain" as const }} />
+            </div>
           </div>
 
           {/* Brand name — single line, won't clip */}
