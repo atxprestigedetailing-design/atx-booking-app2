@@ -495,9 +495,9 @@ export default function App() {
 
   // ── Splash screen sequencing ──
   useEffect(() => {
-    const t1 = setTimeout(() => setSplashPhase(1), 900);   // tagline appears
-    const t2 = setTimeout(() => setSplashPhase(2), 2200);  // fade out begins
-    const t3 = setTimeout(() => setSplashDone(true), 3000); // app takes over
+    const t1 = setTimeout(() => setSplashPhase(1), 1200);   // tagline appears
+    const t2 = setTimeout(() => setSplashPhase(2), 3200);   // fade out begins
+    const t3 = setTimeout(() => setSplashDone(true), 4000); // app takes over
     return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
   }, []);
 
@@ -1490,30 +1490,30 @@ export default function App() {
         <div style={{ position: "absolute", width: 200, height: 200, borderRadius: "50%", border: "1px solid rgba(59,130,246,0.3)", animation: "ringExpand 1.8s cubic-bezier(0.2,0,0.8,1) 0.6s both", marginBottom: 140 }} />
 
         {/* All content in a single centered column */}
-        <div style={{ display: "flex", flexDirection: "column" as const, alignItems: "center", gap: 0, position: "relative", zIndex: 1 }}>
+        <div style={{ display: "flex", flexDirection: "column" as const, alignItems: "center", gap: 0, position: "relative", zIndex: 1, width: "100%", maxWidth: 480 }}>
 
           {/* Logo */}
           <div style={{
-            width: 130, height: 130,
+            width: 110, height: 110,
             borderRadius: "50%",
             background: "rgba(255,255,255,0.06)",
             border: "1.5px solid rgba(255,255,255,0.15)",
             display: "flex", alignItems: "center", justifyContent: "center",
             animation: "logoReveal 0.9s cubic-bezier(0.16,1,0.3,1) both, borderGlow 3s ease-in-out 1s infinite",
             backdropFilter: "blur(20px)",
-            marginBottom: 32,
+            marginBottom: 28,
             flexShrink: 0,
           }}>
-            <img src={logo} alt="ATX Prestige" style={{ width: 100, height: 100, objectFit: "contain" as const }} />
+            <img src={logo} alt="ATX Prestige" style={{ width: 85, height: 85, objectFit: "contain" as const }} />
           </div>
 
           {/* Brand name */}
           <div style={{
-            fontSize: "clamp(2.2rem, 8vw, 3.2rem)",
+            fontSize: "clamp(2rem, 10vw, 3rem)",
             fontWeight: 900,
-            letterSpacing: "-2px",
-            lineHeight: 1,
-            marginBottom: 14,
+            letterSpacing: "-1px",
+            lineHeight: 1.1,
+            marginBottom: 12,
             background: "linear-gradient(90deg, rgba(255,255,255,0.4) 0%, #ffffff 30%, rgba(255,255,255,0.9) 60%, #93c5fd 80%, rgba(255,255,255,0.4) 100%)",
             backgroundSize: "200% 100%",
             WebkitBackgroundClip: "text",
@@ -1521,6 +1521,8 @@ export default function App() {
             backgroundClip: "text",
             animation: "shimmerSweep 2.5s linear 0.5s infinite",
             textAlign: "center" as const,
+            width: "100%",
+            overflow: "visible",
           }}>
             ATX Prestige
           </div>
