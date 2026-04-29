@@ -1438,7 +1438,6 @@ export default function App() {
         opacity: splashPhase === 2 ? 0 : 1,
         transition: "opacity 0.8s cubic-bezier(0.4,0,0.2,1)",
         overflow: "hidden",
-        padding: "0 24px",
       }}>
         <style>{`
           @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;700;900&display=swap');
@@ -1455,17 +1454,17 @@ export default function App() {
             50% { transform: translate(40px,60px) scale(1.2); }
           }
           @keyframes logoReveal {
-            0% { opacity: 0; transform: scale(0.6) translateY(20px); filter: blur(12px); }
-            60% { opacity: 1; transform: scale(1.05) translateY(-4px); filter: blur(0); }
-            100% { opacity: 1; transform: scale(1) translateY(0); filter: blur(0); }
+            0% { opacity: 0; transform: scale(0.6); filter: blur(12px); }
+            60% { opacity: 1; transform: scale(1.05); filter: blur(0); }
+            100% { opacity: 1; transform: scale(1); filter: blur(0); }
           }
-          @keyframes ringExpand {
-            0% { transform: scale(0.5); opacity: 0.8; }
-            100% { transform: scale(2.2); opacity: 0; }
+          @keyframes textReveal {
+            0% { opacity: 0; transform: translateY(18px); }
+            100% { opacity: 1; transform: translateY(0); }
           }
           @keyframes shimmerSweep {
-            0% { background-position: -200% 0; }
-            100% { background-position: 200% 0; }
+            0% { background-position: -400% 0; }
+            100% { background-position: 400% 0; }
           }
           @keyframes dotPulse {
             0%,100% { opacity: 0.3; transform: scaleY(0.6); }
@@ -1475,9 +1474,28 @@ export default function App() {
             0%,100% { box-shadow: 0 0 30px rgba(59,130,246,0.3), 0 0 60px rgba(59,130,246,0.1); }
             50% { box-shadow: 0 0 50px rgba(59,130,246,0.6), 0 0 100px rgba(59,130,246,0.2); }
           }
+          @keyframes carOrbit {
+            0%   { transform: rotate(0deg)   translateX(150px) rotate(0deg); }
+            25%  { transform: rotate(90deg)  translateX(150px) rotate(-90deg); }
+            50%  { transform: rotate(180deg) translateX(150px) rotate(-180deg); }
+            75%  { transform: rotate(270deg) translateX(150px) rotate(-270deg); }
+            100% { transform: rotate(360deg) translateX(150px) rotate(-360deg); }
+          }
+          @keyframes smokeTrail {
+            0%   { transform: rotate(0deg)   translateX(150px) rotate(0deg)   translateX(0) translateY(0); opacity: 0.5; }
+            100% { transform: rotate(360deg) translateX(150px) rotate(-360deg) translateX(0) translateY(0); opacity: 0; }
+          }
+          @keyframes orbitRing {
+            0%   { stroke-dashoffset: 0; }
+            100% { stroke-dashoffset: -942; }
+          }
+          @keyframes tireSmoke {
+            0%   { opacity: 0.6; r: 2; }
+            100% { opacity: 0; r: 8; }
+          }
         `}</style>
 
-        {/* Animated orbs */}
+        {/* Animated background orbs */}
         <div style={{ position: "absolute" as const, inset: 0, overflow: "hidden", pointerEvents: "none" }}>
           <div style={{ position: "absolute", width: 700, height: 700, top: "-200px", right: "-150px", borderRadius: "50%", background: "radial-gradient(circle, rgba(30,64,175,0.5) 0%, transparent 70%)", filter: "blur(60px)", animation: "splashOrb1 8s ease-in-out infinite" }} />
           <div style={{ position: "absolute", width: 600, height: 600, bottom: "-150px", left: "-200px", borderRadius: "50%", background: "radial-gradient(circle, rgba(14,116,144,0.45) 0%, transparent 70%)", filter: "blur(60px)", animation: "splashOrb2 10s ease-in-out infinite" }} />
@@ -1485,77 +1503,114 @@ export default function App() {
           <div style={{ position: "absolute", inset: 0, backgroundImage: "linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px)", backgroundSize: "60px 60px" }} />
         </div>
 
-        {/* All content in a single centered column */}
-        <div style={{ display: "flex", flexDirection: "column" as const, alignItems: "center", position: "relative", zIndex: 1, width: "100%", padding: "0 40px", boxSizing: "border-box" as const, marginTop: "-40px" }}>
+        {/* Central content */}
+        <div style={{ position: "relative" as const, zIndex: 1, display: "flex", flexDirection: "column" as const, alignItems: "center" }}>
 
-          {/* Logo with ring effect built in */}
-          <div style={{ position: "relative" as const, marginBottom: 28, display: "flex", alignItems: "center", justifyContent: "center" }}>
-            {/* Rings anchored to logo */}
-            <div style={{ position: "absolute", width: 130, height: 130, borderRadius: "50%", border: "1px solid rgba(59,130,246,0.6)", animation: "ringExpand 1.8s cubic-bezier(0.2,0,0.8,1) 0.3s both", pointerEvents: "none" }} />
-            <div style={{ position: "absolute", width: 130, height: 130, borderRadius: "50%", border: "1px solid rgba(59,130,246,0.35)", animation: "ringExpand 1.8s cubic-bezier(0.2,0,0.8,1) 0.55s both", pointerEvents: "none" }} />
+          {/* Car drift orbit + logo — all relative to center */}
+          <div style={{ position: "relative" as const, width: 320, height: 320, marginBottom: 20, flexShrink: 0 }}>
+
+            {/* Orbit track ring */}
+            <svg style={{ position: "absolute" as const, inset: 0, width: "100%", height: "100%" }} viewBox="0 0 320 320">
+              {/* Faint orbit path */}
+              <circle cx="160" cy="160" r="150" fill="none" stroke="rgba(59,130,246,0.08)" strokeWidth="1" strokeDasharray="4 6" />
+              {/* Animated glowing dash that runs around the track */}
+              <circle cx="160" cy="160" r="150" fill="none" stroke="rgba(59,130,246,0.35)" strokeWidth="1.5"
+                strokeDasharray="60 882" strokeDashoffset="0"
+                style={{ animation: "orbitRing 2.2s linear infinite", transformOrigin: "160px 160px" }} />
+            </svg>
+
+            {/* Logo in center */}
             <div style={{
-              width: 100, height: 100,
+              position: "absolute" as const,
+              top: "50%", left: "50%",
+              transform: "translate(-50%, -50%)",
+              width: 110, height: 110,
               borderRadius: "50%",
-              background: "rgba(255,255,255,0.06)",
+              background: "rgba(10,14,26,0.95)",
               border: "1.5px solid rgba(255,255,255,0.15)",
               display: "flex", alignItems: "center", justifyContent: "center",
               animation: "logoReveal 0.9s cubic-bezier(0.16,1,0.3,1) both, borderGlow 3s ease-in-out 1s infinite",
               backdropFilter: "blur(20px)",
-              flexShrink: 0,
-              position: "relative" as const,
-              zIndex: 1,
             }}>
-              <img src={logo} alt="ATX Prestige" style={{ width: 78, height: 78, objectFit: "contain" as const }} />
+              <img src={logo} alt="ATX Prestige" style={{ width: 86, height: 86, objectFit: "contain" as const }} />
             </div>
+
+            {/* Car orbiting — wrapper rotates, inner counter-rotates to keep car upright */}
+            <div style={{
+              position: "absolute" as const,
+              top: "50%", left: "50%",
+              width: 0, height: 0,
+              animation: "carOrbit 2.2s linear infinite",
+              transformOrigin: "0 0",
+            }}>
+              {/* Tire smoke puffs — appear behind car */}
+              <div style={{ position: "absolute" as const, right: 28, top: 4, width: 14, height: 8, borderRadius: "50%", background: "rgba(150,150,180,0.25)", filter: "blur(4px)", transform: "scale(1)", animation: "dotPulse 0.4s ease-in-out infinite" }} />
+              <div style={{ position: "absolute" as const, right: 36, top: 6, width: 10, height: 6, borderRadius: "50%", background: "rgba(150,150,180,0.15)", filter: "blur(3px)" }} />
+
+              {/* SVG Car — facing forward along orbit */}
+              <svg width="44" height="20" viewBox="0 0 44 20" style={{ position: "absolute" as const, top: "-10px", left: "-22px" }}>
+                {/* Body */}
+                <rect x="2" y="8" width="40" height="10" rx="3" fill="#e2e8f0" />
+                {/* Cabin */}
+                <path d="M10 8 L14 2 L30 2 L34 8 Z" fill="#cbd5e1" />
+                {/* Windows */}
+                <path d="M15 8 L18 3 L26 3 L29 8 Z" fill="rgba(59,130,246,0.6)" />
+                {/* Wheels */}
+                <circle cx="10" cy="18" r="4" fill="#1e293b" />
+                <circle cx="10" cy="18" r="2" fill="#475569" />
+                <circle cx="34" cy="18" r="4" fill="#1e293b" />
+                <circle cx="34" cy="18" r="2" fill="#475569" />
+                {/* Headlights */}
+                <rect x="38" y="10" width="4" height="3" rx="1" fill="#fbbf24" opacity="0.9" />
+                {/* Tail lights */}
+                <rect x="2" y="10" width="3" height="3" rx="1" fill="#ef4444" opacity="0.8" />
+              </svg>
+            </div>
+
           </div>
 
-          {/* Brand name — single line, won't clip */}
+          {/* Brand name — fixed size, no shimmer animation to avoid clip */}
           <div style={{
-            fontSize: "min(11vw, 56px)",
+            fontSize: "52px",
             fontWeight: 900,
-            letterSpacing: "-1px",
-            lineHeight: 1.05,
+            letterSpacing: "-1.5px",
+            lineHeight: 1,
             marginBottom: 10,
-            background: "linear-gradient(90deg, rgba(255,255,255,0.5) 0%, #ffffff 40%, #93c5fd 70%, rgba(255,255,255,0.5) 100%)",
-            backgroundSize: "200% 100%",
-            WebkitBackgroundClip: "text",
-            WebkitTextFillColor: "transparent",
-            backgroundClip: "text",
-            animation: "shimmerSweep 2.5s linear 0.5s infinite",
+            color: "#fff",
             textAlign: "center" as const,
-            whiteSpace: "nowrap" as const,
+            animation: "textReveal 0.7s cubic-bezier(0.16,1,0.3,1) 0.4s both",
+            textShadow: "0 0 40px rgba(59,130,246,0.4), 0 2px 20px rgba(0,0,0,0.5)",
           }}>
             ATX Prestige
           </div>
 
           {/* Tagline */}
           <div style={{
-            fontSize: "clamp(0.75rem, 2.5vw, 0.9rem)",
+            fontSize: "0.82rem",
             fontWeight: 400,
-            letterSpacing: "0.28em",
+            letterSpacing: "0.32em",
             textTransform: "uppercase" as const,
-            color: "rgba(255,255,255,0.45)",
+            color: "rgba(255,255,255,0.4)",
             opacity: splashPhase >= 1 ? 1 : 0,
-            transform: splashPhase >= 1 ? "translateY(0)" : "translateY(12px)",
+            transform: splashPhase >= 1 ? "translateY(0)" : "translateY(10px)",
             transition: "opacity 0.7s ease, transform 0.7s ease",
-            marginBottom: 52,
-            textAlign: "center" as const,
+            marginBottom: 40,
           }}>
             Detailing
           </div>
 
           {/* Loading bars */}
           <div style={{
-            display: "flex", gap: 6, alignItems: "flex-end",
+            display: "flex", gap: 5, alignItems: "flex-end",
             opacity: splashPhase >= 1 ? 1 : 0,
             transition: "opacity 0.5s ease 0.3s",
           }}>
             {[0, 1, 2, 3, 4].map(i => (
               <div key={i} style={{
-                width: 4,
-                height: 18 + (i % 3) * 8,
+                width: 3,
+                height: 14 + (i % 3) * 7,
                 borderRadius: 999,
-                background: i === 2 ? "#3b82f6" : i === 1 || i === 3 ? "rgba(59,130,246,0.6)" : "rgba(59,130,246,0.3)",
+                background: i === 2 ? "#3b82f6" : i === 1 || i === 3 ? "rgba(59,130,246,0.55)" : "rgba(59,130,246,0.25)",
                 animation: `dotPulse 0.9s ease-in-out ${i * 0.12}s infinite`,
               }} />
             ))}
