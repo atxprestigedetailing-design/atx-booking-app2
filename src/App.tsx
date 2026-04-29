@@ -1,5 +1,6 @@
 import logo from "./assets/logo.png";
 import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import { useRive } from "@rive-app/react-canvas";
 
 declare global {
   interface Window {
@@ -1427,135 +1428,77 @@ export default function App() {
 
   // MY BOOKINGS VIEW
   // ── SPLASH SCREEN ──────────────────────────────────────────────────────────
+  // ── Rive splash component (defined inside App so it can access state) ──
+  function RiveSplash() {
+    const { RiveComponent } = useRive({
+      src: "/479-941-clean-the-car.riv",
+      autoplay: true,
+    });
+    return <RiveComponent style={{ width: "100%", height: "100%" }} />;
+  }
+
   if (!splashDone) {
     return (
       <div style={{
         position: "fixed" as const, inset: 0,
         background: "#080c12",
-        display: "flex", alignItems: "center", justifyContent: "center",
+        display: "flex", flexDirection: "column" as const,
+        alignItems: "center", justifyContent: "center",
         zIndex: 9999, fontFamily: '"Outfit", sans-serif',
         opacity: splashPhase === 2 ? 0 : 1,
         transition: "opacity 0.8s cubic-bezier(0.4,0,0.2,1)",
         overflow: "hidden",
       }}>
         <style>{`
-          @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;700;900&display=swap');
+          @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;700;900&display=swap');
           @keyframes orb1{0%,100%{transform:translate(0,0)}50%{transform:translate(60px,-40px)}}
           @keyframes orb2{0%,100%{transform:translate(0,0)}50%{transform:translate(-50px,60px)}}
-          @keyframes orb3{0%,100%{transform:translate(0,0)}50%{transform:translate(40px,50px)}}
-          @keyframes logoIn{0%{opacity:0;transform:scale(0.5);filter:blur(16px)}70%{opacity:1;transform:scale(1.06);filter:blur(0)}100%{opacity:1;transform:scale(1);filter:blur(0)}}
-          @keyframes textIn{0%{opacity:0;transform:translateY(20px)}100%{opacity:1;transform:translateY(0)}}
+          @keyframes fadeUp{0%{opacity:0;transform:translateY(16px)}100%{opacity:1;transform:translateY(0)}}
           @keyframes pulse{0%,100%{opacity:0.25;transform:scaleY(0.5)}50%{opacity:1;transform:scaleY(1)}}
-          @keyframes glowRing{0%,100%{box-shadow:0 0 24px rgba(59,130,246,0.3),0 0 48px rgba(59,130,246,0.1)}50%{box-shadow:0 0 40px rgba(59,130,246,0.6),0 0 80px rgba(59,130,246,0.25)}}
-          @keyframes smoke1{0%{opacity:0.7;transform:translate(0,0) scale(1)}100%{opacity:0;transform:translate(-16px,-8px) scale(3.5)}}
-          @keyframes smoke2{0%{opacity:0.5;transform:translate(0,0) scale(1)}100%{opacity:0;transform:translate(-24px,4px) scale(4)}}
-          @keyframes smoke3{0%{opacity:0.35;transform:translate(0,0) scale(1)}100%{opacity:0;transform:translate(-12px,10px) scale(3)}}
-          @keyframes trackDash{from{stroke-dashoffset:0}to{stroke-dashoffset:-1508}}
-          @keyframes orbit{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
-          @keyframes counterOrbit{from{transform:translateX(236px) rotate(0deg)}to{transform:translateX(236px) rotate(-360deg)}}
         `}</style>
 
         {/* Background orbs */}
         <div style={{ position:"absolute", inset:0, overflow:"hidden", pointerEvents:"none" }}>
-          <div style={{ position:"absolute", width:800, height:800, top:"-250px", right:"-200px", borderRadius:"50%", background:"radial-gradient(circle,rgba(30,64,175,0.55) 0%,transparent 70%)", filter:"blur(70px)", animation:"orb1 9s ease-in-out infinite" }} />
-          <div style={{ position:"absolute", width:650, height:650, bottom:"-180px", left:"-220px", borderRadius:"50%", background:"radial-gradient(circle,rgba(14,116,144,0.45) 0%,transparent 70%)", filter:"blur(65px)", animation:"orb2 11s ease-in-out infinite" }} />
-          <div style={{ position:"absolute", width:450, height:450, top:"38%", left:"38%", borderRadius:"50%", background:"radial-gradient(circle,rgba(91,33,182,0.4) 0%,transparent 70%)", filter:"blur(55px)", animation:"orb3 13s ease-in-out infinite" }} />
+          <div style={{ position:"absolute", width:800, height:800, top:"-250px", right:"-200px", borderRadius:"50%", background:"radial-gradient(circle,rgba(30,64,175,0.45) 0%,transparent 70%)", filter:"blur(70px)", animation:"orb1 9s ease-in-out infinite" }} />
+          <div style={{ position:"absolute", width:650, height:650, bottom:"-180px", left:"-220px", borderRadius:"50%", background:"radial-gradient(circle,rgba(14,116,144,0.4) 0%,transparent 70%)", filter:"blur(65px)", animation:"orb2 11s ease-in-out infinite" }} />
           <div style={{ position:"absolute", inset:0, backgroundImage:"linear-gradient(rgba(255,255,255,0.018) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.018) 1px,transparent 1px)", backgroundSize:"60px 60px" }} />
         </div>
 
-        {/* 480x480 orbit arena — car circles the whole thing, content centered inside */}
-        <div style={{ position:"relative" as const, width:480, height:480, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+        {/* Rive animation */}
+        <div style={{ width: 320, height: 320, position:"relative", zIndex:1, flexShrink:0 }}>
+          <RiveSplash />
+        </div>
 
-          {/* Orbit ring SVG */}
-          <svg style={{ position:"absolute", inset:0, width:"100%", height:"100%", overflow:"visible", pointerEvents:"none" }} viewBox="0 0 480 480">
-            <circle cx="240" cy="240" r="236" fill="none" stroke="rgba(59,130,246,0.06)" strokeWidth="1" strokeDasharray="3 12" />
-          </svg>
-
-          {/* Car orbit: div anchored to center, rotates, car is offset by radius */}
+        {/* Logo + brand */}
+        <div style={{ display:"flex", flexDirection:"column" as const, alignItems:"center", position:"relative", zIndex:1, animation:"fadeUp 0.8s ease 0.4s both" }}>
           <div style={{
-            position:"absolute" as const,
-            top:"50%", left:"50%",
-            width:0, height:0,
-            transformOrigin:"0 0",
-            animation:"orbit 2.4s linear infinite",
+            display:"flex", alignItems:"center", gap:14, marginBottom:10,
           }}>
-            {/* Offset car to radius, counter-rotate to stay upright */}
-            <div style={{ position:"absolute", transform:"translateX(236px)", transformOrigin:"0 0", animation:"counterOrbit 2.4s linear infinite" }}>
-              {/* Drift skew wrapper */}
-              <div style={{ transform:"skewX(-10deg)" }}>
-                {/* Glow trail behind car */}
-                <div style={{ position:"absolute", left:-40, top:-4, width:36, height:18, borderRadius:"50%", background:"rgba(59,130,246,0.25)", filter:"blur(8px)", transform:"scaleX(2)" }} />
-                <div style={{ position:"absolute", left:-24, top:-2, width:20, height:14, borderRadius:"50%", background:"rgba(59,130,246,0.15)", filter:"blur(6px)" }} />
-                {/* Smoke clouds */}
-                <div style={{ position:"absolute", left:-12, top:0, width:22, height:16, borderRadius:"50%", background:"rgba(160,160,200,0.6)", filter:"blur(6px)", animation:"smoke1 0.5s ease-out infinite" }} />
-                <div style={{ position:"absolute", left:-18, top:7, width:17, height:13, borderRadius:"50%", background:"rgba(140,140,190,0.45)", filter:"blur(7px)", animation:"smoke2 0.5s ease-out 0.17s infinite" }} />
-                <div style={{ position:"absolute", left:-9, top:-4, width:13, height:11, borderRadius:"50%", background:"rgba(180,180,220,0.35)", filter:"blur(5px)", animation:"smoke3 0.5s ease-out 0.33s infinite" }} />
-                {/* Car — top:-13 left:-28 centers it on the pivot point */}
-                <svg width="56" height="26" viewBox="0 0 56 26" style={{ position:"absolute", top:"-13px", left:"-28px", display:"block", filter:"drop-shadow(0 0 8px rgba(59,130,246,0.8))" }}>
-                  <ellipse cx="28" cy="25" rx="22" ry="2" fill="rgba(0,0,0,0.35)" />
-                  <path d="M4 16 L8 16 L10 10 L16 4 L36 4 L44 10 L52 12 L52 18 L4 18 Z" fill="#e2e8f0" />
-                  <path d="M12 10 L17 4 L36 4 L42 10 Z" fill="#cbd5e1" />
-                  <path d="M18 10 L21 5 L30 5 L35 10 Z" fill="rgba(59,130,246,0.7)" />
-                  <path d="M13 10 L16 5 L20 5 L17 10 Z" fill="rgba(59,130,246,0.5)" />
-                  <path d="M8 15 L44 15 L44 14 L8 14 Z" fill="rgba(59,130,246,0.3)" />
-                  <rect x="50" y="12" width="4" height="3" rx="1" fill="#fde68a" />
-                  <rect x="2"  y="12" width="4" height="3" rx="1" fill="#ef4444" />
-                  <rect x="50" y="16" width="4" height="2" rx="1" fill="#475569" />
-                  <rect x="2"  y="16" width="4" height="2" rx="1" fill="#334155" />
-                  <circle cx="18" cy="20" r="5" fill="#1e293b" />
-                  <circle cx="18" cy="20" r="3" fill="#334155" />
-                  <circle cx="18" cy="20" r="1.5" fill="#64748b" />
-                  <circle cx="40" cy="20" r="5" fill="#1e293b" />
-                  <circle cx="40" cy="20" r="3" fill="#334155" />
-                  <circle cx="40" cy="20" r="1.5" fill="#64748b" />
-                  <line x1="18" y1="17" x2="18" y2="23" stroke="#475569" strokeWidth="1" />
-                  <line x1="15" y1="20" x2="21" y2="20" stroke="#475569" strokeWidth="1" />
-                  <line x1="40" y1="17" x2="40" y2="23" stroke="#475569" strokeWidth="1" />
-                  <line x1="37" y1="20" x2="43" y2="20" stroke="#475569" strokeWidth="1" />
-                </svg>
-              </div>
-            </div>
-          </div>
-
-          {/* Center content — perfectly centered by flexbox of the parent */}
-          <div style={{ display:"flex", flexDirection:"column" as const, alignItems:"center", gap:0, zIndex:2, position:"relative" as const }}>
             <div style={{
-              width:110, height:110, borderRadius:"50%",
-              background:"rgba(6,10,20,0.97)",
-              border:"1.5px solid rgba(255,255,255,0.18)",
+              width:52, height:52, borderRadius:"50%",
+              background:"rgba(255,255,255,0.06)",
+              border:"1px solid rgba(255,255,255,0.15)",
               display:"flex", alignItems:"center", justifyContent:"center",
-              animation:"logoIn 1s cubic-bezier(0.16,1,0.3,1) both, glowRing 3s ease-in-out 1.2s infinite",
-              backdropFilter:"blur(24px)",
-              marginBottom:14,
+              backdropFilter:"blur(20px)",
             }}>
-              <img src={logo} alt="ATX" style={{ width:86, height:86, objectFit:"contain" as const }} />
+              <img src={logo} alt="ATX" style={{ width:42, height:42, objectFit:"contain" as const }} />
             </div>
-            <div style={{
-              fontSize:"46px", fontWeight:900, letterSpacing:"-1.5px", lineHeight:1,
-              color:"#fff", textAlign:"center" as const, marginBottom:8,
-              animation:"textIn 0.7s cubic-bezier(0.16,1,0.3,1) 0.6s both",
-              textShadow:"0 0 40px rgba(59,130,246,0.5), 0 2px 20px rgba(0,0,0,0.6)",
-              whiteSpace:"nowrap" as const,
-            }}>ATX Prestige</div>
-            <div style={{
-              fontSize:"0.72rem", fontWeight:400, letterSpacing:"0.32em",
-              textTransform:"uppercase" as const, color:"rgba(255,255,255,0.4)",
-              opacity: splashPhase >= 1 ? 1 : 0,
-              transform: splashPhase >= 1 ? "translateY(0)" : "translateY(10px)",
-              transition:"opacity 0.7s ease, transform 0.7s ease",
-              marginBottom:22,
-            }}>Detailing</div>
-            <div style={{ display:"flex", gap:5, alignItems:"flex-end", opacity: splashPhase >= 1 ? 1 : 0, transition:"opacity 0.5s ease 0.3s" }}>
-              {[0,1,2,3,4].map(i => (
-                <div key={i} style={{
-                  width:3, height:10+(i%3)*7, borderRadius:999,
-                  background: i===2?"#3b82f6":i===1||i===3?"rgba(59,130,246,0.55)":"rgba(59,130,246,0.25)",
-                  animation:`pulse 0.9s ease-in-out ${i*0.12}s infinite`,
-                }} />
-              ))}
+            <div>
+              <div style={{ fontSize:"28px", fontWeight:900, letterSpacing:"-1px", color:"#fff", lineHeight:1, textShadow:"0 0 30px rgba(59,130,246,0.5)" }}>ATX Prestige</div>
+              <div style={{ fontSize:"0.7rem", letterSpacing:"0.28em", textTransform:"uppercase" as const, color:"rgba(255,255,255,0.4)", marginTop:3 }}>Detailing</div>
             </div>
           </div>
 
+          {/* Loading bars */}
+          <div style={{ display:"flex", gap:5, alignItems:"flex-end", opacity: splashPhase >= 1 ? 1 : 0, transition:"opacity 0.5s ease" }}>
+            {[0,1,2,3,4].map(i => (
+              <div key={i} style={{
+                width:3, height:10+(i%3)*7, borderRadius:999,
+                background: i===2?"#3b82f6":i===1||i===3?"rgba(59,130,246,0.55)":"rgba(59,130,246,0.25)",
+                animation:`pulse 0.9s ease-in-out ${i*0.12}s infinite`,
+              }} />
+            ))}
+          </div>
         </div>
       </div>
     );
