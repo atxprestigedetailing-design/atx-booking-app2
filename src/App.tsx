@@ -3324,19 +3324,41 @@ export default function App() {
                       {last6.length > 0 ? (
                         <div style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: 20, marginBottom: 16 }}>
                           <div style={{ fontWeight: 700, color: "#f1f5f9", marginBottom: 16, fontSize: "0.95rem" }}>Revenue — Last 6 Months</div>
-                          <div style={{ display: "flex", alignItems: "flex-end", gap: 8, height: 120 }}>
-                            {last6.map(k => {
-                              const pct = (monthlyData[k] / maxVal) * 100;
+                          <svg width="100%" height="160" viewBox={`0 0 ${last6.length * 80} 160`} preserveAspectRatio="none" style={{ overflow: "visible" }}>
+                            {last6.map((k, i) => {
+                              const barH = Math.max((monthlyData[k] / maxVal) * 110, 6);
+                              const x = i * 80 + 10;
+                              const barW = 52;
                               const isThis = k === thisMonthKey;
+                              const yTop = 120 - barH;
+                              const label = monthlyData[k] >= 1000 ? `$${(monthlyData[k]/1000).toFixed(1)}k` : `$${monthlyData[k].toFixed(0)}`;
                               return (
-                                <div key={k} style={{ flex: 1, display: "flex", flexDirection: "column" as const, alignItems: "center", gap: 6 }}>
-                                  <div style={{ fontSize: "0.65rem", color: "rgba(255,255,255,0.45)", fontWeight: 600 }}>${monthlyData[k] >= 1000 ? (monthlyData[k]/1000).toFixed(1)+"k" : monthlyData[k].toFixed(0)}</div>
-                                  <div style={{ width: "100%", background: isThis ? "linear-gradient(180deg,#059669,#047857)" : "rgba(16,185,129,0.3)", borderRadius: "6px 6px 0 0", height: `${Math.max(pct, 4)}%`, transition: "height 0.4s ease", boxShadow: isThis ? "0 0 12px rgba(5,150,105,0.4)" : "none" }} />
-                                  <div style={{ fontSize: "0.65rem", color: isThis ? "#34d399" : "rgba(255,255,255,0.35)", fontWeight: isThis ? 700 : 400 }}>{monthName(k)}</div>
-                                </div>
+                                <g key={k}>
+                                  {/* Bar */}
+                                  <rect x={x} y={yTop} width={barW} height={barH} rx={6}
+                                    fill={isThis ? "url(#barGrad)" : "rgba(16,185,129,0.25)"}
+                                    style={{ filter: isThis ? "drop-shadow(0 0 8px rgba(5,150,105,0.5))" : "none" }}
+                                  />
+                                  {/* Amount label above bar */}
+                                  <text x={x + barW / 2} y={yTop - 6} textAnchor="middle" fontSize="10" fill="rgba(255,255,255,0.5)" fontFamily="Outfit,sans-serif" fontWeight="600">{label}</text>
+                                  {/* Month label below */}
+                                  <text x={x + barW / 2} y={148} textAnchor="middle" fontSize="10"
+                                    fill={isThis ? "#34d399" : "rgba(255,255,255,0.3)"}
+                                    fontFamily="Outfit,sans-serif" fontWeight={isThis ? "700" : "400"}>
+                                    {monthName(k)}
+                                  </text>
+                                </g>
                               );
                             })}
-                          </div>
+                            {/* Baseline */}
+                            <line x1="0" y1="121" x2={last6.length * 80} y2="121" stroke="rgba(255,255,255,0.08)" strokeWidth="1" />
+                            <defs>
+                              <linearGradient id="barGrad" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0%" stopColor="#10b981" />
+                                <stop offset="100%" stopColor="#047857" />
+                              </linearGradient>
+                            </defs>
+                          </svg>
                         </div>
                       ) : (
                         <div style={{ textAlign: "center", padding: 40, color: "rgba(255,255,255,0.45)" }}>No paid invoices yet.</div>
