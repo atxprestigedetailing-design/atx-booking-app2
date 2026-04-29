@@ -1434,7 +1434,7 @@ export default function App() {
       src: "/479-941-clean-the-car.riv",
       autoplay: true,
     });
-    return <RiveComponent style={{ width: "100%", height: "100%" }} />;
+    return <RiveComponent style={{ width: "100%", height: "100%", background: "transparent" }} />;
   }
 
   if (!splashDone) {
@@ -1464,8 +1464,8 @@ export default function App() {
           <div style={{ position:"absolute", inset:0, backgroundImage:"linear-gradient(rgba(255,255,255,0.018) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.018) 1px,transparent 1px)", backgroundSize:"60px 60px" }} />
         </div>
 
-        {/* Rive animation */}
-        <div style={{ width: 320, height: 320, position:"relative", zIndex:1, flexShrink:0 }}>
+        {/* Rive animation — mixBlendMode blends away the blue artboard bg */}
+        <div style={{ width: 360, height: 360, position:"relative", zIndex:1, flexShrink:0, mixBlendMode:"screen" as const, filter:"saturate(1.3) brightness(1.1)" }}>
           <RiveSplash />
         </div>
 
