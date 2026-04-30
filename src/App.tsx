@@ -449,6 +449,7 @@ export default function App() {
   const [newSlotTime, setNewSlotTime]                   = useState("");
   const [addingSlot, setAddingSlot]                     = useState(false);
   const [photoUploading, setPhotoUploading]             = useState<{[key: number]: string}>({});
+  const [localPhotoPreviews, setLocalPhotoPreviews]     = useState<{[key: string]: string[]}>({});
   const [processingRows, setProcessingRows]             = useState<Set<number>>(new Set());
   const [userBookings, setUserBookings]                 = useState<Booking[]>([]);
   const [bookingsLoading, setBookingsLoading]           = useState(false);
@@ -2919,53 +2920,102 @@ export default function App() {
                                 {/* Photo upload — Before & After (multiple) */}
                                 <div style={{ marginTop: 14, padding: 14, background: "rgba(59,130,246,0.08)", borderRadius: 12, border: "1px solid #bae6fd" }}>
                                   <div style={{ fontWeight: 700, color: "#0369a1", marginBottom: 10, fontSize: "0.85rem" }}>Job Photos</div>
-                                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" as const }}>
-                                    {(["before", "after"] as const).map(type => (
-                                      <label key={type} style={{ cursor: "pointer" }}>
-                                        <input type="file" accept="image/*" multiple style={{ display: "none" }}
-                                          onChange={async (e) => {
-                                            const files = Array.from(e.target.files || []);
-                                            if (!files.length) return;
-                                            setPhotoUploading(prev => ({ ...prev, [b.rowIndex]: type }));
-                                            let uploaded = 0;
-                                            for (const file of files) {
-                                              try {
-                                                await new Promise<void>((resolve) => {
-                                                  const reader = new FileReader();
-                                                  reader.onload = async () => {
-                                                    const base64 = (reader.result as string).split(",")[1];
-                                                    const res = await fetch(SCRIPT_URL, {
-                                                      method: "POST",
-                                                      body: JSON.stringify({
-                                                        action: "uploadJobPhoto",
-                                                        customerName: b.name,
-                                                        serviceDate: b.date,
-                                                        photoType: type,
-                                                        base64,
-                                                        mimeType: file.type,
-                                                        rowIndex: b.rowIndex,
-                                                      }),
+
+                                  {/* Before section */}
+                                  {(["before", "after"] as const).map(type => {
+                                    const previewKey = `${b.rowIndex}_${type}`;
+                                    const previews = localPhotoPreviews[previewKey] || [];
+                                    const existingUrls = type === "before"
+                                      ? (b.beforePhotoUrl ? b.beforePhotoUrl.split(",").map(u => u.trim()).filter(Boolean) : [])
+                                      : (b.afterPhotoUrl  ? b.afterPhotoUrl.split(",").map(u => u.trim()).filter(Boolean) : []);
+                                    const allPreviews = [...existingUrls, ...previews];
+                                    return (
+                                      <div key={type} style={{ marginBottom: 12 }}>
+                                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                                          <div style={{ fontSize: "0.75rem", fontWeight: 700, color: type === "before" ? "#7dd3fc" : "#6ee7b7", textTransform: "uppercase" as const, letterSpacing: "0.06em" }}>
+                                            {type === "before" ? "Before" : "After"} {allPreviews.length > 0 ? `(${allPreviews.length})` : ""}
+                                          </div>
+                                          <label style={{ cursor: "pointer" }}>
+                                            <input type="file" accept="image/*" multiple style={{ display: "none" }}
+                                              onChange={async (e) => {
+                                                const files = Array.from(e.target.files || []);
+                                                if (!files.length) return;
+                                                setPhotoUploading(prev => ({ ...prev, [b.rowIndex]: type }));
+
+                                                const newPreviews: string[] = [];
+                                                let uploaded = 0;
+
+                                                for (const file of files) {
+                                                  try {
+                                                    await new Promise<void>((resolve) => {
+                                                      const reader = new FileReader();
+                                                      reader.onload = async () => {
+                                                        const dataUrl = reader.result as string;
+                                                        const base64 = dataUrl.split(",")[1];
+                                                        // Add local preview immediately
+                                                        newPreviews.push(dataUrl);
+                                                        const res = await fetch(SCRIPT_URL, {
+                                                          method: "POST",
+                                                          body: JSON.stringify({
+                                                            action: "uploadJobPhoto",
+                                                            customerName: b.name,
+                                                            serviceDate: b.date,
+                                                            photoType: type,
+                                                            base64,
+                                                            mimeType: file.type,
+                                                            rowIndex: b.rowIndex,
+                                                          }),
+                                                        });
+                                                        const d = await res.json();
+                                                        if (d.success) uploaded++;
+                                                        resolve();
+                                                      };
+                                                      reader.readAsDataURL(file);
                                                     });
-                                                    const d = await res.json();
-                                                    if (d.success) uploaded++;
-                                                    resolve();
-                                                  };
-                                                  reader.readAsDataURL(file);
-                                                });
-                                              } catch { console.error("Upload error for", file.name); }
-                                            }
-                                            alert(`${uploaded} of ${files.length} ${type} photo${files.length > 1 ? "s" : ""} uploaded!`);
-                                            setPhotoUploading(prev => { const n = {...prev}; delete n[b.rowIndex]; return n; });
-                                            e.target.value = "";
-                                          }}
-                                        />
-                                        <span style={{ display: "inline-block", background: type === "before" ? "#0369a1" : "#059669", color: "#fff", border: "none", borderRadius: 8, padding: "7px 14px", fontSize: "0.82rem", fontWeight: 600, cursor: "pointer", opacity: photoUploading[b.rowIndex] ? 0.5 : 1 }}>
-                                          {photoUploading[b.rowIndex] === type ? `Uploading ${type}...` : type === "before" ? "Before Photos" : "After Photos"}
-                                        </span>
-                                      </label>
-                                    ))}
-                                  </div>
-                                  <div style={{ fontSize: "0.72rem", color: "#0369a1", marginTop: 8 }}>Select multiple photos at once. All save to Google Drive.</div>
+                                                  } catch { console.error("Upload error for", file.name); }
+                                                }
+
+                                                // Save previews to local state
+                                                setLocalPhotoPreviews(prev => ({
+                                                  ...prev,
+                                                  [previewKey]: [...(prev[previewKey] || []), ...newPreviews],
+                                                }));
+
+                                                setPhotoUploading(prev => { const n = {...prev}; delete n[b.rowIndex]; return n; });
+                                                e.target.value = "";
+                                              }}
+                                            />
+                                            <span style={{ display: "inline-flex", alignItems: "center", gap: 5, background: type === "before" ? "#0369a1" : "#059669", color: "#fff", borderRadius: 8, padding: "6px 12px", fontSize: "0.78rem", fontWeight: 600, cursor: "pointer", opacity: photoUploading[b.rowIndex] ? 0.5 : 1 }}>
+                                              {photoUploading[b.rowIndex] === type ? (
+                                                <><div style={{ width: 12, height: 12, border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", borderRadius: "50%", animation: "spin 0.7s linear infinite" }} /> Uploading...</>
+                                              ) : (
+                                                <>+ Add {type === "before" ? "Before" : "After"}</>
+                                              )}
+                                            </span>
+                                          </label>
+                                        </div>
+
+                                        {/* Photo thumbnails */}
+                                        {allPreviews.length > 0 ? (
+                                          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(72px, 1fr))", gap: 6 }}>
+                                            {allPreviews.map((src, i) => (
+                                              <div key={i} style={{ position: "relative" as const, aspectRatio: "1", borderRadius: 8, overflow: "hidden", border: `2px solid ${type === "before" ? "rgba(125,211,252,0.4)" : "rgba(110,231,183,0.4)"}` }}>
+                                                <img src={src} style={{ width: "100%", height: "100%", objectFit: "cover" as const, display: "block" }} />
+                                                <div style={{ position: "absolute" as const, bottom: 0, left: 0, right: 0, background: "rgba(0,0,0,0.5)", fontSize: "0.6rem", color: "#fff", textAlign: "center" as const, padding: "2px 0", fontWeight: 600 }}>
+                                                  {i < existingUrls.length ? "✓ saved" : "✓ uploaded"}
+                                                </div>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        ) : (
+                                          <div style={{ background: "rgba(255,255,255,0.04)", border: "1.5px dashed rgba(255,255,255,0.12)", borderRadius: 8, padding: "12px", textAlign: "center" as const, fontSize: "0.75rem", color: "rgba(255,255,255,0.3)" }}>
+                                            No {type} photos yet
+                                          </div>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
+                                  <div style={{ fontSize: "0.7rem", color: "#0369a1", marginTop: 4 }}>Photos save to Google Drive automatically.</div>
                                 </div>
                               </div>
                             )}
