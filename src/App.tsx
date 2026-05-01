@@ -1467,20 +1467,24 @@ export default function App() {
         {/* 3D Spline car + centered content */}
         <div style={{ position:"relative" as const, width:"100%", height:"100vh", display:"flex", alignItems:"center", justifyContent:"center" }}>
 
-          {/* Spline 3D background */}
+          {/* Spline 3D — fully interactive */}
           <iframe
             src="https://my.spline.design/zooxautonomousvehicle-swC2lsvHWZjCeAEOrYirbLPh/"
             frameBorder={0}
-            style={{ position:"absolute", inset:0, width:"100%", height:"100%", border:"none", pointerEvents:"none" }}
+            style={{ position:"absolute", inset:0, width:"100%", height:"100%", border:"none" }}
           />
 
-          {/* Centered brand overlay */}
-          <div style={{ position:"relative", zIndex:2, display:"flex", flexDirection:"column" as const, alignItems:"center", gap:0, pointerEvents:"none" }}>
-            <div style={{ width:90, height:90, borderRadius:"50%", background:"rgba(6,10,20,0.85)", border:"1.5px solid rgba(255,255,255,0.18)", display:"flex", alignItems:"center", justifyContent:"center", backdropFilter:"blur(24px)", marginBottom:14, animation:"logoIn 1s cubic-bezier(0.16,1,0.3,1) both" }}>
-              <img src={logo} alt="ATX" style={{ width:70, height:70, objectFit:"contain" as const }} />
+          {/* Brand overlay — bottom center, doesn't cover the car */}
+          <div style={{ position:"absolute", bottom:40, left:0, right:0, zIndex:2, display:"flex", flexDirection:"column" as const, alignItems:"center", pointerEvents:"none" }}>
+            <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:10 }}>
+              <div style={{ width:52, height:52, borderRadius:"50%", background:"rgba(6,10,20,0.8)", border:"1.5px solid rgba(255,255,255,0.2)", display:"flex", alignItems:"center", justifyContent:"center", backdropFilter:"blur(16px)", animation:"logoIn 1s cubic-bezier(0.16,1,0.3,1) both" }}>
+                <img src={logo} alt="ATX" style={{ width:40, height:40, objectFit:"contain" as const }} />
+              </div>
+              <div>
+                <div style={{ fontSize:"28px", fontWeight:900, letterSpacing:"-1px", lineHeight:1, color:"#fff", textShadow:"0 0 30px rgba(59,130,246,0.6), 0 2px 16px rgba(0,0,0,0.9)", animation:"textIn 0.7s cubic-bezier(0.16,1,0.3,1) 0.4s both", whiteSpace:"nowrap" as const }}>ATX Prestige</div>
+                <div style={{ fontSize:"0.65rem", letterSpacing:"0.28em", textTransform:"uppercase" as const, color:"rgba(255,255,255,0.5)", marginTop:2 }}>Detailing</div>
+              </div>
             </div>
-            <div style={{ fontSize:"46px", fontWeight:900, letterSpacing:"-1.5px", lineHeight:1, color:"#fff", textAlign:"center" as const, marginBottom:8, animation:"textIn 0.7s cubic-bezier(0.16,1,0.3,1) 0.6s both", textShadow:"0 0 40px rgba(59,130,246,0.6), 0 2px 20px rgba(0,0,0,0.8)", whiteSpace:"nowrap" as const }}>ATX Prestige</div>
-            <div style={{ fontSize:"0.72rem", fontWeight:400, letterSpacing:"0.32em", textTransform:"uppercase" as const, color:"rgba(255,255,255,0.6)", opacity: splashPhase >= 1 ? 1 : 0, transform: splashPhase >= 1 ? "translateY(0)" : "translateY(10px)", transition:"opacity 0.7s ease, transform 0.7s ease", marginBottom:22 }}>Detailing</div>
             <div style={{ display:"flex", gap:5, alignItems:"flex-end", opacity: splashPhase >= 1 ? 1 : 0, transition:"opacity 0.5s ease 0.3s" }}>
               {[0,1,2,3,4].map(i => (
                 <div key={i} style={{ width:3, height:10+(i%3)*7, borderRadius:999, background: i===2?"#3b82f6":i===1||i===3?"rgba(59,130,246,0.55)":"rgba(59,130,246,0.25)", animation:`pulse 0.9s ease-in-out ${i*0.12}s infinite` }} />
