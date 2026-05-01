@@ -1467,7 +1467,7 @@ export default function App() {
           />
         </div>
 
-        {/* TOP — Logo + name */}
+        {/* TOP — Logo + name, free text no pill */}
         <div style={{
           position:"absolute",
           top:"clamp(16px,3vh,32px)",
@@ -1477,13 +1477,13 @@ export default function App() {
           pointerEvents:"none",
           animation:"logoIn 1s cubic-bezier(0.16,1,0.3,1) 0.3s both",
         }}>
-          <div style={{ display:"flex", alignItems:"center", gap:10, background:"rgba(6,10,20,0.55)", backdropFilter:"blur(16px)", borderRadius:999, padding:"8px 18px 8px 8px", border:"1px solid rgba(255,255,255,0.1)" }}>
-            <div style={{ width:"clamp(32px,4vw,42px)", height:"clamp(32px,4vw,42px)", borderRadius:"50%", background:"rgba(255,255,255,0.08)", border:"1px solid rgba(255,255,255,0.15)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
-              <img src={logo} alt="ATX" style={{ width:"80%", height:"80%", objectFit:"contain" as const }} />
+          <div style={{ display:"flex", alignItems:"center", gap:14 }}>
+            <div style={{ width:"clamp(52px,7vw,72px)", height:"clamp(52px,7vw,72px)", borderRadius:"50%", background:"rgba(6,10,20,0.7)", border:"1.5px solid rgba(255,255,255,0.18)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, backdropFilter:"blur(12px)" }}>
+              <img src={logo} alt="ATX" style={{ width:"82%", height:"82%", objectFit:"contain" as const }} />
             </div>
             <div>
-              <div style={{ fontSize:"clamp(14px,2.5vw,20px)", fontWeight:900, letterSpacing:"-0.3px", lineHeight:1, color:"#fff", textShadow:"0 2px 12px rgba(0,0,0,0.8)", whiteSpace:"nowrap" as const }}>ATX Prestige Detailing</div>
-              <div style={{ fontSize:"clamp(0.48rem,1vw,0.58rem)", letterSpacing:"0.2em", textTransform:"uppercase" as const, color:"rgba(255,255,255,0.45)", marginTop:2 }}>Defined by Detail · Driven by Standards</div>
+              <div style={{ fontSize:"clamp(20px,3.5vw,30px)", fontWeight:900, letterSpacing:"-0.5px", lineHeight:1, color:"#fff", textShadow:"0 2px 20px rgba(0,0,0,1), 0 0 30px rgba(59,130,246,0.4)", whiteSpace:"nowrap" as const }}>ATX Prestige Detailing</div>
+              <div style={{ fontSize:"clamp(0.52rem,1.1vw,0.62rem)", letterSpacing:"0.22em", textTransform:"uppercase" as const, color:"rgba(255,255,255,0.55)", marginTop:4, textShadow:"0 1px 8px rgba(0,0,0,0.9)" }}>Defined by Detail · Driven by Standards</div>
             </div>
           </div>
         </div>
