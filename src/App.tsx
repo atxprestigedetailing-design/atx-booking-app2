@@ -467,6 +467,7 @@ export default function App() {
   const [name, setName]                                 = useState("");
   const [phone, setPhone]                               = useState("");
   const [smsConsent, setSmsConsent]                     = useState(false);
+  const [smsMarketingConsent, setSmsMarketingConsent]   = useState(false);
   const [email, setEmail]                               = useState("");
   const [year, setYear]                                 = useState("");
   const [make, setMake]                                 = useState("");
@@ -1263,7 +1264,7 @@ export default function App() {
       : [year, make, model].filter(Boolean).join(" ") || "N/A";
 
   const step6Disabled =
-    !name || !phone || !email || !selectedDate || !selectedTime || !smsConsent ||
+    !name || !phone || !email || !selectedDate || !selectedTime ||
     (vehicle === "boat" ? !boatSize || !boatMake || !boatModel : !year || !make || !model);
 
   const standardBookings    = userBookings.filter((b) => b.clientType !== "maintenance");
@@ -4493,9 +4494,12 @@ export default function App() {
                 )}
               </div>
 
-              {/* SMS Consent — required for booking */}
+              {/* SMS Consent — optional, two separate checkboxes */}
               {selectedDate && selectedTime && name && phone && email && (
-                <div style={{ marginTop: 16, background: "rgba(59,130,246,0.06)", border: "1px solid rgba(59,130,246,0.2)", borderRadius: 14, padding: "14px 16px" }}>
+                <div style={{ marginTop: 16, background: "rgba(59,130,246,0.06)", border: "1px solid rgba(59,130,246,0.2)", borderRadius: 14, padding: "16px 16px", display: "flex", flexDirection: "column" as const, gap: 14 }}>
+                  <div style={{ fontSize: "0.78rem", fontWeight: 700, color: "#93c5fd", textTransform: "uppercase" as const, letterSpacing: "0.06em" }}>SMS Notifications (Optional)</div>
+
+                  {/* Transactional */}
                   <label style={{ display: "flex", alignItems: "flex-start", gap: 12, cursor: "pointer" }}>
                     <input
                       type="checkbox"
@@ -4504,11 +4508,28 @@ export default function App() {
                       style={{ width: 18, height: 18, marginTop: 2, accentColor: "#3b82f6", flexShrink: 0, cursor: "pointer" }}
                     />
                     <span style={{ fontSize: "0.82rem", color: "rgba(255,255,255,0.6)", lineHeight: 1.6 }}>
-                      By checking this box, I consent to receive SMS text messages from ATX Prestige Detailing at the phone number provided above. Messages may include booking confirmations, appointment reminders, job status updates, and payment notifications. Message frequency varies. Message & data rates may apply. Reply <strong style={{ color: "#f1f5f9" }}>STOP</strong> to unsubscribe at any time. Reply <strong style={{ color: "#f1f5f9" }}>HELP</strong> for assistance. View our{" "}
-                      <a href="https://atxprestigedetailing.com/privacy-policy" target="_blank" rel="noopener noreferrer" style={{ color: "#93c5fd" }}>Privacy Policy</a>{" "}and{" "}
-                      <a href="https://atxprestigedetailing.com/terms-and-conditions" target="_blank" rel="noopener noreferrer" style={{ color: "#93c5fd" }}>Terms & Conditions</a>.
+                      <strong style={{ color: "#f1f5f9" }}>Transactional SMS:</strong> I agree to receive booking confirmations, appointment reminders, job status updates, and payment notifications via SMS from ATX Prestige Detailing. Message frequency varies. Message & data rates may apply. Reply <strong style={{ color: "#f1f5f9" }}>STOP</strong> to unsubscribe. Reply <strong style={{ color: "#f1f5f9" }}>HELP</strong> for help.
                     </span>
                   </label>
+
+                  {/* Marketing */}
+                  <label style={{ display: "flex", alignItems: "flex-start", gap: 12, cursor: "pointer" }}>
+                    <input
+                      type="checkbox"
+                      checked={smsMarketingConsent}
+                      onChange={e => setSmsMarketingConsent(e.target.checked)}
+                      style={{ width: 18, height: 18, marginTop: 2, accentColor: "#3b82f6", flexShrink: 0, cursor: "pointer" }}
+                    />
+                    <span style={{ fontSize: "0.82rem", color: "rgba(255,255,255,0.6)", lineHeight: 1.6 }}>
+                      <strong style={{ color: "#f1f5f9" }}>Marketing SMS:</strong> I agree to receive promotional offers, seasonal specials, and marketing messages from ATX Prestige Detailing. Message frequency varies. Message & data rates may apply. Reply <strong style={{ color: "#f1f5f9" }}>STOP</strong> to unsubscribe at any time.
+                    </span>
+                  </label>
+
+                  <div style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.35)", lineHeight: 1.5 }}>
+                    Both checkboxes are optional. You may submit your booking without checking either. View our{" "}
+                    <a href="https://atxprestigedetailing.com/privacy-policy" target="_blank" rel="noopener noreferrer" style={{ color: "#93c5fd" }}>Privacy Policy</a>{" "}and{" "}
+                    <a href="https://atxprestigedetailing.com/terms-and-conditions" target="_blank" rel="noopener noreferrer" style={{ color: "#93c5fd" }}>Terms & Conditions</a>.
+                  </div>
                 </div>
               )}
 
@@ -4594,6 +4615,8 @@ export default function App() {
                           avgTime: packageHours, notes: bookingNotes,
                           clientType,
                           recurringFrequency: frequency,
+                          smsConsent: smsConsent,
+                          smsMarketingConsent: smsMarketingConsent,
                         }),
                       });
                       const data = await res.json();
