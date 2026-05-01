@@ -1445,12 +1445,27 @@ export default function App() {
           @keyframes glowPulse{0%,100%{box-shadow:0 0 20px rgba(59,130,246,0.5),0 4px 24px rgba(0,0,0,0.5)}50%{box-shadow:0 0 44px rgba(59,130,246,0.85),0 4px 24px rgba(0,0,0,0.5)}}
         `}</style>
 
-        {/* Spline 3D — fully interactive, fills screen */}
-        <iframe
-          src="https://my.spline.design/zooxautonomousvehicle-swC2lsvHWZjCeAEOrYirbLPh/"
-          frameBorder={0}
-          style={{ position:"absolute", inset:0, width:"100%", height:"100%", border:"none" }}
-        />
+        {/* Spline 3D — scaled down on mobile */}
+        <div style={{ position:"absolute", inset:0, overflow:"hidden" }}>
+          <style>{`
+            @media (max-width: 640px) {
+              .spline-frame {
+                transform: scale(0.65);
+                transform-origin: center center;
+                width: 154% !important;
+                height: 154% !important;
+                top: -27% !important;
+                left: -27% !important;
+              }
+            }
+          `}</style>
+          <iframe
+            className="spline-frame"
+            src="https://my.spline.design/zooxautonomousvehicle-swC2lsvHWZjCeAEOrYirbLPh/"
+            frameBorder={0}
+            style={{ position:"absolute", inset:0, width:"100%", height:"100%", border:"none" }}
+          />
+        </div>
 
         {/* TOP — Logo + name */}
         <div style={{
@@ -1500,7 +1515,7 @@ export default function App() {
               display:"flex", alignItems:"center", gap:8,
             }}
           >
-            Book a Detail <span style={{ fontSize:"1.1em" }}>→</span>
+            Get Started <span style={{ fontSize:"1.1em" }}>→</span>
           </button>
         </div>
       </div>
