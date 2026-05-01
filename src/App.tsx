@@ -1264,7 +1264,7 @@ export default function App() {
       : [year, make, model].filter(Boolean).join(" ") || "N/A";
 
   const step6Disabled =
-    !name || !phone || !email || !selectedDate || !selectedTime ||
+    !name || !email || !selectedDate || !selectedTime ||
     (vehicle === "boat" ? !boatSize || !boatMake || !boatModel : !year || !make || !model);
 
   const standardBookings    = userBookings.filter((b) => b.clientType !== "maintenance");
@@ -4444,7 +4444,7 @@ export default function App() {
                     {/* Phone + Email — side by side on desktop, stacked on mobile */}
                     <div style={{ gridColumn: "1 / -1", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
                     <div>
-                      <label style={{ display: "block", fontSize: "0.78rem", fontWeight: 700, color: "rgba(255,255,255,0.35)", textTransform: "uppercase" as const, letterSpacing: "0.06em", marginBottom: 6 }}>Phone</label>
+                      <label style={{ display: "block", fontSize: "0.78rem", fontWeight: 700, color: "rgba(255,255,255,0.35)", textTransform: "uppercase" as const, letterSpacing: "0.06em", marginBottom: 6 }}>Phone <span style={{ fontWeight: 400, textTransform: "none" as const, letterSpacing: 0, color: "rgba(255,255,255,0.25)", fontSize: "0.72rem" }}>(optional)</span></label>
                       <input style={S.input} placeholder="(512) 000-0000" value={phone} type="tel" inputMode="numeric"
                         onChange={(e) => {
                           const raw = e.target.value.replace(/\D/g, "").slice(0, 10);
