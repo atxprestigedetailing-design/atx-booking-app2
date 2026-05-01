@@ -2942,43 +2942,50 @@ export default function App() {
                                                 if (!files.length) return;
                                                 setPhotoUploading(prev => ({ ...prev, [b.rowIndex]: type }));
 
-                                                const newPreviews: string[] = [];
-                                                let uploaded = 0;
+                                                // Compress image in browser before uploading (3-5MB → ~300KB)
+                                                const compressImage = (file: File): Promise<{base64: string; dataUrl: string}> =>
+                                                  new Promise((resolve) => {
+                                                    const img = new Image();
+                                                    const url = URL.createObjectURL(file);
+                                                    img.onload = () => {
+                                                      URL.revokeObjectURL(url);
+                                                      const MAX = 1200;
+                                                      const scale = Math.min(1, MAX / Math.max(img.width, img.height));
+                                                      const canvas = document.createElement("canvas");
+                                                      canvas.width  = Math.round(img.width  * scale);
+                                                      canvas.height = Math.round(img.height * scale);
+                                                      canvas.getContext("2d")!.drawImage(img, 0, 0, canvas.width, canvas.height);
+                                                      const dataUrl = canvas.toDataURL("image/jpeg", 0.78);
+                                                      resolve({ base64: dataUrl.split(",")[1], dataUrl });
+                                                    };
+                                                    img.src = url;
+                                                  });
 
-                                                for (const file of files) {
-                                                  try {
-                                                    await new Promise<void>((resolve) => {
-                                                      const reader = new FileReader();
-                                                      reader.onload = async () => {
-                                                        const dataUrl = reader.result as string;
-                                                        const base64 = dataUrl.split(",")[1];
-                                                        // Add local preview immediately
-                                                        newPreviews.push(dataUrl);
-                                                        const res = await fetch(SCRIPT_URL, {
-                                                          method: "POST",
-                                                          body: JSON.stringify({
-                                                            action: "uploadJobPhoto",
-                                                            customerName: b.name,
-                                                            serviceDate: b.date,
-                                                            photoType: type,
-                                                            base64,
-                                                            mimeType: file.type,
-                                                            rowIndex: b.rowIndex,
-                                                          }),
-                                                        });
-                                                        const d = await res.json();
-                                                        if (d.success) uploaded++;
-                                                        resolve();
-                                                      };
-                                                      reader.readAsDataURL(file);
-                                                    });
-                                                  } catch { console.error("Upload error for", file.name); }
-                                                }
+                                                // Compress all first (fast, browser-side)
+                                                const compressed = await Promise.all(files.map(compressImage));
 
-                                                // Save previews to local state
+                                                // Show previews immediately after compression
                                                 setLocalPhotoPreviews(prev => ({
                                                   ...prev,
-                                                  [previewKey]: [...(prev[previewKey] || []), ...newPreviews],
+                                                  [previewKey]: [...(prev[previewKey] || []), ...compressed.map(c => c.dataUrl)],
+                                                }));
+
+                                                // Upload all in parallel
+                                                await Promise.all(compressed.map(async ({ base64 }, idx) => {
+                                                  try {
+                                                    await fetch(SCRIPT_URL, {
+                                                      method: "POST",
+                                                      body: JSON.stringify({
+                                                        action: "uploadJobPhoto",
+                                                        customerName: b.name,
+                                                        serviceDate: b.date,
+                                                        photoType: type,
+                                                        base64,
+                                                        mimeType: "image/jpeg",
+                                                        rowIndex: b.rowIndex,
+                                                      }),
+                                                    });
+                                                  } catch { console.error("Upload error for photo", idx); }
                                                 }));
 
                                                 setPhotoUploading(prev => { const n = {...prev}; delete n[b.rowIndex]; return n; });
