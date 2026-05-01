@@ -1452,52 +1452,56 @@ export default function App() {
           style={{ position:"absolute", inset:0, width:"100%", height:"100%", border:"none" }}
         />
 
-        {/* Bottom overlay — logo + Enter App button */}
+        {/* TOP — Logo + name */}
+        <div style={{
+          position:"absolute",
+          top:"clamp(16px,3vh,32px)",
+          left:0, right:0,
+          zIndex:2,
+          display:"flex", justifyContent:"center",
+          pointerEvents:"none",
+          animation:"logoIn 1s cubic-bezier(0.16,1,0.3,1) 0.3s both",
+        }}>
+          <div style={{ display:"flex", alignItems:"center", gap:10, background:"rgba(6,10,20,0.55)", backdropFilter:"blur(16px)", borderRadius:999, padding:"8px 18px 8px 8px", border:"1px solid rgba(255,255,255,0.1)" }}>
+            <div style={{ width:"clamp(32px,4vw,42px)", height:"clamp(32px,4vw,42px)", borderRadius:"50%", background:"rgba(255,255,255,0.08)", border:"1px solid rgba(255,255,255,0.15)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+              <img src={logo} alt="ATX" style={{ width:"80%", height:"80%", objectFit:"contain" as const }} />
+            </div>
+            <div>
+              <div style={{ fontSize:"clamp(14px,2.5vw,20px)", fontWeight:900, letterSpacing:"-0.3px", lineHeight:1, color:"#fff", textShadow:"0 2px 12px rgba(0,0,0,0.8)", whiteSpace:"nowrap" as const }}>ATX Prestige Detailing</div>
+              <div style={{ fontSize:"clamp(0.48rem,1vw,0.58rem)", letterSpacing:"0.2em", textTransform:"uppercase" as const, color:"rgba(255,255,255,0.45)", marginTop:2 }}>Defined by Detail · Driven by Standards</div>
+            </div>
+          </div>
+        </div>
+
+        {/* BOTTOM — Enter button only */}
         <div style={{
           position:"absolute",
           bottom:"clamp(16px,4vh,40px)",
           left:0, right:0,
           zIndex:2,
-          display:"flex", flexDirection:"column" as const, alignItems:"center",
-          gap:14,
-          padding:"0 24px",
+          display:"flex", justifyContent:"center",
+          opacity: splashPhase >= 1 ? 1 : 0,
+          transform: splashPhase >= 1 ? "translateY(0)" : "translateY(14px)",
+          transition: "opacity 0.6s ease 0.2s, transform 0.6s ease 0.2s",
+          pointerEvents: splashPhase >= 1 ? "auto" : "none" as const,
         }}>
-          {/* Logo + name */}
-          <div style={{ display:"flex", alignItems:"center", gap:10, animation:"logoIn 1s cubic-bezier(0.16,1,0.3,1) 0.3s both" }}>
-            <div style={{ width:"clamp(32px,5vw,46px)", height:"clamp(32px,5vw,46px)", borderRadius:"50%", background:"rgba(6,10,20,0.85)", border:"1.5px solid rgba(255,255,255,0.2)", display:"flex", alignItems:"center", justifyContent:"center", backdropFilter:"blur(16px)", flexShrink:0 }}>
-              <img src={logo} alt="ATX" style={{ width:"75%", height:"75%", objectFit:"contain" as const }} />
-            </div>
-            <div>
-              <div style={{ fontSize:"clamp(16px,3.5vw,24px)", fontWeight:900, letterSpacing:"-0.5px", lineHeight:1, color:"#fff", textShadow:"0 0 24px rgba(59,130,246,0.7), 0 2px 12px rgba(0,0,0,1)", whiteSpace:"nowrap" as const }}>ATX Prestige Detailing</div>
-              <div style={{ fontSize:"clamp(0.5rem,1.2vw,0.62rem)", letterSpacing:"0.22em", textTransform:"uppercase" as const, color:"rgba(255,255,255,0.5)", marginTop:2 }}>Defined by Detail · Driven by Standards</div>
-            </div>
-          </div>
-
-          {/* Enter App button */}
-          <div style={{
-            opacity: splashPhase >= 1 ? 1 : 0,
-            transform: splashPhase >= 1 ? "translateY(0)" : "translateY(14px)",
-            transition: "opacity 0.6s ease 0.2s, transform 0.6s ease 0.2s",
-            pointerEvents: splashPhase >= 1 ? "auto" : "none" as const,
-          }}>
-            <button
-              onClick={() => { setSplashPhase(2); setTimeout(() => setSplashDone(true), 800); }}
-              style={{
-                background: "linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)",
-                color: "#fff", border: "none",
-                borderRadius: 999,
-                padding: "clamp(10px,2vh,14px) clamp(28px,6vw,48px)",
-                fontSize: "clamp(0.88rem,2vw,1rem)",
-                fontWeight: 700, cursor: "pointer",
-                letterSpacing: "0.05em",
-                animation: "glowPulse 2.5s ease-in-out infinite",
-                fontFamily: '"Outfit", sans-serif',
-                display:"flex", alignItems:"center", gap:8,
-              }}
-            >
-              Book a Detail <span style={{ fontSize:"1.1em" }}>→</span>
-            </button>
-          </div>
+          <button
+            onClick={() => { setSplashPhase(2); setTimeout(() => setSplashDone(true), 800); }}
+            style={{
+              background: "linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)",
+              color: "#fff", border: "none",
+              borderRadius: 999,
+              padding: "clamp(10px,2vh,14px) clamp(28px,6vw,48px)",
+              fontSize: "clamp(0.88rem,2vw,1rem)",
+              fontWeight: 700, cursor: "pointer",
+              letterSpacing: "0.05em",
+              animation: "glowPulse 2.5s ease-in-out infinite",
+              fontFamily: '"Outfit", sans-serif',
+              display:"flex", alignItems:"center", gap:8,
+            }}
+          >
+            Book a Detail <span style={{ fontSize:"1.1em" }}>→</span>
+          </button>
         </div>
       </div>
     );
