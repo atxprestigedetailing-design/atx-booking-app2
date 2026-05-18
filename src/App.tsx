@@ -1462,7 +1462,7 @@ export default function App() {
           `}</style>
           <iframe
             className="spline-frame"
-            src="https://my.spline.design/zooxautonomousvehicle-swC2lsvHWZjCeAEOrYirbLPh/"
+            src="https://my.spline.design/pushittothelimit-gnTQOnjqWClQAZkRcFzxDHQs/"
             frameBorder={0}
             style={{ position:"absolute", inset:0, width:"100%", height:"100%", border:"none" }}
           />
