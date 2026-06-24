@@ -83,10 +83,10 @@ type Booking = {
 };
 
 const vehicleOptions = [
-  { id: "truckSuv" as VehicleType, label: "Truck / SUV", basicRate: 80, premiumRate: 100 },
-  { id: "sedan"    as VehicleType, label: "Sedan",        basicRate: 70, premiumRate: 90  },
-  { id: "coupe"    as VehicleType, label: "Coupe",        basicRate: 65, premiumRate: 85  },
-  { id: "boat"     as VehicleType, label: "Boat",         basicRate: 90, premiumRate: 100 },
+  { id: "truckSuv" as VehicleType, label: "Truck / SUV", basicRate: 85, premiumRate: 105 },
+  { id: "sedan"    as VehicleType, label: "Sedan",        basicRate: 75, premiumRate: 95  },
+  { id: "coupe"    as VehicleType, label: "Coupe",        basicRate: 70, premiumRate: 90  },
+  { id: "boat"     as VehicleType, label: "Boat",         basicRate: 95, premiumRate: 105 },
 ];
 
 const addOnOptions: { label: AddOn; priceText: string; fixedPrice?: number }[] = [
