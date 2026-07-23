@@ -11,7 +11,7 @@ const GOOGLE_CLIENT_ID =
   "447699234633-ivo2e1c2q843scj32k5323o2rkq6h7dp.apps.googleusercontent.com";
 
 const SCRIPT_URL =
-  "https://script.google.com/macros/s/AKfycbwP6z8V2jw8ShngkV3bV_QBPP0Q-JJIYJa1vZoxspTb5gkAWG66pP07fG8VhKRQUwcR_w/exec";
+  "https://script.google.com/macros/s/AKfycbxLrS009eiw6PlWxkR12gpj9_fYoZBsnIuuWZzwuCe945WBQDXCBpKbTr8qr8ZyWIrMzg/exec";
 
 const TOTAL_STEPS = 9;
 const ADMIN_EMAIL = "atxprestigedetailing@gmail.com";
@@ -235,9 +235,10 @@ async function updateBooking(rowIndex: number, updates: Record<string, string>):
   return data.success;
 }
 
-function BookingCard({ booking, upcoming, onCancel, onBookAgain, isEditing, editFields, onStartEdit, onEditField, onSaveEdit, onCancelEdit, editSaving }: {
+function BookingCard({ booking, upcoming, onCancel, onBookAgain, isEditing, editFields, onStartEdit, onEditField, onSaveEdit, onCancelEdit, editSaving, allAvailableSlots }: {
   booking: Booking; upcoming: boolean; onCancel?: (b: Booking) => void; onBookAgain?: (b: Booking) => void;
   isEditing?: boolean; editFields?: Partial<Booking>; onStartEdit?: (b: Booking) => void; onEditField?: (patch: Partial<Booking>) => void; onSaveEdit?: () => void; onCancelEdit?: () => void; editSaving?: boolean;
+  allAvailableSlots?: AvailabilitySlot[];
 }) {
   const vehicleLabel =
     booking.vehicle === "boat"
@@ -369,9 +370,47 @@ function BookingCard({ booking, upcoming, onCancel, onBookAgain, isEditing, edit
         )}
       </div>
 
-      {/* Inline edit form — package, vehicle details, name (email stays tied to the Google account) */}
+      {/* Inline edit form — date/time, package, vehicle details, name (email stays tied to the Google account) */}
       {isEditing && editFields && (
         <div style={{ marginTop: 14, background: "rgba(59,130,246,0.06)", border: "1px solid rgba(59,130,246,0.2)", borderRadius: 14, padding: 16, display: "grid", gap: 12 }}>
+          {((editFields.date && editFields.date !== booking.date) || (editFields.time && editFields.time !== booking.time)) && (
+            <div style={{ background: "rgba(251,191,36,0.08)", border: "1.5px solid #f59e0b", borderRadius: 10, padding: "12px 14px" }}>
+              <div style={{ fontWeight: 700, color: "#fbbf24", fontSize: "0.85rem", marginBottom: 4 }}>Reschedule Detected</div>
+              <div style={{ fontSize: "0.82rem", color: "#fbbf24" }}>
+                <span style={{ textDecoration: "line-through", opacity: 0.7 }}>{formatDateLabel(booking.date)}{booking.time ? ` at ${booking.time}` : ""}</span>
+                <span style={{ margin: "0 8px" }}>→</span>
+                <strong>{formatDateLabel(editFields.date || booking.date)}{(editFields.time || booking.time) ? ` at ${editFields.time || booking.time}` : ""}</strong>
+              </div>
+            </div>
+          )}
+          <div>
+            <div style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.45)", marginBottom: 4 }}>Date &amp; Time</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+              <input
+                type="date"
+                value={editFields.date ?? booking.date}
+                min={new Date().toISOString().split("T")[0]}
+                onChange={(e) => onEditField?.({ date: e.target.value, time: "" })}
+                style={editInputStyle}
+              />
+              {(() => {
+                const slotsForDate = (allAvailableSlots || []).filter(s => s.date === (editFields.date ?? booking.date));
+                const sameDate = (editFields.date ?? booking.date) === booking.date;
+                return slotsForDate.length > 0 || sameDate ? (
+                  <select value={editFields.time ?? booking.time} onChange={(e) => onEditField?.({ time: e.target.value })} style={{ ...editInputStyle, backgroundColor: "rgba(255,255,255,0.06)" }}>
+                    {sameDate && <option value={booking.time}>{booking.time} (current)</option>}
+                    {slotsForDate.filter(s => s.time !== booking.time).map(s => (
+                      <option key={s.time} value={s.time}>{s.time}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <div style={{ display: "flex", alignItems: "center", padding: "0 12px", background: "rgba(239,68,68,0.1)", border: "1px solid #fca5a5", borderRadius: 10, fontSize: "0.8rem", color: "#f87171" }}>
+                    No open slots that day
+                  </div>
+                );
+              })()}
+            </div>
+          </div>
           <div>
             <div style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.45)", marginBottom: 4 }}>Full Name</div>
             <input value={editFields.name ?? booking.name} onChange={(e) => onEditField?.({ name: e.target.value })} style={editInputStyle} />
@@ -512,6 +551,12 @@ export default function App() {
   const [adminTab, setAdminTab]                         = useState<"bookings" | "invoices" | "revenue" | "availability" | "clients">("bookings");
   const [clientSearch, setClientSearch]                 = useState("");
   const [selectedClientKey, setSelectedClientKey]       = useState<string | null>(null);
+  const [clientNotesOpen, setClientNotesOpen]           = useState(false);
+  const [clientNotesLoading, setClientNotesLoading]     = useState(false);
+  const [clientNotesList, setClientNotesList]           = useState<{ rowIndex: number; timestamp: string; email: string; noteDate: string; note: string }[]>([]);
+  const [newNoteDate, setNewNoteDate]                   = useState(() => new Date().toISOString().split("T")[0]);
+  const [newNoteText, setNewNoteText]                   = useState("");
+  const [addingNote, setAddingNote]                     = useState(false);
   const [adminBookings, setAdminBookings]               = useState<Booking[]>([]);
   const [adminLoading, setAdminLoading]                 = useState(false);
   const [adminFilter, setAdminFilter]                   = useState<"all" | "upcoming" | "past" | "maintenance">("all");
@@ -939,6 +984,38 @@ export default function App() {
     } catch (e) { console.error("Failed to load admin bookings", e); }
     finally { setAdminLoading(false); }
   }, []);
+
+  async function openClientNotes(email: string) {
+    setClientNotesOpen(true);
+    setClientNotesLoading(true);
+    setNewNoteText("");
+    setNewNoteDate(new Date().toISOString().split("T")[0]);
+    try {
+      const res = await fetch(`${SCRIPT_URL}?action=getClientNotes&email=${encodeURIComponent(email)}`);
+      const data = await res.json();
+      setClientNotesList(data.notes || []);
+    } catch (e) { console.error("Failed to load client notes", e); }
+    finally { setClientNotesLoading(false); }
+  }
+
+  async function handleAddClientNote(email: string) {
+    if (!newNoteText.trim()) return;
+    setAddingNote(true);
+    try {
+      const res = await fetch(SCRIPT_URL, {
+        method: "POST",
+        body: JSON.stringify({ action: "addClientNote", email, noteDate: newNoteDate, note: newNoteText.trim() }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setNewNoteText("");
+        await openClientNotes(email);
+      } else {
+        alert("Something went wrong saving that note.");
+      }
+    } catch { alert("Something went wrong saving that note."); }
+    finally { setAddingNote(false); }
+  }
 
   const loadInventory = useCallback(async () => {
     setInventoryLoading(true);
@@ -1409,7 +1486,7 @@ export default function App() {
 
   function handleStartClientEdit(b: Booking) {
     setClientEditBooking(b);
-    setClientEditFields({ name: b.name, packageType: b.packageType, year: b.year, make: b.make, model: b.model, boatSize: b.boatSize });
+    setClientEditFields({ name: b.name, packageType: b.packageType, year: b.year, make: b.make, model: b.model, boatSize: b.boatSize, date: b.date, time: b.time });
   }
 
   function handleClientCancelEdit() {
@@ -1421,6 +1498,14 @@ export default function App() {
     if (!clientEditBooking) return;
     const b = clientEditBooking;
     const pkgLabel = (p: string) => p === "basic" ? "Basic Detail" : p === "premium" ? "Premium Detail" : p === "exterior" ? "Exterior Basic" : p === "exteriorPremium" ? "Exterior Premium" : p === "interior" ? "Interior Basic" : p === "interiorPremium" ? "Interior Premium" : p;
+    const dateChanged = !!clientEditFields.date && clientEditFields.date !== b.date;
+    const timeChanged = !!clientEditFields.time && clientEditFields.time !== b.time;
+    const scheduleChanged = dateChanged || timeChanged;
+    if (scheduleChanged && !clientEditFields.time) { showToast("Please pick a time for the new date.", "error", 3500); return; }
+
+    // Mirrors the admin edit flow: reschedule (date/time) and other detail changes are
+    // reported through two separate backend notification paths, so date/time isn't
+    // included in changeDetails here — the scheduleChanged branch handles that email/SMS.
     const changeDetails: { field: string; from: string; to: string }[] = [];
     if (clientEditFields.name && clientEditFields.name !== b.name) changeDetails.push({ field: "Name", from: b.name, to: clientEditFields.name });
     if (clientEditFields.packageType && clientEditFields.packageType !== b.packageType) changeDetails.push({ field: "Package", from: pkgLabel(b.packageType), to: pkgLabel(clientEditFields.packageType) });
@@ -1432,10 +1517,10 @@ export default function App() {
     if (clientEditFields.make && clientEditFields.make !== b.make) changeDetails.push({ field: "Make", from: b.make, to: clientEditFields.make });
     if (clientEditFields.model && clientEditFields.model !== b.model) changeDetails.push({ field: "Model", from: b.model, to: clientEditFields.model });
 
-    if (changeDetails.length === 0) { handleClientCancelEdit(); return; }
+    if (changeDetails.length === 0 && !scheduleChanged) { handleClientCancelEdit(); return; }
 
     setClientEditSaving(true);
-    const tid = showToast("Saving your changes...", "loading");
+    const tid = showToast(scheduleChanged ? "Rescheduling your appointment..." : "Saving your changes...", "loading");
     try {
       const vl = b.vehicle === "boat"
         ? [clientEditFields.boatSize || b.boatSize, clientEditFields.make || b.make, clientEditFields.model || b.model].filter(Boolean).join(" ")
@@ -1446,7 +1531,9 @@ export default function App() {
           action: "updateBookingFields",
           rowIndex: b.rowIndex,
           fields: clientEditFields,
-          scheduleChanged: false,
+          scheduleChanged,
+          oldDate: b.date,
+          oldTime: b.time,
           customerName: clientEditFields.name || b.name,
           customerEmail: b.email,
           customerPhone: b.phone,
@@ -1455,8 +1542,8 @@ export default function App() {
           serviceType: b.serviceType,
           address: b.address,
           hourlyRate: b.hourlyRate,
-          serviceDate: b.date,
-          hasDetailChanges: true,
+          serviceDate: clientEditFields.date || b.date,
+          hasDetailChanges: changeDetails.length > 0,
           changeDetails: JSON.stringify(changeDetails),
           editedBy: "client",
         }),
@@ -1464,10 +1551,10 @@ export default function App() {
       const data = await res.json();
       if (data.success) {
         setUserBookings(prev => prev.map(bk => bk.rowIndex === b.rowIndex ? { ...bk, ...clientEditFields } : bk));
-        updateToast(tid, "Your changes have been saved.", "success", 4000);
+        updateToast(tid, scheduleChanged ? "Your appointment has been rescheduled." : "Your changes have been saved.", "success", 4000);
         handleClientCancelEdit();
       } else {
-        updateToast(tid, "Something went wrong. Please try again.", "error", 4000);
+        updateToast(tid, data.error || "Something went wrong. Please try again.", "error", 4500);
       }
     } catch {
       updateToast(tid, "Something went wrong. Please try again.", "error", 4000);
@@ -1860,6 +1947,7 @@ export default function App() {
                                 onSaveEdit={handleClientSaveEdit}
                                 onCancelEdit={handleClientCancelEdit}
                                 editSaving={clientEditSaving}
+                                allAvailableSlots={allAvailableSlots}
                               />
                             ))}
                           </div>
@@ -3898,7 +3986,12 @@ export default function App() {
                     const jobsCompleted = selected.bookings.filter(b => b.status === "Completed").length;
                     return (
                       <>
-                        <button onClick={() => setSelectedClientKey(null)} style={{ ...S.secondary, padding: "7px 14px", fontSize: "0.85rem", marginBottom: 16 }}>← All Clients</button>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap" as const, gap: 8 }}>
+                          <button onClick={() => setSelectedClientKey(null)} style={{ ...S.secondary, padding: "7px 14px", fontSize: "0.85rem" }}>← All Clients</button>
+                          <button onClick={() => openClientNotes(selected.email)} style={{ background: "rgba(167,139,250,0.15)", color: "#a78bfa", border: "1px solid rgba(167,139,250,0.35)", borderRadius: 10, padding: "7px 16px", fontSize: "0.85rem", fontWeight: 700, cursor: "pointer" }}>
+                            Notes
+                          </button>
+                        </div>
 
                         <div style={{ background: "rgba(167,139,250,0.08)", border: "1px solid rgba(167,139,250,0.3)", borderRadius: 16, padding: 20, marginBottom: 16 }}>
                           <div style={{ fontWeight: 800, color: "#f1f5f9", fontSize: "1.15rem", marginBottom: 4 }}>{selected.name}</div>
@@ -3967,6 +4060,45 @@ export default function App() {
                             );
                           })}
                         </div>
+
+                        {/* Client notes popup */}
+                        {clientNotesOpen && (
+                          <div style={{ position: "fixed" as const, inset: 0, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 2000, padding: 16, backdropFilter: "blur(8px)" }} onClick={() => setClientNotesOpen(false)}>
+                            <div onClick={(e) => e.stopPropagation()} style={{ background: "rgba(15,20,30,0.98)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 20, padding: 24, maxWidth: 480, width: "100%", maxHeight: "80vh", display: "flex", flexDirection: "column" as const, boxShadow: "0 40px 100px rgba(0,0,0,0.6)" }}>
+                              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+                                <div style={{ fontWeight: 800, color: "#f1f5f9", fontSize: "1.1rem" }}>Notes — {selected.name}</div>
+                                <button onClick={() => setClientNotesOpen(false)} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.4)", cursor: "pointer", fontSize: "1.2rem" }}>✕</button>
+                              </div>
+
+                              <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 14, padding: 14, marginBottom: 16 }}>
+                                <input type="date" value={newNoteDate} onChange={(e) => setNewNoteDate(e.target.value)}
+                                  style={{ ...S.input, padding: "8px 10px", fontSize: "0.85rem", width: "auto", marginBottom: 8 }} />
+                                <textarea value={newNoteText} onChange={(e) => setNewNoteText(e.target.value)}
+                                  placeholder="e.g. Recommend ceramic coating next visit, offered 10% off for referral..."
+                                  style={{ ...S.input, minHeight: 70, resize: "vertical" as const, fontFamily: "inherit", marginBottom: 8, display: "block" }} />
+                                <button onClick={() => handleAddClientNote(selected.email)} disabled={!newNoteText.trim() || addingNote}
+                                  style={{ ...S.primary, padding: "8px 16px", fontSize: "0.85rem", ...(!newNoteText.trim() || addingNote ? S.disabled : {}) }}>
+                                  {addingNote ? "Saving..." : "+ Add Note"}
+                                </button>
+                              </div>
+
+                              <div style={{ overflowY: "auto" as const, flex: 1, display: "grid", gap: 10 }}>
+                                {clientNotesLoading ? (
+                                  <div style={{ textAlign: "center", padding: 20, color: "rgba(255,255,255,0.45)" }}>Loading notes...</div>
+                                ) : clientNotesList.length === 0 ? (
+                                  <div style={{ textAlign: "center", padding: 20, color: "rgba(255,255,255,0.35)", fontSize: "0.88rem" }}>No notes yet for this client.</div>
+                                ) : (
+                                  clientNotesList.map((n, i) => (
+                                    <div key={i} style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 12, padding: "10px 14px" }}>
+                                      <div style={{ fontSize: "0.72rem", fontWeight: 700, color: "#a78bfa", marginBottom: 4 }}>{n.noteDate ? formatDateLabel(n.noteDate) : ""}</div>
+                                      <div style={{ fontSize: "0.88rem", color: "rgba(255,255,255,0.75)", lineHeight: 1.5, whiteSpace: "pre-wrap" as const }}>{n.note}</div>
+                                    </div>
+                                  ))
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        )}
                       </>
                     );
                   }
