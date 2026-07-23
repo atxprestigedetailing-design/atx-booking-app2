@@ -227,8 +227,8 @@ async function updateBooking(rowIndex: number, updates: Record<string, string>):
   return data.success;
 }
 
-function BookingCard({ booking, upcoming, onRequestChange }: {
-  booking: Booking; upcoming: boolean; onRequestChange: (b: Booking) => void;
+function BookingCard({ booking, upcoming, onRequestChange, onCancel }: {
+  booking: Booking; upcoming: boolean; onRequestChange: (b: Booking) => void; onCancel?: (b: Booking) => void;
 }) {
   const vehicleLabel =
     booking.vehicle === "boat"
@@ -237,8 +237,25 @@ function BookingCard({ booking, upcoming, onRequestChange }: {
 
   const hasPhotos = booking.beforePhotoUrl || booking.afterPhotoUrl;
   const isCompleted = booking.status === "Completed" || booking.invoiceStatus === "paid";
+  const isCancellable = upcoming && booking.status !== "Cancelled" && booking.status !== "Skipped" && !isCompleted;
   const [showPhotos, setShowPhotos] = React.useState(false);
   const [loadedImgs, setLoadedImgs] = React.useState<Record<string, boolean>>({});
+
+  // Rough price estimate for bookings that haven't been invoiced yet
+  const estimatedPrice = (() => {
+    if (booking.invoiceStatus === "paid" || booking.invoiceStatus === "released") return null;
+    if (booking.packageType === "custom") {
+      const match = (booking.notes || "").match(/\$(\d+(\.\d+)?)/);
+      return match ? parseFloat(match[1]) : null;
+    }
+    const rate = parseFloat(booking.hourlyRate || "0");
+    if (!rate) return null;
+    const isMaint = booking.clientType === "maintenance";
+    const isBoat = booking.vehicle === "boat";
+    const isPartial = booking.packageType === "exterior" || booking.packageType === "interior" || booking.packageType === "exteriorPremium" || booking.packageType === "interiorPremium";
+    const hrs = isMaint ? 2 : isBoat ? 4 : isPartial ? 2 : 3;
+    return rate * hrs;
+  })();
 
   const beforeUrls = booking.beforePhotoUrl ? booking.beforePhotoUrl.split(",").map(u => u.trim()).filter(Boolean) : [];
   const afterUrls  = booking.afterPhotoUrl  ? booking.afterPhotoUrl.split(",").map(u => u.trim()).filter(Boolean) : [];
@@ -261,24 +278,34 @@ function BookingCard({ booking, upcoming, onRequestChange }: {
     }
   }
 
+  const isCancelled = booking.status === "Cancelled";
+  const isSkipped = booking.status === "Skipped";
+
   return (
-    <div style={{ background: "rgba(255,255,255,0.05)", border: upcoming ? "1px solid rgba(59,130,246,0.45)" : "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: 18, position: "relative" as const }}>
+    <div style={{ background: isCancelled ? "rgba(239,68,68,0.05)" : "rgba(255,255,255,0.05)", border: isCancelled ? "1px solid rgba(239,68,68,0.3)" : isSkipped ? "1px solid rgba(59,130,246,0.3)" : upcoming ? "1px solid rgba(59,130,246,0.45)" : "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: 18, position: "relative" as const, opacity: isCancelled || isSkipped ? 0.8 : 1 }}>
       {upcoming && (
-        <span style={{ position: "absolute" as const, top: 14, right: 14, background: "rgba(59,130,246,0.15)", color: "#93c5fd", fontSize: "0.75rem", fontWeight: 700, borderRadius: 999, padding: "3px 10px", border: "1px solid rgba(59,130,246,0.3)" }}>
-          UPCOMING
+        <span style={{ position: "absolute" as const, top: 14, right: 14, background: isCancelled ? "rgba(239,68,68,0.15)" : isSkipped ? "rgba(59,130,246,0.15)" : "rgba(59,130,246,0.15)", color: isCancelled ? "#f87171" : isSkipped ? "#93c5fd" : "#93c5fd", fontSize: "0.75rem", fontWeight: 700, borderRadius: 999, padding: "3px 10px", border: isCancelled ? "1px solid rgba(239,68,68,0.3)" : "1px solid rgba(59,130,246,0.3)" }}>
+          {isCancelled ? "CANCELLED" : isSkipped ? "SKIPPED" : "UPCOMING"}
         </span>
       )}
-      <div style={{ fontSize: "1rem", fontWeight: 700, color: "#f1f5f9", marginBottom: 4 }}>
-        {formatDateLabel(booking.date)}{booking.time ? ` at ${booking.time}` : ""}
-      </div>
-      <div style={{ fontSize: "0.92rem", color: "rgba(255,255,255,0.45)", lineHeight: 1.6 }}>
-        {vehicleLabel && <div>{vehicleLabel}</div>}
-        <div>{booking.packageType === "basic" ? "Basic Detail" : booking.packageType === "premium" ? "Premium Detail" : booking.packageType === "exterior" ? "Exterior Only — Basic" : booking.packageType === "interior" ? "Interior Only — Basic" : booking.packageType === "exteriorPremium" ? "Exterior Only — Premium" : booking.packageType === "interiorPremium" ? "Interior Only — Premium" : booking.packageType}</div>
-        {booking.serviceType && (
-          <div>{booking.serviceType === "mobile" ? `Mobile Service${booking.address ? ` - ${booking.address}` : ""}` : "Drop-Off Service"}</div>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4, paddingRight: upcoming ? 90 : 0 }}>
+        <div style={{ fontSize: "1rem", fontWeight: 700, color: "#f1f5f9" }}>
+          {formatDateLabel(booking.date)}{booking.time ? ` at ${booking.time}` : ""}
+        </div>
+        {booking.clientType === "maintenance" && (
+          <span style={{ background: "rgba(16,185,129,0.15)", color: "#34d399", fontSize: "0.68rem", fontWeight: 700, borderRadius: 999, padding: "2px 8px", whiteSpace: "nowrap" as const }}>
+            {booking.recurringFrequency === "biweekly" ? "BI-WEEKLY" : "MONTHLY"}
+          </span>
         )}
-        {booking.addOns && <div>Add-Ons: {booking.addOns}</div>}
-        {booking.notes && <div>Notes: {booking.notes}</div>}
+      </div>
+      <div style={{ fontSize: "0.92rem", color: "rgba(255,255,255,0.5)", lineHeight: 1.7 }}>
+        {vehicleLabel && <div>{booking.vehicle === "boat" ? "⛵" : "🚗"} {vehicleLabel}</div>}
+        <div>🧽 {booking.packageType === "basic" ? "Basic Detail" : booking.packageType === "premium" ? "Premium Detail" : booking.packageType === "exterior" ? "Exterior Only — Basic" : booking.packageType === "interior" ? "Interior Only — Basic" : booking.packageType === "exteriorPremium" ? "Exterior Only — Premium" : booking.packageType === "interiorPremium" ? "Interior Only — Premium" : booking.packageType === "custom" ? `Custom: ${booking.addOns || "Custom Job"}` : booking.packageType}</div>
+        {booking.serviceType && (
+          <div>📍 {booking.serviceType === "mobile" ? `Mobile Service${booking.address ? ` - ${booking.address}` : ""}` : "Drop-Off Service"}</div>
+        )}
+        {booking.addOns && booking.packageType !== "custom" && <div>✨ Add-Ons: {booking.addOns}</div>}
+        {booking.notes && <div>📝 {booking.notes}</div>}
       </div>
 
       {booking.invoiceStatus === "released" && booking.invoiceAmount && (
@@ -294,11 +321,24 @@ function BookingCard({ booking, upcoming, onRequestChange }: {
         </div>
       )}
 
+      {estimatedPrice !== null && booking.status !== "Cancelled" && (
+        <div style={{ marginTop: 10, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 10, padding: "8px 14px", fontSize: "0.82rem", color: "rgba(255,255,255,0.5)" }}>
+          Estimated price: <span style={{ fontWeight: 700, color: "#93c5fd" }}>${estimatedPrice.toFixed(0)}</span>
+          <span style={{ color: "rgba(255,255,255,0.35)" }}> — final invoice sent after service</span>
+        </div>
+      )}
+
       {/* Action buttons */}
-      <div style={{ display: "flex", gap: 8, marginTop: 14, flexWrap: "wrap" as const }}>
+      {(upcoming || (isCompleted && (hasPhotos || booking.invoiceLink))) && (
+      <div style={{ display: "flex", gap: 8, marginTop: 14, flexWrap: "wrap" as const, borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: 14 }}>
         {upcoming && (
           <button onClick={() => onRequestChange(booking)} style={{ background: "rgba(255,255,255,0.08)", color: "#f1f5f9", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 10, padding: "9px 16px", fontSize: "0.9rem", fontWeight: 600, cursor: "pointer" }}>
             Request a Change
+          </button>
+        )}
+        {isCancellable && onCancel && (
+          <button onClick={() => onCancel(booking)} style={{ background: "rgba(239,68,68,0.1)", color: "#f87171", border: "1px solid rgba(239,68,68,0.35)", borderRadius: 10, padding: "9px 16px", fontSize: "0.9rem", fontWeight: 600, cursor: "pointer" }}>
+            Cancel Appointment
           </button>
         )}
         {isCompleted && hasPhotos && (
@@ -314,6 +354,7 @@ function BookingCard({ booking, upcoming, onRequestChange }: {
           </a>
         )}
       </div>
+      )}
 
       {/* Inline photo gallery */}
       {showPhotos && hasPhotos && (
@@ -1318,6 +1359,46 @@ export default function App() {
     finally { setChangeSubmitting(false); }
   }
 
+  async function handleClientCancel(b: Booking) {
+    const confirmed = window.confirm(
+      b.clientType === "maintenance"
+        ? "Cancel your entire maintenance plan? This will cancel all upcoming maintenance appointments."
+        : `Cancel your appointment on ${formatDateLabel(b.date)}${b.time ? ` at ${b.time}` : ""}?`
+    );
+    if (!confirmed) return;
+    const tid = showToast("Cancelling appointment...", "loading");
+    try {
+      const vl = b.vehicle === "boat"
+        ? [b.boatSize, b.make, b.model].filter(Boolean).join(" ")
+        : [b.year, b.make, b.model].filter(Boolean).join(" ");
+      const res = await fetch(SCRIPT_URL, {
+        method: "POST",
+        body: JSON.stringify({
+          action: "cancelBooking",
+          rowIndex: b.rowIndex,
+          customerName: b.name,
+          customerEmail: b.email,
+          customerPhone: b.phone,
+          date: b.date,
+          time: b.time,
+          vehicle: vl,
+          packageType: b.packageType,
+          address: b.address,
+          clientType: b.clientType,
+        }),
+      });
+      const d = await res.json();
+      if (d.success) {
+        setUserBookings(prev => prev.map(bk => bk.rowIndex === b.rowIndex ? { ...bk, status: "Cancelled" } : bk));
+        updateToast(tid, "Appointment cancelled.", "success", 4000);
+      } else {
+        updateToast(tid, "Something went wrong. Please try again.", "error", 4000);
+      }
+    } catch {
+      updateToast(tid, "Something went wrong. Please try again.", "error", 4000);
+    }
+  }
+
   const S = {
     page:           { minHeight: "100vh", background: "#080c12", color: "#e8eaf0", padding: "32px 16px", fontFamily: '"Outfit", ui-sans-serif, system-ui, sans-serif', position: "relative" as const, overflow: "hidden" } as const,
     container:      { maxWidth: 960, margin: "0 auto", position: "relative" as const, zIndex: 1 } as const,
@@ -1589,7 +1670,7 @@ export default function App() {
                           <div style={{ fontWeight: 700, color: "rgba(255,255,255,0.7)", fontSize: "0.95rem", marginBottom: 12, textTransform: "uppercase" as const, letterSpacing: "0.04em" }}>Upcoming</div>
                           <div style={{ display: "grid", gap: 14, marginBottom: 28 }}>
                             {allUpcoming.map((b, i) => (
-                              <BookingCard key={i} booking={b} upcoming onRequestChange={(b) => { setChangeTarget(b); setChangeNote(""); setChangeSubmitted(false); setView("requestChange"); }} />
+                              <BookingCard key={i} booking={b} upcoming onRequestChange={(b) => { setChangeTarget(b); setChangeNote(""); setChangeSubmitted(false); setView("requestChange"); }} onCancel={handleClientCancel} />
                             ))}
                           </div>
                         </>
