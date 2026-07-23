@@ -405,7 +405,9 @@ export default function App() {
   const [splashDone, setSplashDone]                     = useState(false);
   const [splashPhase, setSplashPhase]                   = useState(0); // 0=logo, 1=tagline, 2=fadeout
   const [view, setView]                                 = useState<"booking" | "myBookings" | "requestChange" | "admin" | "balance" | "inventory">("booking");
-  const [adminTab, setAdminTab]                         = useState<"bookings" | "invoices" | "revenue" | "availability">("bookings");
+  const [adminTab, setAdminTab]                         = useState<"bookings" | "invoices" | "revenue" | "availability" | "clients">("bookings");
+  const [clientSearch, setClientSearch]                 = useState("");
+  const [selectedClientKey, setSelectedClientKey]       = useState<string | null>(null);
   const [adminBookings, setAdminBookings]               = useState<Booking[]>([]);
   const [adminLoading, setAdminLoading]                 = useState(false);
   const [adminFilter, setAdminFilter]                   = useState<"all" | "upcoming" | "past" | "maintenance">("all");
@@ -1926,6 +1928,7 @@ export default function App() {
               </button>
               <button onClick={() => { setAdminTab("revenue"); }} style={{ background: "none", border: "none", cursor: "pointer", padding: "10px 18px", fontSize: "0.95rem", fontWeight: 700, color: adminTab === "revenue" ? "#059669" : "#9ca3af", borderBottom: adminTab === "revenue" ? "3px solid #059669" : "3px solid transparent", marginBottom: -2 }}>Revenue</button>
               <button onClick={() => { setAdminTab("availability"); if (availSlots.length === 0) { setAvailLoading(true); fetch(`${SCRIPT_URL}?action=getAllAvailability`).then(r => r.json()).then(d => { setAvailSlots(d.slots || []); setAvailLoading(false); }).catch(() => setAvailLoading(false)); } }} style={{ background: "none", border: "none", cursor: "pointer", padding: "10px 18px", fontSize: "0.95rem", fontWeight: 700, color: adminTab === "availability" ? "#2563eb" : "#9ca3af", borderBottom: adminTab === "availability" ? "3px solid #2563eb" : "3px solid transparent", marginBottom: -2 }}>Availability</button>
+              <button onClick={() => { setAdminTab("clients"); setSelectedClientKey(null); setClientSearch(""); }} style={{ background: "none", border: "none", cursor: "pointer", padding: "10px 18px", fontSize: "0.95rem", fontWeight: 700, color: adminTab === "clients" ? "#a78bfa" : "#9ca3af", borderBottom: adminTab === "clients" ? "3px solid #a78bfa" : "3px solid transparent", marginBottom: -2 }}>Clients</button>
             </div>
 
             {adminLoading ? (
@@ -3580,6 +3583,136 @@ export default function App() {
                     )}
                   </>
                 )}
+
+                {/* ── CLIENTS TAB ── */}
+                {adminTab === "clients" && (() => {
+                  type ClientSummary = {
+                    key: string;
+                    name: string;
+                    email: string;
+                    phone: string;
+                    bookings: Booking[];
+                    totalPaid: number;
+                    totalPending: number;
+                    lastDate: string;
+                  };
+                  const clientMap: Record<string, ClientSummary> = {};
+                  adminBookings.forEach(b => {
+                    if (!b.name) return;
+                    const key = b.email || b.name;
+                    if (!clientMap[key]) clientMap[key] = { key, name: b.name, email: b.email, phone: b.phone, bookings: [], totalPaid: 0, totalPending: 0, lastDate: "" };
+                    const c = clientMap[key];
+                    c.bookings.push(b);
+                    if (b.invoiceStatus === "paid") c.totalPaid += parseFloat(b.invoiceAmount || "0");
+                    if (b.invoiceStatus === "released") c.totalPending += parseFloat(b.invoiceAmount || "0");
+                    if (!c.phone && b.phone) c.phone = b.phone;
+                    if (b.date && (!c.lastDate || b.date > c.lastDate)) c.lastDate = b.date;
+                  });
+                  const clients = Object.values(clientMap).sort((a, b) => (b.lastDate || "").localeCompare(a.lastDate || ""));
+                  const filtered = clientSearch
+                    ? clients.filter(c =>
+                        c.name.toLowerCase().includes(clientSearch.toLowerCase()) ||
+                        c.email.toLowerCase().includes(clientSearch.toLowerCase()) ||
+                        (c.phone || "").includes(clientSearch))
+                    : clients;
+                  const selected = selectedClientKey ? clientMap[selectedClientKey] : null;
+
+                  if (selected) {
+                    const sortedBookings = [...selected.bookings].sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+                    const jobsCompleted = selected.bookings.filter(b => b.status === "Completed").length;
+                    return (
+                      <>
+                        <button onClick={() => setSelectedClientKey(null)} style={{ ...S.secondary, padding: "7px 14px", fontSize: "0.85rem", marginBottom: 16 }}>← All Clients</button>
+
+                        <div style={{ background: "rgba(167,139,250,0.08)", border: "1px solid rgba(167,139,250,0.3)", borderRadius: 16, padding: 20, marginBottom: 16 }}>
+                          <div style={{ fontWeight: 800, color: "#f1f5f9", fontSize: "1.15rem", marginBottom: 4 }}>{selected.name}</div>
+                          <div style={{ fontSize: "0.88rem", color: "rgba(255,255,255,0.5)" }}>{selected.email}{selected.phone ? ` · ${selected.phone}` : ""}</div>
+                        </div>
+
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12, marginBottom: 20 }}>
+                          {[
+                            { label: "Total Jobs", value: String(selected.bookings.length), color: "#2563eb" },
+                            { label: "Completed", value: String(jobsCompleted), color: "#7c3aed" },
+                            { label: "Total Paid", value: `$${selected.totalPaid.toFixed(0)}`, color: "#059669" },
+                            { label: "Pending Invoices", value: `$${selected.totalPending.toFixed(0)}`, color: "#d97706" },
+                            { label: "Last Service", value: selected.lastDate ? formatDateLabel(selected.lastDate) : "—", color: "#0891b2" },
+                          ].map((card, i) => (
+                            <div key={i} style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: "16px 14px" }}>
+                              <div style={{ fontSize: "0.72rem", color: "rgba(255,255,255,0.35)", marginBottom: 6, fontWeight: 600, textTransform: "uppercase" as const, letterSpacing: "0.04em" }}>{card.label}</div>
+                              <div style={{ fontSize: "1.3rem", fontWeight: 900, color: card.color, letterSpacing: "-1px" }}>{card.value}</div>
+                            </div>
+                          ))}
+                        </div>
+
+                        <div style={{ fontWeight: 700, color: "#f1f5f9", marginBottom: 12, fontSize: "0.95rem" }}>Booking History</div>
+                        <div style={{ display: "grid", gap: 10 }}>
+                          {sortedBookings.map((b, i) => {
+                            const vl = b.vehicle === "boat"
+                              ? [b.boatSize, b.make, b.model].filter(Boolean).join(" ")
+                              : [b.year, b.make, b.model].filter(Boolean).join(" ");
+                            const pkgLabel = b.packageType === "basic" ? "Basic Detail" : b.packageType === "premium" ? "Premium Detail" : b.packageType === "exterior" ? "Exterior Only — Basic" : b.packageType === "exteriorPremium" ? "Exterior Only — Premium" : b.packageType === "interior" ? "Interior Only — Basic" : b.packageType === "interiorPremium" ? "Interior Only — Premium" : b.packageType === "custom" ? `⚡ Custom: ${b.addOns || "Custom Job"}` : b.packageType;
+                            return (
+                              <div key={i} style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 14, padding: 14 }}>
+                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8, flexWrap: "wrap" as const }}>
+                                  <div>
+                                    <div style={{ fontWeight: 700, color: "#f1f5f9", fontSize: "0.9rem" }}>{formatDateLabel(b.date)}{b.time ? ` at ${b.time}` : ""}</div>
+                                    <div style={{ fontSize: "0.82rem", color: "rgba(255,255,255,0.45)" }}>{vl} · {pkgLabel}</div>
+                                    {b.addOns && b.packageType !== "custom" && <div style={{ fontSize: "0.78rem", color: "#93c5fd" }}>Add-Ons: {b.addOns}</div>}
+                                    {b.notes && <div style={{ fontSize: "0.78rem", color: "rgba(255,255,255,0.35)" }}>Notes: {b.notes}</div>}
+                                  </div>
+                                  <div style={{ display: "flex", flexDirection: "column" as const, alignItems: "flex-end", gap: 4 }}>
+                                    <span style={{ background: b.status === "Cancelled" ? "rgba(239,68,68,0.15)" : b.status === "Skipped" ? "rgba(59,130,246,0.15)" : b.status === "Completed" ? "rgba(16,185,129,0.15)" : isUpcoming(b.date) ? "rgba(59,130,246,0.15)" : "rgba(255,255,255,0.06)", color: b.status === "Cancelled" ? "#f87171" : b.status === "Skipped" ? "#93c5fd" : b.status === "Completed" ? "#34d399" : isUpcoming(b.date) ? "#93c5fd" : "rgba(255,255,255,0.35)", fontSize: "0.72rem", fontWeight: 700, borderRadius: 999, padding: "2px 8px" }}>
+                                      {b.status === "Cancelled" ? "CANCELLED" : b.status === "Skipped" ? "SKIPPED" : b.status === "Completed" ? "COMPLETED" : isUpcoming(b.date) ? "UPCOMING" : "PAST"}
+                                    </span>
+                                    {b.invoiceStatus && b.invoiceStatus !== "" && (
+                                      <span style={{ background: b.invoiceStatus === "paid" ? "rgba(16,185,129,0.2)" : "rgba(251,191,36,0.1)", color: b.invoiceStatus === "paid" ? "#34d399" : "#fbbf24", fontSize: "0.72rem", fontWeight: 700, borderRadius: 999, padding: "2px 8px" }}>
+                                        {b.invoiceStatus === "pending" ? "INVOICE PENDING" : b.invoiceStatus === "released" ? `INVOICE SENT $${b.invoiceAmount}` : `PAID $${b.invoiceAmount}`}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </>
+                    );
+                  }
+
+                  return (
+                    <>
+                      <input
+                        type="text"
+                        placeholder="Search by name, email, or phone..."
+                        value={clientSearch}
+                        onChange={e => setClientSearch(e.target.value)}
+                        style={{ ...S.input, marginBottom: 16 }}
+                      />
+                      {filtered.length === 0 ? (
+                        <div style={{ textAlign: "center", padding: 40, color: "rgba(255,255,255,0.45)" }}>No clients found.</div>
+                      ) : (
+                        <div style={{ display: "grid", gap: 10 }}>
+                          {filtered.map(c => (
+                            <button key={c.key} onClick={() => setSelectedClientKey(c.key)}
+                              style={{ textAlign: "left" as const, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 14, padding: 16, cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" as const }}>
+                              <div>
+                                <div style={{ fontWeight: 700, color: "#f1f5f9", fontSize: "0.95rem" }}>{c.name}</div>
+                                <div style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.45)" }}>{c.email}{c.phone ? ` · ${c.phone}` : ""}</div>
+                              </div>
+                              <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+                                <div style={{ textAlign: "right" as const }}>
+                                  <div style={{ fontSize: "0.78rem", color: "rgba(255,255,255,0.35)" }}>{c.bookings.length} job{c.bookings.length !== 1 ? "s" : ""}</div>
+                                  <div style={{ fontSize: "0.78rem", color: "rgba(255,255,255,0.35)" }}>{c.lastDate ? `Last: ${formatDateLabel(c.lastDate)}` : ""}</div>
+                                </div>
+                                <div style={{ fontWeight: 800, color: "#34d399", fontSize: "1rem" }}>${c.totalPaid.toFixed(0)}</div>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
               </>
             )}
           </div>
