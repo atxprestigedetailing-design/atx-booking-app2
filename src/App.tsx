@@ -11,7 +11,7 @@ const GOOGLE_CLIENT_ID =
   "447699234633-ivo2e1c2q843scj32k5323o2rkq6h7dp.apps.googleusercontent.com";
 
 const SCRIPT_URL =
-  "https://script.google.com/macros/s/AKfycbwgnwzxFP_e11m_LYBsrIzWdSKXDcGzcohC2NdiL6ZD3wimJoAmkEmrDNejEdBZAMS9/exec";
+  "https://script.google.com/macros/s/AKfycbyCakwPMlUOv2fqDRAuJ8MM2o-HbZDcw22Ay9a6EaKrJ0ZtIbYPTvozqsJp8S46M9ITFg/exec";
 
 const TOTAL_STEPS = 9;
 const ADMIN_EMAIL = "atxprestigedetailing@gmail.com";
@@ -80,7 +80,15 @@ type Booking = {
   phone: string;
   email: string;
   rowIndex: number;
+  smsConsent?: string | boolean;
+  smsMarketingConsent?: string | boolean;
 };
+
+// Sheet-backed booleans can come back as real booleans, or as "true"/"TRUE" strings
+function isConsentGiven(v: string | boolean | undefined): boolean {
+  if (typeof v === "boolean") return v;
+  return (v || "").toString().trim().toLowerCase() === "true";
+}
 
 const vehicleOptions = [
   { id: "truckSuv" as VehicleType, label: "Truck / SUV", basicRate: 85, premiumRate: 105 },
@@ -481,7 +489,7 @@ export default function App() {
   const [qCustomPrice, setQCustomPrice]                 = useState("");
   const [squarePopup, setSquarePopup]                   = useState(false);
   const [squareBooking, setSquareBooking]               = useState<Booking | null>(null);
-  const [copiedAmount, setCopiedAmount]                 = useState<number | null>(null);
+  const [copiedKey, setCopiedKey]                       = useState<string | null>(null);
   const [editingBooking, setEditingBooking]             = useState<Booking | null>(null);
   const [editFields, setEditFields]                     = useState<Partial<Booking>>({});
   const [editSaving, setEditSaving]                     = useState(false);
@@ -1314,6 +1322,10 @@ export default function App() {
   const maintenanceBookings = userBookings.filter((b) => b.clientType === "maintenance");
   const isMaintenance       = maintenanceBookings.length > 0;
 
+  // Outstanding balance — invoices released to the client but not yet paid
+  const outstandingInvoices    = userBookings.filter((b) => b.invoiceStatus === "released");
+  const outstandingBalanceDue  = outstandingInvoices.reduce((sum, b) => sum + parseFloat(b.invoiceAmount || "0"), 0);
+
   // A booking is "done" if admin explicitly marked it Completed
   // (regardless of invoice — a past date with no status is also done)
   const isDone = (b: Booking) => b.status === "Completed";
@@ -1643,11 +1655,28 @@ export default function App() {
                     Maintenance Plan
                   </button>
                 )}
-                <button onClick={() => setBookingsTab("balance" as any)} style={{ background: "none", border: "none", cursor: "pointer", padding: "10px 16px", fontSize: "0.9rem", fontWeight: 700, color: (bookingsTab as string) === "balance" ? "#d97706" : "#9ca3af", borderBottom: (bookingsTab as string) === "balance" ? "3px solid #d97706" : "3px solid transparent", marginBottom: -2, whiteSpace: "nowrap" as const }}>
+                <button onClick={() => setBookingsTab("balance" as any)} style={{ background: "none", border: "none", cursor: "pointer", padding: "10px 16px", fontSize: "0.9rem", fontWeight: 700, color: (bookingsTab as string) === "balance" ? "#d97706" : outstandingInvoices.length > 0 ? "#fbbf24" : "#9ca3af", borderBottom: (bookingsTab as string) === "balance" ? "3px solid #d97706" : "3px solid transparent", marginBottom: -2, whiteSpace: "nowrap" as const, display: "flex", alignItems: "center", gap: 6 }}>
                   Balance
+                  {outstandingInvoices.length > 0 && (
+                    <span style={{ background: "#ef4444", color: "#fff", borderRadius: 999, padding: "2px 8px", fontSize: "0.72rem", fontWeight: 800 }}>
+                      ${outstandingBalanceDue.toFixed(0)} due
+                    </span>
+                  )}
                 </button>
               </div>
             </div>
+
+            {!bookingsLoading && (bookingsTab as string) !== "balance" && outstandingInvoices.length > 0 && (
+              <button
+                onClick={() => setBookingsTab("balance" as any)}
+                style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, width: "100%", textAlign: "left" as const, background: "rgba(251,191,36,0.12)", border: "1px solid #fde047", borderRadius: 14, padding: "14px 18px", marginBottom: 20, cursor: "pointer" }}>
+                <div>
+                  <div style={{ fontWeight: 700, color: "#fbbf24", fontSize: "0.95rem" }}>You have an outstanding balance</div>
+                  <div style={{ fontSize: "0.82rem", color: "rgba(255,255,255,0.5)", marginTop: 2 }}>{outstandingInvoices.length} invoice{outstandingInvoices.length !== 1 ? "s" : ""} due — tap to view and pay</div>
+                </div>
+                <div style={{ fontSize: "1.3rem", fontWeight: 900, color: "#fbbf24", whiteSpace: "nowrap" as const }}>${outstandingBalanceDue.toFixed(2)} →</div>
+              </button>
+            )}
 
             {bookingsLoading ? (
               <div style={{ textAlign: "center", padding: 40, color: "rgba(255,255,255,0.45)" }}>Loading your bookings...</div>
@@ -1834,54 +1863,57 @@ export default function App() {
                                 {[b.year, b.make, b.model, b.boatSize].filter(Boolean).join(" ")}
                                 {b.invoiceNote ? ` — ${b.invoiceNote}` : ""}
                               </div>
-                              {/* Amount due box showing both prices + copy button */}
+                              {/* Amount due box — separate copy button under each payment method */}
                               <div style={{ background: "rgba(251,191,36,0.12)", border: "1px solid #fde047", borderRadius: 12, padding: "14px 16px", marginBottom: 14 }}>
-                                <div style={{ display: "flex", gap: 0, marginBottom: 12 }}>
-                                  <div style={{ flex: 1, textAlign: "center" as const, padding: "0 8px" }}>
+                                <div style={{ display: "flex", gap: 12 }}>
+                                  <div style={{ flex: 1, textAlign: "center" as const }}>
                                     <div style={{ fontSize: "0.72rem", color: "#fbbf24", marginBottom: 3 }}>Venmo / Cash App</div>
                                     <div style={{ fontSize: "1.5rem", fontWeight: 900, color: "#fbbf24", letterSpacing: "-0.5px" }}>${baseAmt.toFixed(2)}</div>
-                                    <div style={{ fontSize: "0.68rem", color: "#f59e0b", marginTop: 2 }}>No fee</div>
+                                    <div style={{ fontSize: "0.68rem", color: "#f59e0b", marginTop: 2, marginBottom: 10 }}>No fee</div>
+                                    <button
+                                      onClick={() => {
+                                        navigator.clipboard.writeText(baseAmt.toFixed(2));
+                                        setCopiedKey(`${b.rowIndex}-base`);
+                                        setTimeout(() => setCopiedKey(null), 2500);
+                                      }}
+                                      style={{ width: "100%", background: copiedKey === `${b.rowIndex}-base` ? "#059669" : "#111827", color: "#fff", border: "none", borderRadius: 10, padding: "10px 8px", fontSize: "0.8rem", fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, transition: "background 0.2s ease" }}
+                                    >
+                                      {copiedKey === `${b.rowIndex}-base` ? (
+                                        <><span>✓</span> Copied</>
+                                      ) : (
+                                        <><span>⎘</span> Copy Amount</>
+                                      )}
+                                    </button>
                                   </div>
                                   <div style={{ width: 1, background: "#fde047", alignSelf: "stretch" }} />
-                                  <div style={{ flex: 1, textAlign: "center" as const, padding: "0 8px" }}>
+                                  <div style={{ flex: 1, textAlign: "center" as const }}>
                                     <div style={{ fontSize: "0.72rem", color: "#fbbf24", marginBottom: 3 }}>Square (Card)</div>
                                     <div style={{ fontSize: "1.5rem", fontWeight: 900, color: "#fbbf24", letterSpacing: "-0.5px" }}>${squareAmt}</div>
-                                    <div style={{ fontSize: "0.68rem", color: "#f59e0b", marginTop: 2 }}>+4% fee</div>
+                                    <div style={{ fontSize: "0.68rem", color: "#f59e0b", marginTop: 2, marginBottom: 10 }}>+4% fee</div>
+                                    <button
+                                      onClick={() => {
+                                        navigator.clipboard.writeText(squareAmt);
+                                        setCopiedKey(`${b.rowIndex}-square`);
+                                        setTimeout(() => setCopiedKey(null), 2500);
+                                      }}
+                                      style={{ width: "100%", background: copiedKey === `${b.rowIndex}-square` ? "#059669" : "#111827", color: "#fff", border: "none", borderRadius: 10, padding: "10px 8px", fontSize: "0.8rem", fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, transition: "background 0.2s ease" }}
+                                    >
+                                      {copiedKey === `${b.rowIndex}-square` ? (
+                                        <><span>✓</span> Copied</>
+                                      ) : (
+                                        <><span>⎘</span> Copy Amount</>
+                                      )}
+                                    </button>
                                   </div>
                                 </div>
-                                {/* Copy amount button */}
-                                <button
-                                  onClick={() => {
-                                    navigator.clipboard.writeText(baseAmt.toFixed(2));
-                                    setCopiedAmount(baseAmt);
-                                    setTimeout(() => setCopiedAmount(null), 2500);
-                                  }}
-                                  style={{
-                                    width: "100%",
-                                    background: copiedAmount === baseAmt ? "#059669" : "#111827",
-                                    color: "#fff",
-                                    border: "none",
-                                    borderRadius: 10,
-                                    padding: "11px 16px",
-                                    fontSize: "0.9rem",
-                                    fontWeight: 700,
-                                    cursor: "pointer",
-                                    display: "flex",
-                                    alignItems: "center",
-                                    justifyContent: "center",
-                                    gap: 8,
-                                    transition: "background 0.2s ease",
-                                  }}
-                                >
-                                  {copiedAmount === baseAmt ? (
-                                    <><span style={{ fontSize: "1rem" }}>✓</span> Copied ${baseAmt.toFixed(2)} to clipboard</>
-                                  ) : (
-                                    <><span style={{ fontSize: "1rem" }}>⎘</span> Copy Amount — ${baseAmt.toFixed(2)}</>
-                                  )}
-                                </button>
-                                {copiedAmount === baseAmt && (
-                                  <div style={{ fontSize: "0.78rem", color: "#059669", textAlign: "center" as const, marginTop: 6 }}>
+                                {copiedKey === `${b.rowIndex}-base` && (
+                                  <div style={{ fontSize: "0.78rem", color: "#059669", textAlign: "center" as const, marginTop: 8 }}>
                                     Now open Venmo or Cash App and paste into the amount field
+                                  </div>
+                                )}
+                                {copiedKey === `${b.rowIndex}-square` && (
+                                  <div style={{ fontSize: "0.78rem", color: "#059669", textAlign: "center" as const, marginTop: 8 }}>
+                                    Now open Square (Card) and paste into the amount field
                                   </div>
                                 )}
                               </div>
@@ -3708,6 +3740,17 @@ export default function App() {
                         <div style={{ background: "rgba(167,139,250,0.08)", border: "1px solid rgba(167,139,250,0.3)", borderRadius: 16, padding: 20, marginBottom: 16 }}>
                           <div style={{ fontWeight: 800, color: "#f1f5f9", fontSize: "1.15rem", marginBottom: 4 }}>{selected.name}</div>
                           <div style={{ fontSize: "0.88rem", color: "rgba(255,255,255,0.5)" }}>{selected.email}{selected.phone ? ` · ${selected.phone}` : ""}</div>
+                          {sortedBookings.length > 0 && (
+                            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" as const, marginTop: 12 }}>
+                              <span style={{ background: isConsentGiven(sortedBookings[0].smsConsent) ? "rgba(16,185,129,0.15)" : "rgba(255,255,255,0.06)", color: isConsentGiven(sortedBookings[0].smsConsent) ? "#34d399" : "rgba(255,255,255,0.4)", fontSize: "0.72rem", fontWeight: 700, borderRadius: 999, padding: "3px 10px" }}>
+                                {isConsentGiven(sortedBookings[0].smsConsent) ? "✓" : "✕"} Transactional SMS
+                              </span>
+                              <span style={{ background: isConsentGiven(sortedBookings[0].smsMarketingConsent) ? "rgba(16,185,129,0.15)" : "rgba(255,255,255,0.06)", color: isConsentGiven(sortedBookings[0].smsMarketingConsent) ? "#34d399" : "rgba(255,255,255,0.4)", fontSize: "0.72rem", fontWeight: 700, borderRadius: 999, padding: "3px 10px" }}>
+                                {isConsentGiven(sortedBookings[0].smsMarketingConsent) ? "✓" : "✕"} Marketing SMS
+                              </span>
+                              <span style={{ fontSize: "0.72rem", color: "rgba(255,255,255,0.3)", alignSelf: "center" }}>as of most recent booking ({formatDateLabel(sortedBookings[0].date)})</span>
+                            </div>
+                          )}
                         </div>
 
                         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12, marginBottom: 20 }}>
@@ -3740,6 +3783,11 @@ export default function App() {
                                     <div style={{ fontSize: "0.82rem", color: "rgba(255,255,255,0.45)" }}>{vl} · {pkgLabel}</div>
                                     {b.addOns && b.packageType !== "custom" && <div style={{ fontSize: "0.78rem", color: "#93c5fd" }}>Add-Ons: {b.addOns}</div>}
                                     {b.notes && <div style={{ fontSize: "0.78rem", color: "rgba(255,255,255,0.35)" }}>Notes: {b.notes}</div>}
+                                    {(b.smsConsent !== undefined || b.smsMarketingConsent !== undefined) && (
+                                      <div style={{ fontSize: "0.72rem", color: "rgba(255,255,255,0.3)", marginTop: 4 }}>
+                                        SMS consent at booking: {isConsentGiven(b.smsConsent) ? "✓ Transactional" : "✕ Transactional"} · {isConsentGiven(b.smsMarketingConsent) ? "✓ Marketing" : "✕ Marketing"}
+                                      </div>
+                                    )}
                                   </div>
                                   <div style={{ display: "flex", flexDirection: "column" as const, alignItems: "flex-end", gap: 4 }}>
                                     <span style={{ background: b.status === "Cancelled" ? "rgba(239,68,68,0.15)" : b.status === "Skipped" ? "rgba(59,130,246,0.15)" : b.status === "Completed" ? "rgba(16,185,129,0.15)" : isUpcoming(b.date) ? "rgba(59,130,246,0.15)" : "rgba(255,255,255,0.06)", color: b.status === "Cancelled" ? "#f87171" : b.status === "Skipped" ? "#93c5fd" : b.status === "Completed" ? "#34d399" : isUpcoming(b.date) ? "#93c5fd" : "rgba(255,255,255,0.35)", fontSize: "0.72rem", fontWeight: 700, borderRadius: 999, padding: "2px 8px" }}>
