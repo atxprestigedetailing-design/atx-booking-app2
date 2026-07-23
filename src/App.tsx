@@ -11,7 +11,7 @@ const GOOGLE_CLIENT_ID =
   "447699234633-ivo2e1c2q843scj32k5323o2rkq6h7dp.apps.googleusercontent.com";
 
 const SCRIPT_URL =
-  "https://script.google.com/macros/s/AKfycbyCakwPMlUOv2fqDRAuJ8MM2o-HbZDcw22Ay9a6EaKrJ0ZtIbYPTvozqsJp8S46M9ITFg/exec";
+  "https://script.google.com/macros/s/AKfycbwP6z8V2jw8ShngkV3bV_QBPP0Q-JJIYJa1vZoxspTb5gkAWG66pP07fG8VhKRQUwcR_w/exec";
 
 const TOTAL_STEPS = 9;
 const ADMIN_EMAIL = "atxprestigedetailing@gmail.com";
@@ -235,8 +235,9 @@ async function updateBooking(rowIndex: number, updates: Record<string, string>):
   return data.success;
 }
 
-function BookingCard({ booking, upcoming, onRequestChange, onCancel, onBookAgain }: {
-  booking: Booking; upcoming: boolean; onRequestChange: (b: Booking) => void; onCancel?: (b: Booking) => void; onBookAgain?: (b: Booking) => void;
+function BookingCard({ booking, upcoming, onCancel, onBookAgain, isEditing, editFields, onStartEdit, onEditField, onSaveEdit, onCancelEdit, editSaving }: {
+  booking: Booking; upcoming: boolean; onCancel?: (b: Booking) => void; onBookAgain?: (b: Booking) => void;
+  isEditing?: boolean; editFields?: Partial<Booking>; onStartEdit?: (b: Booking) => void; onEditField?: (patch: Partial<Booking>) => void; onSaveEdit?: () => void; onCancelEdit?: () => void; editSaving?: boolean;
 }) {
   const vehicleLabel =
     booking.vehicle === "boat"
@@ -248,6 +249,7 @@ function BookingCard({ booking, upcoming, onRequestChange, onCancel, onBookAgain
   const isCancellable = upcoming && booking.status !== "Cancelled" && booking.status !== "Skipped" && !isCompleted;
   const [showPhotos, setShowPhotos] = React.useState(false);
   const [loadedImgs, setLoadedImgs] = React.useState<Record<string, boolean>>({});
+  const editInputStyle = { width: "100%", boxSizing: "border-box" as const, background: "rgba(255,255,255,0.06)", color: "#f1f5f9", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 10, padding: "9px 12px", fontSize: "0.9rem", outline: "none" as const };
 
   // Rough price estimate for bookings that haven't been invoiced yet
   const estimatedPrice = (() => {
@@ -338,9 +340,9 @@ function BookingCard({ booking, upcoming, onRequestChange, onCancel, onBookAgain
 
       {/* Action buttons */}
       <div style={{ display: "flex", gap: 8, marginTop: 14, flexWrap: "wrap" as const, borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: 14 }}>
-        {upcoming && (
-          <button onClick={() => onRequestChange(booking)} style={{ background: "rgba(255,255,255,0.08)", color: "#f1f5f9", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 10, padding: "9px 16px", fontSize: "0.9rem", fontWeight: 600, cursor: "pointer" }}>
-            Request a Change
+        {isCancellable && onStartEdit && (
+          <button onClick={() => (isEditing ? onCancelEdit?.() : onStartEdit(booking))} style={{ background: "rgba(255,255,255,0.08)", color: "#f1f5f9", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 10, padding: "9px 16px", fontSize: "0.9rem", fontWeight: 600, cursor: "pointer" }}>
+            {isEditing ? "Cancel Edit" : "Edit Details"}
           </button>
         )}
         {isCancellable && onCancel && (
@@ -366,6 +368,56 @@ function BookingCard({ booking, upcoming, onRequestChange, onCancel, onBookAgain
           </a>
         )}
       </div>
+
+      {/* Inline edit form — package, vehicle details, name (email stays tied to the Google account) */}
+      {isEditing && editFields && (
+        <div style={{ marginTop: 14, background: "rgba(59,130,246,0.06)", border: "1px solid rgba(59,130,246,0.2)", borderRadius: 14, padding: 16, display: "grid", gap: 12 }}>
+          <div>
+            <div style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.45)", marginBottom: 4 }}>Full Name</div>
+            <input value={editFields.name ?? booking.name} onChange={(e) => onEditField?.({ name: e.target.value })} style={editInputStyle} />
+          </div>
+          <div>
+            <div style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.45)", marginBottom: 4 }}>Package</div>
+            <select value={editFields.packageType ?? booking.packageType} onChange={(e) => onEditField?.({ packageType: e.target.value })} style={{ ...editInputStyle, backgroundColor: "rgba(255,255,255,0.06)" }}>
+              <option value="basic">Basic Detail</option>
+              <option value="premium">Premium Detail</option>
+              {booking.vehicle !== "boat" && (
+                <>
+                  <option value="exterior">Exterior Only — Basic</option>
+                  <option value="exteriorPremium">Exterior Only — Premium</option>
+                  <option value="interior">Interior Only — Basic</option>
+                  <option value="interiorPremium">Interior Only — Premium</option>
+                </>
+              )}
+            </select>
+          </div>
+          <div>
+            <div style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.45)", marginBottom: 4 }}>{booking.vehicle === "boat" ? "Boat Details" : "Vehicle Details"}</div>
+            {booking.vehicle === "boat" ? (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(100px, 1fr))", gap: 8 }}>
+                <input placeholder="Size" value={editFields.boatSize ?? booking.boatSize} onChange={(e) => onEditField?.({ boatSize: e.target.value })} style={editInputStyle} />
+                <input placeholder="Make" value={editFields.make ?? booking.make} onChange={(e) => onEditField?.({ make: e.target.value })} style={editInputStyle} />
+                <input placeholder="Model" value={editFields.model ?? booking.model} onChange={(e) => onEditField?.({ model: e.target.value })} style={editInputStyle} />
+              </div>
+            ) : (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(100px, 1fr))", gap: 8 }}>
+                <input placeholder="Year" value={editFields.year ?? booking.year} onChange={(e) => onEditField?.({ year: e.target.value })} style={editInputStyle} />
+                <input placeholder="Make" value={editFields.make ?? booking.make} onChange={(e) => onEditField?.({ make: e.target.value })} style={editInputStyle} />
+                <input placeholder="Model" value={editFields.model ?? booking.model} onChange={(e) => onEditField?.({ model: e.target.value })} style={editInputStyle} />
+              </div>
+            )}
+          </div>
+          <div style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.35)" }}>
+            Need to change the email on file? Message us using the chat bubble in the bottom-right corner.
+          </div>
+          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+            <button onClick={onCancelEdit} style={{ background: "rgba(255,255,255,0.08)", color: "#f1f5f9", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 10, padding: "9px 16px", fontSize: "0.9rem", fontWeight: 600, cursor: "pointer" }}>Cancel</button>
+            <button onClick={onSaveEdit} disabled={editSaving} style={{ background: "#3b82f6", color: "#fff", border: "none", borderRadius: 10, padding: "9px 16px", fontSize: "0.9rem", fontWeight: 700, cursor: "pointer", opacity: editSaving ? 0.6 : 1 }}>
+              {editSaving ? "Saving..." : "Save Changes"}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Inline photo gallery */}
       {showPhotos && hasPhotos && (
@@ -446,7 +498,6 @@ function BookingCard({ booking, upcoming, onRequestChange, onCancel, onBookAgain
 
 export default function App() {
   const addressInputRef = useRef(null);
-  const gsiButtonRef = useRef<HTMLDivElement>(null);
 
   const [googleUser, setGoogleUser]                     = useState<GoogleUser | null>(() => {
     try {
@@ -457,7 +508,7 @@ export default function App() {
   const [googleScriptLoaded, setGoogleScriptLoaded]     = useState(false);
   const [splashDone, setSplashDone]                     = useState(false);
   const [splashPhase, setSplashPhase]                   = useState(0); // 0=logo, 1=tagline, 2=fadeout
-  const [view, setView]                                 = useState<"booking" | "myBookings" | "requestChange" | "admin" | "balance" | "inventory">("booking");
+  const [view, setView]                                 = useState<"booking" | "myBookings" | "admin" | "balance" | "inventory">("booking");
   const [adminTab, setAdminTab]                         = useState<"bookings" | "invoices" | "revenue" | "availability" | "clients">("bookings");
   const [clientSearch, setClientSearch]                 = useState("");
   const [selectedClientKey, setSelectedClientKey]       = useState<string | null>(null);
@@ -508,10 +559,9 @@ export default function App() {
   const [processingRows, setProcessingRows]             = useState<Set<number>>(new Set());
   const [userBookings, setUserBookings]                 = useState<Booking[]>([]);
   const [bookingsLoading, setBookingsLoading]           = useState(false);
-  const [changeTarget, setChangeTarget]                 = useState<Booking | null>(null);
-  const [changeNote, setChangeNote]                     = useState("");
-  const [changeSubmitted, setChangeSubmitted]           = useState(false);
-  const [changeSubmitting, setChangeSubmitting]         = useState(false);
+  const [clientEditBooking, setClientEditBooking]       = useState<Booking | null>(null);
+  const [clientEditFields, setClientEditFields]         = useState<Partial<Booking>>({});
+  const [clientEditSaving, setClientEditSaving]         = useState(false);
   const [step, setStep]                                 = useState(0);
   const [vehicle, setVehicle]                           = useState<VehicleType>("");
   const [clientType, setClientType]                     = useState<ClientType>("");
@@ -841,24 +891,13 @@ export default function App() {
     window.google.accounts.id.initialize({
       client_id: GOOGLE_CLIENT_ID,
       callback: handleGoogleCredential,
-      use_fedcm_for_prompt: true,
+      // itp_support targets Safari's Intelligent Tracking Prevention specifically —
+      // it's Google's documented fix for prompt() silently no-op'ing on iOS/Safari
+      // in regular (non-incognito) browsing, which is what caused "nothing happens"
+      // on mobile before.
+      itp_support: true,
     });
-    // Render an actual Google Sign-In button rather than relying on the One Tap
-    // prompt() — on mobile Safari/Chrome, third-party cookie and FedCM restrictions
-    // frequently make prompt() silently no-op, which is why the old button sometimes
-    // did nothing. The rendered button uses Google's own reliable click flow instead.
-    if (gsiButtonRef.current) {
-      gsiButtonRef.current.innerHTML = "";
-      window.google.accounts.id.renderButton(gsiButtonRef.current, {
-        type: "standard",
-        theme: "filled_black",
-        size: "large",
-        shape: "pill",
-        text: "signin_with",
-        logo_alignment: "left",
-      });
-    }
-  }, [googleScriptLoaded, googleUser, view, splashDone]);
+  }, [googleScriptLoaded, googleUser]);
 
   function handleGoogleCredential(response: any) {
     try {
@@ -1368,29 +1407,73 @@ export default function App() {
     .filter((b) => !isUpcoming(b.date) || isDone(b))
     .sort((a, b) => b.date.localeCompare(a.date));
 
-  async function submitChangeRequest() {
-    if (!changeTarget || !changeNote.trim()) return;
-    setChangeSubmitting(true);
+  function handleStartClientEdit(b: Booking) {
+    setClientEditBooking(b);
+    setClientEditFields({ name: b.name, packageType: b.packageType, year: b.year, make: b.make, model: b.model, boatSize: b.boatSize });
+  }
+
+  function handleClientCancelEdit() {
+    setClientEditBooking(null);
+    setClientEditFields({});
+  }
+
+  async function handleClientSaveEdit() {
+    if (!clientEditBooking) return;
+    const b = clientEditBooking;
+    const pkgLabel = (p: string) => p === "basic" ? "Basic Detail" : p === "premium" ? "Premium Detail" : p === "exterior" ? "Exterior Basic" : p === "exteriorPremium" ? "Exterior Premium" : p === "interior" ? "Interior Basic" : p === "interiorPremium" ? "Interior Premium" : p;
+    const changeDetails: { field: string; from: string; to: string }[] = [];
+    if (clientEditFields.name && clientEditFields.name !== b.name) changeDetails.push({ field: "Name", from: b.name, to: clientEditFields.name });
+    if (clientEditFields.packageType && clientEditFields.packageType !== b.packageType) changeDetails.push({ field: "Package", from: pkgLabel(b.packageType), to: pkgLabel(clientEditFields.packageType) });
+    if (b.vehicle === "boat") {
+      if (clientEditFields.boatSize && clientEditFields.boatSize !== b.boatSize) changeDetails.push({ field: "Boat Size", from: b.boatSize, to: clientEditFields.boatSize });
+    } else {
+      if (clientEditFields.year && clientEditFields.year !== b.year) changeDetails.push({ field: "Year", from: b.year, to: clientEditFields.year });
+    }
+    if (clientEditFields.make && clientEditFields.make !== b.make) changeDetails.push({ field: "Make", from: b.make, to: clientEditFields.make });
+    if (clientEditFields.model && clientEditFields.model !== b.model) changeDetails.push({ field: "Model", from: b.model, to: clientEditFields.model });
+
+    if (changeDetails.length === 0) { handleClientCancelEdit(); return; }
+
+    setClientEditSaving(true);
+    const tid = showToast("Saving your changes...", "loading");
     try {
-      const vl = changeTarget.vehicle === "boat"
-        ? [changeTarget.boatSize, changeTarget.make, changeTarget.model].filter(Boolean).join(" ")
-        : [changeTarget.year, changeTarget.make, changeTarget.model].filter(Boolean).join(" ");
-      await fetch(SCRIPT_URL, {
+      const vl = b.vehicle === "boat"
+        ? [clientEditFields.boatSize || b.boatSize, clientEditFields.make || b.make, clientEditFields.model || b.model].filter(Boolean).join(" ")
+        : [clientEditFields.year || b.year, clientEditFields.make || b.make, clientEditFields.model || b.model].filter(Boolean).join(" ");
+      const res = await fetch(SCRIPT_URL, {
         method: "POST",
         body: JSON.stringify({
-          action: "requestChange",
-          customerEmail: googleUser?.email || "",
-          customerName: googleUser?.name || "",
-          bookingDate: changeTarget.date,
-          bookingTime: changeTarget.time,
+          action: "updateBookingFields",
+          rowIndex: b.rowIndex,
+          fields: clientEditFields,
+          scheduleChanged: false,
+          customerName: clientEditFields.name || b.name,
+          customerEmail: b.email,
+          customerPhone: b.phone,
           vehicle: vl,
-          packageType: changeTarget.packageType,
-          changeNote,
+          packageType: clientEditFields.packageType || b.packageType,
+          serviceType: b.serviceType,
+          address: b.address,
+          hourlyRate: b.hourlyRate,
+          serviceDate: b.date,
+          hasDetailChanges: true,
+          changeDetails: JSON.stringify(changeDetails),
+          editedBy: "client",
         }),
       });
-      setChangeSubmitted(true);
-    } catch (e) { console.error("Change request failed", e); }
-    finally { setChangeSubmitting(false); }
+      const data = await res.json();
+      if (data.success) {
+        setUserBookings(prev => prev.map(bk => bk.rowIndex === b.rowIndex ? { ...bk, ...clientEditFields } : bk));
+        updateToast(tid, "Your changes have been saved.", "success", 4000);
+        handleClientCancelEdit();
+      } else {
+        updateToast(tid, "Something went wrong. Please try again.", "error", 4000);
+      }
+    } catch {
+      updateToast(tid, "Something went wrong. Please try again.", "error", 4000);
+    } finally {
+      setClientEditSaving(false);
+    }
   }
 
   async function handleClientCancel(b: Booking) {
@@ -1523,7 +1606,21 @@ export default function App() {
               <button onClick={handleSignOut} style={{ fontSize: "0.78rem", color: "rgba(255,255,255,0.5)", background: "none", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 8, padding: "4px 10px", cursor: "pointer", marginLeft: 4 }}>Sign out</button>
             </div>
           ) : (
-            <div ref={gsiButtonRef} style={{ minHeight: 40 }} />
+            <button
+              onClick={() => window.google?.accounts?.id?.prompt()}
+              style={{
+                display: "flex", alignItems: "center", gap: 10,
+                background: "rgba(255,255,255,0.07)",
+                border: "1px solid rgba(255,255,255,0.12)",
+                borderRadius: 12, padding: "10px 18px",
+                fontSize: "0.9rem", fontWeight: 600, cursor: "pointer",
+                color: "#e8eaf0", backdropFilter: "blur(10px)",
+                boxShadow: "0 4px 16px rgba(0,0,0,0.2)",
+              }}
+            >
+              <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" style={{ width: 18, height: 18 }} />
+              Sign in with Google
+            </button>
           )}
         </div>
       </div>
@@ -1666,6 +1763,17 @@ export default function App() {
         <div className="atx-orb atx-orb-2" />
         <div className="atx-orb atx-orb-3" />
       </div>
+        {/* Toast container */}
+        <div style={{ position: "fixed" as const, bottom: 100, right: 24, zIndex: 9999, display: "flex", flexDirection: "column" as const, gap: 10, alignItems: "flex-end" }}>
+          {toasts.map(t => (
+            <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 10, background: t.type === "error" ? "rgba(239,68,68,0.12)" : t.type === "success" ? "#f0fdf4" : "#1e293b", color: t.type === "error" ? "#dc2626" : t.type === "success" ? "#065f46" : "#fff", border: t.type === "error" ? "1.5px solid #fca5a5" : t.type === "success" ? "1.5px solid #6ee7b7" : "none", borderRadius: 14, padding: "12px 18px", fontSize: "0.88rem", fontWeight: 600, boxShadow: "0 4px 20px rgba(0,0,0,0.18)", animation: "toastIn 0.25s ease", maxWidth: 320, cursor: "pointer" }} onClick={() => dismissToast(t.id)}>
+              {t.type === "loading" && <div style={{ width: 16, height: 16, border: "2.5px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", borderRadius: "50%", animation: "spin 0.7s linear infinite", flexShrink: 0 }} />}
+              {t.type === "success" && <span style={{ fontSize: "1rem" }}>✓</span>}
+              {t.type === "error" && <span style={{ fontSize: "1rem" }}>✕</span>}
+              <span>{t.message}</span>
+            </div>
+          ))}
+        </div>
         <div style={S.container}>
           <Header />
           <SquarePopup />
@@ -1682,11 +1790,11 @@ export default function App() {
             </div>
 
             {googleUser?.name && (
-              <div style={{ fontSize: "1.05rem", color: "rgba(255,255,255,0.6)", marginBottom: 4, marginTop: -12 }}>
-                Hello, {googleUser.name.split(" ")[0]} — here's what's on your schedule.
+              <div style={{ fontSize: "1.05rem", color: "#93c5fd", fontWeight: 600, marginBottom: 4, marginTop: -12 }}>
+                Hello, {googleUser.name.split(" ")[0]} here's what's on your schedule.
               </div>
             )}
-            <div style={{ fontSize: "0.85rem", color: "rgba(255,255,255,0.35)", marginBottom: 20 }}>
+            <div style={{ fontSize: "0.85rem", color: "#a78bfa", marginBottom: 20 }}>
               Have a question? Click the chat bubble in the bottom-right corner to message us directly.
             </div>
 
@@ -1744,7 +1852,15 @@ export default function App() {
                           <div style={{ fontWeight: 700, color: "rgba(255,255,255,0.7)", fontSize: "0.95rem", marginBottom: 12, textTransform: "uppercase" as const, letterSpacing: "0.04em" }}>Upcoming</div>
                           <div style={{ display: "grid", gap: 14, marginBottom: 28 }}>
                             {allUpcoming.map((b, i) => (
-                              <BookingCard key={i} booking={b} upcoming onRequestChange={(b) => { setChangeTarget(b); setChangeNote(""); setChangeSubmitted(false); setView("requestChange"); }} onCancel={handleClientCancel} />
+                              <BookingCard key={i} booking={b} upcoming onCancel={handleClientCancel}
+                                isEditing={clientEditBooking?.rowIndex === b.rowIndex}
+                                editFields={clientEditFields}
+                                onStartEdit={handleStartClientEdit}
+                                onEditField={(patch) => setClientEditFields(prev => ({ ...prev, ...patch }))}
+                                onSaveEdit={handleClientSaveEdit}
+                                onCancelEdit={handleClientCancelEdit}
+                                editSaving={clientEditSaving}
+                              />
                             ))}
                           </div>
                         </>
@@ -1753,7 +1869,7 @@ export default function App() {
                         <>
                           <div style={{ fontWeight: 700, color: "rgba(255,255,255,0.35)", fontSize: "0.95rem", marginBottom: 12, textTransform: "uppercase" as const, letterSpacing: "0.04em" }}>Past Services</div>
                           <div style={{ display: "grid", gap: 14 }}>
-                            {allPast.map((b, i) => <BookingCard key={i} booking={b} upcoming={false} onRequestChange={() => {}} onBookAgain={handleBookAgain} />)}
+                            {allPast.map((b, i) => <BookingCard key={i} booking={b} upcoming={false} onBookAgain={handleBookAgain} />)}
                           </div>
                         </>
                       )}
@@ -2058,7 +2174,7 @@ export default function App() {
         <div className="atx-orb atx-orb-3" />
       </div>
         {/* Toast container */}
-        <div style={{ position: "fixed" as const, bottom: 24, right: 24, zIndex: 9999, display: "flex", flexDirection: "column" as const, gap: 10, alignItems: "flex-end" }}>
+        <div style={{ position: "fixed" as const, bottom: 100, right: 24, zIndex: 9999, display: "flex", flexDirection: "column" as const, gap: 10, alignItems: "flex-end" }}>
           {toasts.map(t => (
             <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 10, background: t.type === "error" ? "rgba(239,68,68,0.12)" : t.type === "success" ? "#f0fdf4" : "#1e293b", color: t.type === "error" ? "#dc2626" : t.type === "success" ? "#065f46" : "#fff", border: t.type === "error" ? "1.5px solid #fca5a5" : t.type === "success" ? "1.5px solid #6ee7b7" : "none", borderRadius: 14, padding: "12px 18px", fontSize: "0.88rem", fontWeight: 600, boxShadow: "0 4px 20px rgba(0,0,0,0.18)", animation: "toastIn 0.25s ease", maxWidth: 320, cursor: "pointer" }} onClick={() => dismissToast(t.id)}>
               {t.type === "loading" && <div style={{ width: 16, height: 16, border: "2.5px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", borderRadius: "50%", animation: "spin 0.7s linear infinite", flexShrink: 0 }} />}
@@ -3897,67 +4013,6 @@ export default function App() {
     );
   }
 
-  // REQUEST A CHANGE VIEW
-  if (view === "requestChange" && changeTarget) {
-    const vl = changeTarget.vehicle === "boat"
-      ? [changeTarget.boatSize, changeTarget.make, changeTarget.model].filter(Boolean).join(" ")
-      : [changeTarget.year, changeTarget.make, changeTarget.model].filter(Boolean).join(" ");
-
-    return (
-      <div style={S.page}>
-
-      {/* Animated background */}
-      <div className="atx-bg">
-        <div className="atx-grid" />
-        <div className="atx-orb atx-orb-1" />
-        <div className="atx-orb atx-orb-2" />
-        <div className="atx-orb atx-orb-3" />
-      </div>
-        <div style={S.container}>
-          <Header />
-          <div style={S.card} key={step}>
-            <button onClick={() => setView("myBookings")} style={{ ...S.secondary, padding: "9px 14px", fontSize: "0.9rem", marginBottom: 20 }}>Back to My Bookings</button>
-            {changeSubmitted ? (
-              <div style={S.successWrap}>
-                <h2 style={S.title}>Request Sent</h2>
-                <p style={S.successText}>Your request has been sent. Someone will reach out to confirm the changes.</p>
-                <button onClick={() => { setView("myBookings"); loadMyBookings(); }} style={S.primary}>Back to My Bookings</button>
-              </div>
-            ) : (
-              <>
-                <h2 style={S.title}>Request a Change</h2>
-                <p style={S.subtitle}>Let us know what you'd like to change about this appointment.</p>
-                <div style={{ ...S.summaryCard, marginBottom: 24, background: "rgba(255,255,255,0.04)" }}>
-                  <div style={S.summaryHeading}>Appointment</div>
-                  <div style={S.summaryValue}>
-                    {formatDateLabel(changeTarget.date)}{changeTarget.time ? ` at ${changeTarget.time}` : ""}<br />
-                    {vl}<br />
-                    {changeTarget.packageType === "basic" ? "Basic Detail" : changeTarget.packageType === "premium" ? "Premium Detail" : changeTarget.packageType}
-                  </div>
-                </div>
-                <div style={{ maxWidth: 560, margin: "0 auto" }}>
-                  <div style={S.sectionLabel}>What would you like to change?</div>
-                  <textarea
-                    style={{ ...S.input, marginTop: 10, minHeight: 130, resize: "vertical" as const, fontFamily: "inherit", lineHeight: 1.5 }}
-                    placeholder="Describe what you'd like to change, such as a different date, time, or service update."
-                    value={changeNote} onChange={(e) => setChangeNote(e.target.value)}
-                  />
-                </div>
-                <div style={{ ...S.buttonRow, maxWidth: 560, margin: "20px auto 0" }}>
-                  <button style={S.secondary} onClick={() => setView("myBookings")}>Cancel</button>
-                  <button style={{ ...S.primary, ...(!changeNote.trim() || changeSubmitting ? S.disabled : {}) }}
-                    onClick={submitChangeRequest} disabled={!changeNote.trim() || changeSubmitting}>
-                    {changeSubmitting ? "Sending..." : "Send Request"}
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   // ── INVENTORY VIEW ──────────────────────────────────────────────────────────
   if (view === "inventory" && googleUser?.email === ADMIN_EMAIL) {
     const CATEGORIES = ["All", "Microfiber & Towels", "Polishing Pads", "Compounds & Polishes", "Chemicals & Cleaners", "Ceramic Coatings", "Tools & Equipment", "Brushes & Applicators", "Sandpaper & Abrasives", "Accessories & Misc"];
@@ -4344,7 +4399,7 @@ export default function App() {
       `}</style>
 
       {/* Toast container */}
-      <div style={{ position: "fixed" as const, bottom: 24, right: 24, zIndex: 9999, display: "flex", flexDirection: "column" as const, gap: 10, alignItems: "flex-end" }}>
+      <div style={{ position: "fixed" as const, bottom: 100, right: 24, zIndex: 9999, display: "flex", flexDirection: "column" as const, gap: 10, alignItems: "flex-end" }}>
         {toasts.map(t => (
           <div key={t.id} style={{
             display: "flex", alignItems: "center", gap: 10,
@@ -4394,7 +4449,7 @@ export default function App() {
                     Sign in with Google to view your past and upcoming appointments.
                   </p>
                 )}
-                <p style={{ textAlign: "center" as const, color: "rgba(255,255,255,0.3)", fontSize: "0.8rem" }}>
+                <p style={{ textAlign: "center" as const, color: "#a78bfa", fontSize: "0.8rem" }}>
                   Have a question? Click the chat bubble in the bottom-right corner to message us directly.
                 </p>
               </div>
