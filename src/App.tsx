@@ -390,7 +390,12 @@ function BookingCard({ booking, upcoming, onCancel, onBookAgain, isEditing, edit
                 type="date"
                 value={editFields.date ?? booking.date}
                 min={new Date().toISOString().split("T")[0]}
-                onChange={(e) => onEditField?.({ date: e.target.value, time: "" })}
+                onChange={(e) => {
+                  const newDate = e.target.value;
+                  const slotsForNewDate = (allAvailableSlots || []).filter(s => s.date === newDate);
+                  const defaultTime = newDate === booking.date ? booking.time : (slotsForNewDate[0]?.time || "");
+                  onEditField?.({ date: newDate, time: defaultTime });
+                }}
                 style={editInputStyle}
               />
               {(() => {
