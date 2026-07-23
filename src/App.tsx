@@ -235,8 +235,8 @@ async function updateBooking(rowIndex: number, updates: Record<string, string>):
   return data.success;
 }
 
-function BookingCard({ booking, upcoming, onRequestChange, onCancel }: {
-  booking: Booking; upcoming: boolean; onRequestChange: (b: Booking) => void; onCancel?: (b: Booking) => void;
+function BookingCard({ booking, upcoming, onRequestChange, onCancel, onBookAgain }: {
+  booking: Booking; upcoming: boolean; onRequestChange: (b: Booking) => void; onCancel?: (b: Booking) => void; onBookAgain?: (b: Booking) => void;
 }) {
   const vehicleLabel =
     booking.vehicle === "boat"
@@ -307,13 +307,13 @@ function BookingCard({ booking, upcoming, onRequestChange, onCancel }: {
         )}
       </div>
       <div style={{ fontSize: "0.92rem", color: "rgba(255,255,255,0.5)", lineHeight: 1.7 }}>
-        {vehicleLabel && <div>{booking.vehicle === "boat" ? "⛵" : "🚗"} {vehicleLabel}</div>}
-        <div>🧽 {booking.packageType === "basic" ? "Basic Detail" : booking.packageType === "premium" ? "Premium Detail" : booking.packageType === "exterior" ? "Exterior Only — Basic" : booking.packageType === "interior" ? "Interior Only — Basic" : booking.packageType === "exteriorPremium" ? "Exterior Only — Premium" : booking.packageType === "interiorPremium" ? "Interior Only — Premium" : booking.packageType === "custom" ? `Custom: ${booking.addOns || "Custom Job"}` : booking.packageType}</div>
+        {vehicleLabel && <div>{vehicleLabel}</div>}
+        <div>{booking.packageType === "basic" ? "Basic Detail" : booking.packageType === "premium" ? "Premium Detail" : booking.packageType === "exterior" ? "Exterior Only — Basic" : booking.packageType === "interior" ? "Interior Only — Basic" : booking.packageType === "exteriorPremium" ? "Exterior Only — Premium" : booking.packageType === "interiorPremium" ? "Interior Only — Premium" : booking.packageType === "custom" ? `Custom: ${booking.addOns || "Custom Job"}` : booking.packageType}</div>
         {booking.serviceType && (
-          <div>📍 {booking.serviceType === "mobile" ? `Mobile Service${booking.address ? ` - ${booking.address}` : ""}` : "Drop-Off Service"}</div>
+          <div>{booking.serviceType === "mobile" ? `Mobile Service${booking.address ? ` - ${booking.address}` : ""}` : "Drop-Off Service"}</div>
         )}
-        {booking.addOns && booking.packageType !== "custom" && <div>✨ Add-Ons: {booking.addOns}</div>}
-        {booking.notes && <div>📝 {booking.notes}</div>}
+        {booking.addOns && booking.packageType !== "custom" && <div>Add-Ons: {booking.addOns}</div>}
+        {booking.notes && <div>{booking.notes}</div>}
       </div>
 
       {booking.invoiceStatus === "released" && booking.invoiceAmount && (
@@ -337,7 +337,6 @@ function BookingCard({ booking, upcoming, onRequestChange, onCancel }: {
       )}
 
       {/* Action buttons */}
-      {(upcoming || (isCompleted && (hasPhotos || booking.invoiceLink))) && (
       <div style={{ display: "flex", gap: 8, marginTop: 14, flexWrap: "wrap" as const, borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: 14 }}>
         {upcoming && (
           <button onClick={() => onRequestChange(booking)} style={{ background: "rgba(255,255,255,0.08)", color: "#f1f5f9", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 10, padding: "9px 16px", fontSize: "0.9rem", fontWeight: 600, cursor: "pointer" }}>
@@ -349,20 +348,24 @@ function BookingCard({ booking, upcoming, onRequestChange, onCancel }: {
             Cancel Appointment
           </button>
         )}
+        {!upcoming && onBookAgain && booking.status !== "Cancelled" && (
+          <button onClick={() => onBookAgain(booking)} style={{ background: "rgba(59,130,246,0.12)", color: "#93c5fd", border: "1px solid rgba(59,130,246,0.3)", borderRadius: 10, padding: "9px 16px", fontSize: "0.9rem", fontWeight: 600, cursor: "pointer" }}>
+            Book Again
+          </button>
+        )}
         {isCompleted && hasPhotos && (
           <button onClick={() => setShowPhotos(p => !p)}
             style={{ display: "inline-flex", alignItems: "center", gap: 6, background: showPhotos ? "rgba(59,130,246,0.25)" : "rgba(59,130,246,0.12)", color: "#93c5fd", border: "1px solid rgba(59,130,246,0.3)", borderRadius: 10, padding: "9px 16px", fontSize: "0.9rem", fontWeight: 600, cursor: "pointer" }}>
-            📸 {showPhotos ? "Hide Photos" : `View Photos (${beforeUrls.length + afterUrls.length})`}
+            {showPhotos ? "Hide Photos" : `View Photos (${beforeUrls.length + afterUrls.length})`}
           </button>
         )}
         {isCompleted && booking.invoiceLink && (
           <a href={booking.invoiceLink} target="_blank" rel="noopener noreferrer"
             style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "rgba(16,185,129,0.1)", color: "#34d399", border: "1px solid rgba(16,185,129,0.3)", borderRadius: 10, padding: "9px 16px", fontSize: "0.9rem", fontWeight: 600, cursor: "pointer", textDecoration: "none" }}>
-            🧾 Download Invoice
+            Download Invoice
           </a>
         )}
       </div>
-      )}
 
       {/* Inline photo gallery */}
       {showPhotos && hasPhotos && (
@@ -443,6 +446,7 @@ function BookingCard({ booking, upcoming, onRequestChange, onCancel }: {
 
 export default function App() {
   const addressInputRef = useRef(null);
+  const gsiButtonRef = useRef<HTMLDivElement>(null);
 
   const [googleUser, setGoogleUser]                     = useState<GoogleUser | null>(() => {
     try {
@@ -837,8 +841,24 @@ export default function App() {
     window.google.accounts.id.initialize({
       client_id: GOOGLE_CLIENT_ID,
       callback: handleGoogleCredential,
+      use_fedcm_for_prompt: true,
     });
-  }, [googleScriptLoaded, googleUser]);
+    // Render an actual Google Sign-In button rather than relying on the One Tap
+    // prompt() — on mobile Safari/Chrome, third-party cookie and FedCM restrictions
+    // frequently make prompt() silently no-op, which is why the old button sometimes
+    // did nothing. The rendered button uses Google's own reliable click flow instead.
+    if (gsiButtonRef.current) {
+      gsiButtonRef.current.innerHTML = "";
+      window.google.accounts.id.renderButton(gsiButtonRef.current, {
+        type: "standard",
+        theme: "filled_black",
+        size: "large",
+        shape: "pill",
+        text: "signin_with",
+        logo_alignment: "left",
+      });
+    }
+  }, [googleScriptLoaded, googleUser, view, splashDone]);
 
   function handleGoogleCredential(response: any) {
     try {
@@ -847,6 +867,8 @@ export default function App() {
       setGoogleUser(user);
       setEmail(payload.email || "");
       localStorage.setItem("atx_google_user", JSON.stringify(user));
+      const firstName = (user.name || "").split(" ")[0];
+      showToast(firstName ? `Welcome back, ${firstName}!` : "Welcome back!", "success", 3500);
     } catch (e) { console.error("Google sign-in error", e); }
   }
 
@@ -1411,6 +1433,34 @@ export default function App() {
     }
   }
 
+  function handleBookAgain(b: Booking) {
+    setVehicle((b.vehicle as VehicleType) || "");
+    setClientType("oneTime");
+    setFrequency("");
+    setPkg(b.packageType && b.packageType !== "custom" ? (b.packageType as PackageType) : "");
+    setAddOns(b.addOns ? (b.addOns.split(",").map(s => s.trim()).filter(Boolean) as AddOn[]) : []);
+    setServiceType((b.serviceType as ServiceType) || "");
+    setAddress(b.address || "");
+    setAddressSelected(false);
+    setStreet(""); setCity(""); setStateRegion(""); setZip(""); setPlaceId(""); setLat(""); setLng("");
+    if (b.vehicle === "boat") {
+      setBoatSize(b.boatSize || ""); setBoatMake(b.make || ""); setBoatModel(b.model || "");
+      setYear(""); setMake(""); setModel("");
+    } else {
+      setYear(b.year || ""); setMake(b.make || ""); setModel(b.model || "");
+      setBoatSize(""); setBoatMake(""); setBoatModel("");
+    }
+    setMakeOptions([]); setModelOptions([]);
+    setBookingNotes("");
+    setName(b.name || googleUser?.name || "");
+    setPhone(b.phone || "");
+    setEmail(b.email || googleUser?.email || "");
+    setSelectedDate(""); setSelectedTime("");
+    setStep(1);
+    setView("booking");
+    showToast("Your details are filled in from your last booking — pick a new date to continue.", "success", 4500);
+  }
+
   const S = {
     page:           { minHeight: "100vh", background: "#080c12", color: "#e8eaf0", padding: "32px 16px", fontFamily: '"Outfit", ui-sans-serif, system-ui, sans-serif', position: "relative" as const, overflow: "hidden" } as const,
     container:      { maxWidth: 960, margin: "0 auto", position: "relative" as const, zIndex: 1 } as const,
@@ -1473,21 +1523,7 @@ export default function App() {
               <button onClick={handleSignOut} style={{ fontSize: "0.78rem", color: "rgba(255,255,255,0.5)", background: "none", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 8, padding: "4px 10px", cursor: "pointer", marginLeft: 4 }}>Sign out</button>
             </div>
           ) : (
-            <button
-              onClick={() => window.google?.accounts?.id?.prompt()}
-              style={{
-                display: "flex", alignItems: "center", gap: 10,
-                background: "rgba(255,255,255,0.07)",
-                border: "1px solid rgba(255,255,255,0.12)",
-                borderRadius: 12, padding: "10px 18px",
-                fontSize: "0.9rem", fontWeight: 600, cursor: "pointer",
-                color: "#e8eaf0", backdropFilter: "blur(10px)",
-                boxShadow: "0 4px 16px rgba(0,0,0,0.2)",
-              }}
-            >
-              <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" style={{ width: 18, height: 18 }} />
-              Sign in with Google
-            </button>
+            <div ref={gsiButtonRef} style={{ minHeight: 40 }} />
           )}
         </div>
       </div>
@@ -1645,6 +1681,15 @@ export default function App() {
               </div>
             </div>
 
+            {googleUser?.name && (
+              <div style={{ fontSize: "1.05rem", color: "rgba(255,255,255,0.6)", marginBottom: 4, marginTop: -12 }}>
+                Hello, {googleUser.name.split(" ")[0]} — here's what's on your schedule.
+              </div>
+            )}
+            <div style={{ fontSize: "0.85rem", color: "rgba(255,255,255,0.35)", marginBottom: 20 }}>
+              Have a question? Click the chat bubble in the bottom-right corner to message us directly.
+            </div>
+
             <div style={{ overflowX: "auto" as const, marginBottom: 24, borderBottom: "1.5px solid rgba(255,255,255,0.08)" }}>
               <div style={{ display: "flex", gap: 0, minWidth: "max-content" }}>
                 <button onClick={() => setBookingsTab("appointments")} style={{ background: "none", border: "none", cursor: "pointer", padding: "10px 16px", fontSize: "0.9rem", fontWeight: 700, color: bookingsTab === "appointments" ? "#f1f5f9" : "rgba(255,255,255,0.35)", borderBottom: bookingsTab === "appointments" ? "3px solid #f1f5f9" : "3px solid transparent", marginBottom: -2, whiteSpace: "nowrap" as const }}>
@@ -1708,7 +1753,7 @@ export default function App() {
                         <>
                           <div style={{ fontWeight: 700, color: "rgba(255,255,255,0.35)", fontSize: "0.95rem", marginBottom: 12, textTransform: "uppercase" as const, letterSpacing: "0.04em" }}>Past Services</div>
                           <div style={{ display: "grid", gap: 14 }}>
-                            {allPast.map((b, i) => <BookingCard key={i} booking={b} upcoming={false} onRequestChange={() => {}} />)}
+                            {allPast.map((b, i) => <BookingCard key={i} booking={b} upcoming={false} onRequestChange={() => {}} onBookAgain={handleBookAgain} />)}
                           </div>
                         </>
                       )}
@@ -3089,8 +3134,10 @@ export default function App() {
                                                   [previewKey]: [...(prev[previewKey] || []), ...compressed.map(c => c.dataUrl)],
                                                 }));
 
-                                                // Upload all in parallel
-                                                await Promise.all(compressed.map(async ({ base64 }, idx) => {
+                                                // Upload one at a time — the backend does a read-modify-write on the
+                                                // same sheet cell to append each photo URL, so parallel uploads race
+                                                // and silently drop photos whose write loses the race.
+                                                for (let idx = 0; idx < compressed.length; idx++) {
                                                   try {
                                                     await fetch(SCRIPT_URL, {
                                                       method: "POST",
@@ -3099,13 +3146,13 @@ export default function App() {
                                                         customerName: b.name,
                                                         serviceDate: b.date,
                                                         photoType: type,
-                                                        base64,
+                                                        base64: compressed[idx].base64,
                                                         mimeType: "image/jpeg",
                                                         rowIndex: b.rowIndex,
                                                       }),
                                                     });
                                                   } catch { console.error("Upload error for photo", idx); }
-                                                }));
+                                                }
 
                                                 setPhotoUploading(prev => { const n = {...prev}; delete n[b.rowIndex]; return n; });
                                                 e.target.value = "";
@@ -4347,6 +4394,9 @@ export default function App() {
                     Sign in with Google to view your past and upcoming appointments.
                   </p>
                 )}
+                <p style={{ textAlign: "center" as const, color: "rgba(255,255,255,0.3)", fontSize: "0.8rem" }}>
+                  Have a question? Click the chat bubble in the bottom-right corner to message us directly.
+                </p>
               </div>
               <div style={{ borderTop: "1px solid rgba(255,255,255,0.07)", paddingTop: 18, display: "flex", gap: 8, flexWrap: "wrap" as const, justifyContent: "center" }}>
                 {["Auto Detail", "Marine Detail", "Maintenance Plans", "Mobile Service"].map(tag => (
