@@ -4685,6 +4685,11 @@ export default function App() {
         <SignInPromptPopup />
         <Header />
         {step > 0 && step < TOTAL_STEPS - 1 && <ProgressBar />}
+        {step > 0 && step < TOTAL_STEPS - 1 && (
+          <p style={{ textAlign: "center" as const, color: "#a78bfa", fontSize: "0.8rem", margin: "0 0 16px" }}>
+            Have a question? Click the chat bubble in the bottom-right corner to message us directly.
+          </p>
+        )}
         <div style={S.card} key={step}>
 
           {/* STEP 0 */}
