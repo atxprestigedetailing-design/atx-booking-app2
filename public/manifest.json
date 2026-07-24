@@ -4,7 +4,7 @@
   "description": "Book auto and marine detailing services with ATX Prestige Detailing in Austin, TX.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#f7f7f8",
+  "background_color": "#080c12",
   "theme_color": "#111827",
   "orientation": "portrait",
   "icons": [
