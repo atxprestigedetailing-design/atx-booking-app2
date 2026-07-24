@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useRef, useState, useCallback } from "react"
 declare global {
   interface Window {
     google: any;
+    Square: any;
   }
 }
 
@@ -11,7 +12,13 @@ const GOOGLE_CLIENT_ID =
   "447699234633-ivo2e1c2q843scj32k5323o2rkq6h7dp.apps.googleusercontent.com";
 
 const SCRIPT_URL =
-  "https://script.google.com/macros/s/AKfycbwAVVp_ydISTLX_nD1Fo7ZDiA4XXkFIXuQ46zYIl4vT5_yN9vAaGr1_wY9u5tOR-aKGYw/exec";
+  "https://script.google.com/macros/s/AKfycbweGeM_Jg5Su2pPvdUy216SeGfXtJKsdaJ_FFKC6y18dherADW4GPAj91fYsCN5F0f2Cg/exec";
+
+// Sandbox credentials — replace with your Square Sandbox Application ID / Location ID
+// (Dashboard → Sandbox → your app → Locations). These are not secret and are safe here;
+// the Access Token is NOT used on the frontend — it lives only in Apps Script Script Properties.
+const SQUARE_APP_ID = "sandbox-sq0idb-UopczxcDjyjQw6OJjfM1Qg";
+const SQUARE_LOCATION_ID = "LMZ2E4XRSJTMT";
 
 const TOTAL_STEPS = 9;
 const ADMIN_EMAIL = "atxprestigedetailing@gmail.com";
@@ -594,6 +601,10 @@ export default function App() {
   const [qCustomPrice, setQCustomPrice]                 = useState("");
   const [squarePopup, setSquarePopup]                   = useState(false);
   const [squareBooking, setSquareBooking]               = useState<Booking | null>(null);
+  const [cardPaymentOpen, setCardPaymentOpen]           = useState(false);
+  const [cardPaymentBooking, setCardPaymentBooking]     = useState<Booking | null>(null);
+  const [cardPaymentProcessing, setCardPaymentProcessing] = useState(false);
+  const [cardPaymentError, setCardPaymentError]         = useState("");
   const [copiedKey, setCopiedKey]                       = useState<string | null>(null);
   const [editingBooking, setEditingBooking]             = useState<Booking | null>(null);
   const [editFields, setEditFields]                     = useState<Partial<Booking>>({});
@@ -1780,6 +1791,125 @@ export default function App() {
     </div>
   ) : null;
 
+  // IN-APP CARD PAYMENT MODAL — mounts Square's hosted card form and charges via chargeSquarePayment
+  const CardPaymentModal = () => {
+    const cardContainerRef = useRef<HTMLDivElement>(null);
+    const cardInstanceRef = useRef<any>(null);
+    const [sdkError, setSdkError] = useState("");
+
+    useEffect(() => {
+      if (!cardPaymentOpen || !cardPaymentBooking) return;
+      let cancelled = false;
+      setSdkError("");
+      (async () => {
+        try {
+          if (!window.Square) { setSdkError("Payment form failed to load. Please check your connection and try again."); return; }
+          const payments = window.Square.payments(SQUARE_APP_ID, SQUARE_LOCATION_ID);
+          const card = await payments.card();
+          if (cancelled) { return; }
+          await card.attach(cardContainerRef.current);
+          cardInstanceRef.current = card;
+        } catch (e) {
+          setSdkError("Could not load the payment form. Please try again.");
+        }
+      })();
+      return () => {
+        cancelled = true;
+        if (cardInstanceRef.current) {
+          cardInstanceRef.current.destroy();
+          cardInstanceRef.current = null;
+        }
+      };
+    }, [cardPaymentOpen, cardPaymentBooking]);
+
+    if (!cardPaymentOpen || !cardPaymentBooking) return null;
+    const b = cardPaymentBooking;
+    const amt = parseFloat(b.invoiceAmount || "0");
+
+    async function handlePayWithCard() {
+      if (!cardInstanceRef.current) return;
+      setCardPaymentError("");
+      setCardPaymentProcessing(true);
+      try {
+        const result = await cardInstanceRef.current.tokenize();
+        if (result.status !== "OK") {
+          const msg = result.errors?.[0]?.message || "Card details are invalid. Please check and try again.";
+          setCardPaymentError(msg);
+          setCardPaymentProcessing(false);
+          return;
+        }
+        const vehicleLabel = b.vehicle === "boat"
+          ? [b.boatSize, b.make, b.model].filter(Boolean).join(" ")
+          : [b.year, b.make, b.model].filter(Boolean).join(" ");
+        const res = await fetch(SCRIPT_URL, {
+          method: "POST",
+          body: JSON.stringify({
+            action: "chargeSquarePayment",
+            sourceId: result.token,
+            amount: amt,
+            rowIndex: b.rowIndex,
+            customerName: b.name,
+            customerEmail: b.email,
+            customerPhone: b.phone,
+            serviceDate: b.date,
+            packageType: b.packageType,
+            vehicle: vehicleLabel,
+            hourlyRate: b.hourlyRate,
+            addOns: b.addOns,
+            invoiceNote: b.invoiceNote,
+            photosLink: b.photosLink,
+            beforePhotoUrl: b.beforePhotoUrl,
+            afterPhotoUrl: b.afterPhotoUrl,
+          }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          setCardPaymentOpen(false);
+          setCardPaymentBooking(null);
+          setUserBookings(prev => prev.map(bk => bk.rowIndex === b.rowIndex ? { ...bk, invoiceStatus: "paid" } : bk));
+          showToast("Payment successful! A receipt has been sent to your email.", "success", 5000);
+        } else {
+          setCardPaymentError(data.error || "Payment was declined. Please try a different card.");
+        }
+      } catch (e) {
+        setCardPaymentError("Network error — please try again.");
+      } finally {
+        setCardPaymentProcessing(false);
+      }
+    }
+
+    return (
+      <div style={{ position: "fixed" as const, inset: 0, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 16, backdropFilter: "blur(8px)" }}>
+        <div style={{ background: "rgba(15,20,30,0.95)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 24, padding: 32, maxWidth: 400, width: "100%", boxShadow: "0 40px 100px rgba(0,0,0,0.6)" }}>
+          <h3 style={{ margin: "0 0 6px", fontWeight: 800, color: "#f1f5f9" }}>Pay with Card</h3>
+          <p style={{ color: "rgba(255,255,255,0.55)", fontSize: "0.9rem", margin: "0 0 20px" }}>
+            Amount due: <strong style={{ color: "#93c5fd" }}>${amt.toFixed(2)}</strong>
+          </p>
+          <div ref={cardContainerRef} style={{ minHeight: 90, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 12, padding: 12, marginBottom: 16 }} />
+          {sdkError && (
+            <div style={{ background: "rgba(239,68,68,0.12)", border: "1px solid #fca5a5", color: "#fca5a5", borderRadius: 10, padding: "10px 14px", fontSize: "0.85rem", marginBottom: 16 }}>{sdkError}</div>
+          )}
+          {cardPaymentError && (
+            <div style={{ background: "rgba(239,68,68,0.12)", border: "1px solid #fca5a5", color: "#fca5a5", borderRadius: 10, padding: "10px 14px", fontSize: "0.85rem", marginBottom: 16 }}>{cardPaymentError}</div>
+          )}
+          <button
+            onClick={handlePayWithCard}
+            disabled={cardPaymentProcessing || !!sdkError}
+            style={{ background: cardPaymentProcessing ? "#374151" : "#111827", color: "#fff", border: "none", borderRadius: 12, padding: "12px 20px", fontWeight: 700, cursor: cardPaymentProcessing ? "default" : "pointer", width: "100%", marginBottom: 10, opacity: sdkError ? 0.5 : 1 }}
+          >
+            {cardPaymentProcessing ? "Processing…" : `Pay $${amt.toFixed(2)}`}
+          </button>
+          <button
+            onClick={() => { if (!cardPaymentProcessing) { setCardPaymentOpen(false); setCardPaymentBooking(null); setCardPaymentError(""); } }}
+            style={{ background: "transparent", color: "rgba(255,255,255,0.45)", border: "none", borderRadius: 12, padding: "10px 20px", fontWeight: 600, cursor: "pointer", width: "100%", fontSize: "0.88rem" }}
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    );
+  };
+
   // MY BOOKINGS VIEW
   // ── SPLASH SCREEN ──────────────────────────────────────────────────────────
 
@@ -1904,6 +2034,7 @@ export default function App() {
         <div style={S.container}>
           <Header />
           <SquarePopup />
+          <CardPaymentModal />
           <div style={S.card} key={step}>
             <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 24, flexWrap: "wrap" as const }}>
               <button onClick={() => setView("booking")} style={{ ...S.secondary, padding: "9px 14px", fontSize: "0.9rem" }}>Back</button>
@@ -2217,10 +2348,16 @@ export default function App() {
                                   <div style={{ fontSize: "0.72rem", color: "rgba(255,255,255,0.45)", textAlign: "center" as const, marginTop: 3 }}>${baseAmt.toFixed(2)}</div>
                                 </div>
                                 <div>
-                                  <button onClick={() => handleSquareRequest(b)} style={{ display: "block", width: "100%", background: "#111827", color: "#fff", border: "none", borderRadius: 10, padding: "8px 6px", fontWeight: 700, fontSize: "0.82rem", cursor: "pointer" }}>Card (Square)</button>
+                                  <button onClick={() => handleSquareRequest(b)} style={{ display: "block", width: "100%", background: "#111827", color: "#fff", border: "none", borderRadius: 10, padding: "8px 6px", fontWeight: 700, fontSize: "0.82rem", cursor: "pointer" }}>Invoice Link</button>
                                   <div style={{ fontSize: "0.72rem", color: "rgba(255,255,255,0.45)", textAlign: "center" as const, marginTop: 3 }}>${squareAmt}</div>
                                 </div>
                               </div>
+                              <button
+                                onClick={() => { setCardPaymentBooking(b); setCardPaymentError(""); setCardPaymentOpen(true); }}
+                                style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, width: "100%", background: "linear-gradient(135deg, #3b82f6, #2563eb)", color: "#fff", border: "none", borderRadius: 10, padding: "11px 8px", fontWeight: 700, fontSize: "0.88rem", cursor: "pointer", marginTop: 10 }}
+                              >
+                                Pay with Card (in-app) — ${squareAmt}
+                              </button>
                             </div>
                             );
                           })}
