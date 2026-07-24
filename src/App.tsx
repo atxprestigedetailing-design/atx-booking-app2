@@ -613,6 +613,8 @@ export default function App() {
   const [clientEditFields, setClientEditFields]         = useState<Partial<Booking>>({});
   const [clientEditSaving, setClientEditSaving]         = useState(false);
   const [step, setStep]                                 = useState(0);
+  const [showSignInPrompt, setShowSignInPrompt]         = useState(false);
+  const signInPromptShownRef                            = useRef(false);
   const [vehicle, setVehicle]                           = useState<VehicleType>("");
   const [clientType, setClientType]                     = useState<ClientType>("");
   const [frequency, setFrequency]                       = useState<FrequencyType>("");
@@ -655,6 +657,14 @@ export default function App() {
     const t1 = setTimeout(() => setSplashPhase(1), 1200);   // tagline + button appears
     return () => { clearTimeout(t1); };
   }, []);
+
+  // ── Prompt sign-in once when a signed-out visitor starts the booking flow ──
+  useEffect(() => {
+    if (step === 1 && !googleUser && !signInPromptShownRef.current) {
+      signInPromptShownRef.current = true;
+      setShowSignInPrompt(true);
+    }
+  }, [step, googleUser]);
 
   // ── Global styles injected once into <head> so they apply on ALL views ──
   useEffect(() => {
@@ -1741,6 +1751,31 @@ export default function App() {
         </p>
         <p style={{ color: "rgba(255,255,255,0.45)", fontSize: "0.82rem", margin: "0 0 20px" }}>Note: A 4% processing fee applies to card payments.</p>
         <button onClick={() => { setSquarePopup(false); setSquareBooking(null); }} style={{ background: "#111827", color: "#fff", border: "none", borderRadius: 12, padding: "12px 20px", fontWeight: 700, cursor: "pointer", width: "100%" }}>Got it</button>
+      </div>
+    </div>
+  ) : null;
+
+  // SIGN-IN PROMPT MODAL — shown once when a signed-out visitor starts booking
+  const SignInPromptPopup = () => showSignInPrompt ? (
+    <div style={{ position: "fixed" as const, inset: 0, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 16, backdropFilter: "blur(8px)" }}>
+      <div style={{ background: "rgba(15,20,30,0.95)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 24, padding: 32, maxWidth: 400, width: "100%", boxShadow: "0 40px 100px rgba(0,0,0,0.6)" }}>
+        <h3 style={{ margin: "0 0 12px", fontWeight: 800, color: "#f1f5f9" }}>Have you booked with us before?</h3>
+        <p style={{ color: "rgba(255,255,255,0.55)", fontSize: "0.95rem", lineHeight: 1.6, margin: "0 0 24px" }}>
+          Sign in with your Google account to see your current and past bookings, invoice status, and any balance due.
+        </p>
+        <button
+          onClick={() => { setShowSignInPrompt(false); window.google?.accounts?.id?.prompt(); }}
+          style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, background: "#111827", color: "#fff", border: "none", borderRadius: 12, padding: "12px 20px", fontWeight: 700, cursor: "pointer", width: "100%", marginBottom: 10 }}
+        >
+          <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="" style={{ width: 18, height: 18 }} />
+          Sign in with Google
+        </button>
+        <button
+          onClick={() => setShowSignInPrompt(false)}
+          style={{ background: "transparent", color: "rgba(255,255,255,0.45)", border: "none", borderRadius: 12, padding: "10px 20px", fontWeight: 600, cursor: "pointer", width: "100%", fontSize: "0.88rem" }}
+        >
+          Continue as Guest
+        </button>
       </div>
     </div>
   ) : null;
@@ -4558,6 +4593,7 @@ export default function App() {
       </div>
       <div style={S.container}>
         <SquarePopup />
+        <SignInPromptPopup />
         <Header />
         {step > 0 && step < TOTAL_STEPS - 1 && <ProgressBar />}
         <div style={S.card} key={step}>
@@ -4581,24 +4617,6 @@ export default function App() {
                     <button style={S.secondary} onClick={openMyBookings}>My Bookings</button>
                   )}
                 </div>
-                {!googleUser && (
-                  <div style={{ textAlign: "center" as const, marginBottom: 20 }}>
-                    <button
-                      onClick={() => window.google?.accounts?.id?.prompt()}
-                      style={{
-                        display: "inline-flex", alignItems: "center", gap: 8,
-                        background: "transparent",
-                        border: "1px solid rgba(255,255,255,0.18)",
-                        borderRadius: 12, padding: "9px 16px",
-                        fontSize: "0.85rem", fontWeight: 600, cursor: "pointer",
-                        color: "rgba(255,255,255,0.75)",
-                      }}
-                    >
-                      <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="" style={{ width: 15, height: 15 }} />
-                      Sign In to View My Bookings
-                    </button>
-                  </div>
-                )}
                 <p style={{ textAlign: "center" as const, color: "#a78bfa", fontSize: "0.8rem" }}>
                   Have a question? Click the chat bubble in the bottom-right corner to message us directly.
                 </p>
