@@ -615,6 +615,7 @@ export default function App() {
   const [step, setStep]                                 = useState(0);
   const [showSignInPrompt, setShowSignInPrompt]         = useState(false);
   const signInPromptShownRef                            = useRef(false);
+  const returnToLandingAfterSignInRef                   = useRef(false);
   const [vehicle, setVehicle]                           = useState<VehicleType>("");
   const [clientType, setClientType]                     = useState<ClientType>("");
   const [frequency, setFrequency]                       = useState<FrequencyType>("");
@@ -665,6 +666,16 @@ export default function App() {
       setShowSignInPrompt(true);
     }
   }, [step, googleUser]);
+
+  // ── After signing in from that prompt, return to the landing page so the
+  //    user can choose Book a Service or My Bookings, instead of staying
+  //    stuck mid-way into the booking flow they were only browsing. ──
+  useEffect(() => {
+    if (googleUser && returnToLandingAfterSignInRef.current) {
+      returnToLandingAfterSignInRef.current = false;
+      setStep(0);
+    }
+  }, [googleUser]);
 
   // ── Global styles injected once into <head> so they apply on ALL views ──
   useEffect(() => {
@@ -1764,7 +1775,7 @@ export default function App() {
           Sign in with your Google account to see your current and past bookings, invoice status, and any balance due.
         </p>
         <button
-          onClick={() => { setShowSignInPrompt(false); window.google?.accounts?.id?.prompt(); }}
+          onClick={() => { setShowSignInPrompt(false); returnToLandingAfterSignInRef.current = true; window.google?.accounts?.id?.prompt(); }}
           style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, background: "#111827", color: "#fff", border: "none", borderRadius: 12, padding: "12px 20px", fontWeight: 700, cursor: "pointer", width: "100%", marginBottom: 10 }}
         >
           <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="" style={{ width: 18, height: 18 }} />
