@@ -1849,30 +1849,46 @@ export default function App() {
     return (
       <div style={{ position: "fixed" as const, inset: 0, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 16, backdropFilter: "blur(8px)" }}>
         <div style={{ background: "rgba(15,20,30,0.95)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 24, padding: 32, maxWidth: 400, width: "100%", boxShadow: "0 40px 100px rgba(0,0,0,0.6)" }}>
-          <h3 style={{ margin: "0 0 6px", fontWeight: 800, color: "#f1f5f9" }}>Pay with Card</h3>
-          <p style={{ color: "rgba(255,255,255,0.55)", fontSize: "0.9rem", margin: "0 0 20px" }}>
-            Amount due: <strong style={{ color: "#93c5fd" }}>${amt.toFixed(2)}</strong>
-          </p>
-          <div ref={cardContainerRef} style={{ minHeight: 90, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 12, padding: 12, marginBottom: 16 }} />
-          {sdkError && (
-            <div style={{ background: "rgba(239,68,68,0.12)", border: "1px solid #fca5a5", color: "#fca5a5", borderRadius: 10, padding: "10px 14px", fontSize: "0.85rem", marginBottom: 16 }}>{sdkError}</div>
+          {cardPaymentProcessing ? (
+            <div style={{ textAlign: "center" as const, padding: "20px 0 28px" }}>
+              <div style={{ width: 42, height: 42, margin: "0 auto 18px", border: "3px solid rgba(255,255,255,0.15)", borderTopColor: "#3b82f6", borderRadius: "50%", animation: "spin 0.7s linear infinite" }} />
+              <div style={{ fontWeight: 800, color: "#f1f5f9", fontSize: "1.05rem", marginBottom: 6 }}>Processing your payment…</div>
+              <div style={{ color: "rgba(255,255,255,0.5)", fontSize: "0.85rem" }}>Please don't close this window.</div>
+            </div>
+          ) : (
+            <>
+              <h3 style={{ margin: "0 0 6px", fontWeight: 800, color: "#f1f5f9" }}>Pay with Card</h3>
+              <p style={{ color: "rgba(255,255,255,0.55)", fontSize: "0.9rem", margin: "0 0 20px" }}>
+                Amount due: <strong style={{ color: "#93c5fd" }}>${amt.toFixed(2)}</strong>
+              </p>
+            </>
           )}
-          {cardPaymentError && (
-            <div style={{ background: "rgba(239,68,68,0.12)", border: "1px solid #fca5a5", color: "#fca5a5", borderRadius: 10, padding: "10px 14px", fontSize: "0.85rem", marginBottom: 16 }}>{cardPaymentError}</div>
+          {/* Square's card iframe stays mounted throughout — only its visibility toggles,
+              since detaching/reattaching it mid-flow isn't supported by the SDK. */}
+          <div ref={cardContainerRef} style={{ display: cardPaymentProcessing ? "none" : "block", minHeight: 90, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 12, padding: 12, marginBottom: 16 }} />
+          {!cardPaymentProcessing && (
+            <>
+              {sdkError && (
+                <div style={{ background: "rgba(239,68,68,0.12)", border: "1px solid #fca5a5", color: "#fca5a5", borderRadius: 10, padding: "10px 14px", fontSize: "0.85rem", marginBottom: 16 }}>{sdkError}</div>
+              )}
+              {cardPaymentError && (
+                <div style={{ background: "rgba(239,68,68,0.12)", border: "1px solid #fca5a5", color: "#fca5a5", borderRadius: 10, padding: "10px 14px", fontSize: "0.85rem", marginBottom: 16 }}>{cardPaymentError}</div>
+              )}
+              <button
+                onClick={handlePayWithCard}
+                disabled={!!sdkError}
+                style={{ background: "#111827", color: "#fff", border: "none", borderRadius: 12, padding: "12px 20px", fontWeight: 700, cursor: "pointer", width: "100%", marginBottom: 10, opacity: sdkError ? 0.5 : 1 }}
+              >
+                {`Pay $${amt.toFixed(2)}`}
+              </button>
+              <button
+                onClick={() => { setCardPaymentOpen(false); setCardPaymentBooking(null); setCardPaymentError(""); }}
+                style={{ background: "transparent", color: "rgba(255,255,255,0.45)", border: "none", borderRadius: 12, padding: "10px 20px", fontWeight: 600, cursor: "pointer", width: "100%", fontSize: "0.88rem" }}
+              >
+                Cancel
+              </button>
+            </>
           )}
-          <button
-            onClick={handlePayWithCard}
-            disabled={cardPaymentProcessing || !!sdkError}
-            style={{ background: cardPaymentProcessing ? "#374151" : "#111827", color: "#fff", border: "none", borderRadius: 12, padding: "12px 20px", fontWeight: 700, cursor: cardPaymentProcessing ? "default" : "pointer", width: "100%", marginBottom: 10, opacity: sdkError ? 0.5 : 1 }}
-          >
-            {cardPaymentProcessing ? "Processing…" : `Pay $${amt.toFixed(2)}`}
-          </button>
-          <button
-            onClick={() => { if (!cardPaymentProcessing) { setCardPaymentOpen(false); setCardPaymentBooking(null); setCardPaymentError(""); } }}
-            style={{ background: "transparent", color: "rgba(255,255,255,0.45)", border: "none", borderRadius: 12, padding: "10px 20px", fontWeight: 600, cursor: "pointer", width: "100%", fontSize: "0.88rem" }}
-          >
-            Cancel
-          </button>
         </div>
       </div>
     );
@@ -2223,22 +2239,21 @@ export default function App() {
 
                       {outstanding.length > 0 && (
                         <>
-                          <div style={{ background: "rgba(251,191,36,0.12)", border: "1px solid #fde047", borderRadius: 14, padding: "16px 18px", marginBottom: 20, textAlign: "center" as const }}>
-                            <div style={{ fontWeight: 700, color: "#713f12", fontSize: "1rem", marginBottom: 12 }}>Total Balance Due</div>
-                            <div style={{ display: "flex", gap: 0, justifyContent: "center" }}>
-                              <div style={{ flex: 1, textAlign: "center" as const, padding: "0 12px" }}>
-                                <div style={{ fontSize: "0.75rem", color: "#fbbf24", marginBottom: 4 }}>Venmo / Cash App</div>
-                                <div style={{ fontSize: "1.8rem", fontWeight: 900, color: "#fbbf24", letterSpacing: "-0.5px" }}>${totalOwed.toFixed(2)}</div>
-                                <div style={{ fontSize: "0.7rem", color: "#f59e0b", marginTop: 2 }}>No fee</div>
-                              </div>
-                              <div style={{ width: 1, background: "#fde047", alignSelf: "stretch" }} />
-                              <div style={{ flex: 1, textAlign: "center" as const, padding: "0 12px" }}>
-                                <div style={{ fontSize: "0.75rem", color: "#fbbf24", marginBottom: 4 }}>Square / Card (+4%)</div>
-                                <div style={{ fontSize: "1.8rem", fontWeight: 900, color: "#fbbf24", letterSpacing: "-0.5px" }}>${(totalOwed * 1.04).toFixed(2)}</div>
-                                <div style={{ fontSize: "0.7rem", color: "#f59e0b", marginTop: 2 }}>Includes fee</div>
+                          {outstanding.length > 1 && (
+                            <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 12, padding: "12px 16px", marginBottom: 20, display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap" as const, gap: 8 }}>
+                              <div style={{ fontSize: "0.82rem", color: "rgba(255,255,255,0.5)", fontWeight: 600 }}>Total across {outstanding.length} invoices</div>
+                              <div style={{ display: "flex", gap: 16 }}>
+                                <div style={{ textAlign: "right" as const }}>
+                                  <div style={{ fontSize: "0.68rem", color: "rgba(255,255,255,0.4)" }}>Venmo/Cash App</div>
+                                  <div style={{ fontSize: "1.1rem", fontWeight: 800, color: "#f1f5f9" }}>${totalOwed.toFixed(2)}</div>
+                                </div>
+                                <div style={{ textAlign: "right" as const }}>
+                                  <div style={{ fontSize: "0.68rem", color: "rgba(255,255,255,0.4)" }}>Card (+4%)</div>
+                                  <div style={{ fontSize: "1.1rem", fontWeight: 800, color: "#93c5fd" }}>${(totalOwed * 1.04).toFixed(2)}</div>
+                                </div>
                               </div>
                             </div>
-                          </div>
+                          )}
 
                           {outstanding.map((b, i) => {
                             const baseAmt = parseFloat(b.invoiceAmount || "0");
