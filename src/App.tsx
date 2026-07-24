@@ -1784,7 +1784,7 @@ export default function App() {
   className="spline-frame"
   src="https://my.spline.design/genkubgreetingrobot-NgmkAjIFK5UZXMhKVt6jVhFW/"
   frameBorder={0}
-  style={{ position:"absolute", inset:0, width:"100%", height:"100%", border:"none" }}
+  style={{ position:"absolute", inset:0, width:"100%", height:"100%", border:"none", background:"#080c12" }}
 />
         </div>
 
