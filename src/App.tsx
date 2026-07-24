@@ -4582,9 +4582,22 @@ export default function App() {
                   )}
                 </div>
                 {!googleUser && (
-                  <p style={{ textAlign: "center" as const, color: "rgba(255,255,255,0.35)", fontSize: "0.85rem", marginBottom: 20 }}>
-                    Sign in with Google to view your past and upcoming appointments.
-                  </p>
+                  <div style={{ textAlign: "center" as const, marginBottom: 20 }}>
+                    <button
+                      onClick={() => window.google?.accounts?.id?.prompt()}
+                      style={{
+                        display: "inline-flex", alignItems: "center", gap: 8,
+                        background: "transparent",
+                        border: "1px solid rgba(255,255,255,0.18)",
+                        borderRadius: 12, padding: "9px 16px",
+                        fontSize: "0.85rem", fontWeight: 600, cursor: "pointer",
+                        color: "rgba(255,255,255,0.75)",
+                      }}
+                    >
+                      <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="" style={{ width: 15, height: 15 }} />
+                      Sign In to View My Bookings
+                    </button>
+                  </div>
                 )}
                 <p style={{ textAlign: "center" as const, color: "#a78bfa", fontSize: "0.8rem" }}>
                   Have a question? Click the chat bubble in the bottom-right corner to message us directly.
