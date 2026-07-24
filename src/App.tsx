@@ -599,8 +599,6 @@ export default function App() {
   const [qSubmitting, setQSubmitting]                   = useState(false);
   const [qCustomService, setQCustomService]             = useState("");
   const [qCustomPrice, setQCustomPrice]                 = useState("");
-  const [squarePopup, setSquarePopup]                   = useState(false);
-  const [squareBooking, setSquareBooking]               = useState<Booking | null>(null);
   const [cardPaymentOpen, setCardPaymentOpen]           = useState(false);
   const [cardPaymentBooking, setCardPaymentBooking]     = useState<Booking | null>(null);
   const [cardPaymentProcessing, setCardPaymentProcessing] = useState(false);
@@ -1292,24 +1290,6 @@ export default function App() {
     finally { setProcessingRows(prev => { const n = new Set(prev); n.delete(booking.rowIndex); return n; }); }
   }
 
-  async function handleSquareRequest(booking: Booking) {
-    setSquareBooking(booking);
-    setSquarePopup(true);
-    // Send email to admin
-    try {
-      await fetch(SCRIPT_URL, {
-        method: "POST",
-        body: JSON.stringify({
-          action: "squareInvoiceRequest",
-          customerName: booking.name,
-          customerEmail: booking.email,
-          amount: booking.invoiceAmount,
-          date: booking.date,
-        }),
-      });
-    } catch (e) { console.error("Square request email failed", e); }
-  }
-
   // Static vehicle data — reliable curated list
   useEffect(() => {
     if (!vehicle || vehicle === "boat") { setMakeOptions([]); return; }
@@ -1752,20 +1732,6 @@ export default function App() {
     </div>
   );
 
-  // SQUARE POPUP MODAL — defined here so it's available in all views
-  const SquarePopup = () => squarePopup ? (
-    <div style={{ position: "fixed" as const, inset: 0, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 16, backdropFilter: "blur(8px)" }}>
-      <div style={{ background: "rgba(15,20,30,0.95)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 24, padding: 32, maxWidth: 400, width: "100%", boxShadow: "0 40px 100px rgba(0,0,0,0.6)" }}>
-        <h3 style={{ margin: "0 0 12px", fontWeight: 800, color: "#f1f5f9" }}>Square Invoice Request</h3>
-        <p style={{ color: "rgba(255,255,255,0.55)", fontSize: "0.95rem", lineHeight: 1.6, margin: "0 0 20px" }}>
-          We received your request. We will send you a Square invoice to <strong style={{ color: "#93c5fd" }}>{squareBooking?.email}</strong> shortly so you can pay by credit or debit card.
-        </p>
-        <p style={{ color: "rgba(255,255,255,0.45)", fontSize: "0.82rem", margin: "0 0 20px" }}>Note: A 4% processing fee applies to card payments.</p>
-        <button onClick={() => { setSquarePopup(false); setSquareBooking(null); }} style={{ background: "#111827", color: "#fff", border: "none", borderRadius: 12, padding: "12px 20px", fontWeight: 700, cursor: "pointer", width: "100%" }}>Got it</button>
-      </div>
-    </div>
-  ) : null;
-
   // SIGN-IN PROMPT MODAL — shown once when a signed-out visitor starts booking
   const SignInPromptPopup = () => showSignInPrompt ? (
     <div style={{ position: "fixed" as const, inset: 0, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 16, backdropFilter: "blur(8px)" }}>
@@ -1824,7 +1790,9 @@ export default function App() {
 
     if (!cardPaymentOpen || !cardPaymentBooking) return null;
     const b = cardPaymentBooking;
-    const amt = parseFloat(b.invoiceAmount || "0");
+    // Card payments go through Square, which carries the same 4% processing fee
+    // shown elsewhere on this tab — charge that adjusted amount, not the base one.
+    const amt = Math.round(parseFloat(b.invoiceAmount || "0") * 1.04 * 100) / 100;
 
     async function handlePayWithCard() {
       if (!cardInstanceRef.current) return;
@@ -2033,7 +2001,6 @@ export default function App() {
         </div>
         <div style={S.container}>
           <Header />
-          <SquarePopup />
           <CardPaymentModal />
           <div style={S.card} key={step}>
             <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 24, flexWrap: "wrap" as const }}>
@@ -2283,81 +2250,53 @@ export default function App() {
                                 {[b.year, b.make, b.model, b.boatSize].filter(Boolean).join(" ")}
                                 {b.invoiceNote ? ` — ${b.invoiceNote}` : ""}
                               </div>
-                              {/* Amount due box — separate copy button under each payment method */}
-                              <div style={{ background: "rgba(251,191,36,0.12)", border: "1px solid #fde047", borderRadius: 12, padding: "14px 16px", marginBottom: 14 }}>
-                                <div style={{ display: "flex", gap: 12 }}>
-                                  <div style={{ flex: 1, textAlign: "center" as const }}>
-                                    <div style={{ fontSize: "0.72rem", color: "#fbbf24", marginBottom: 3 }}>Venmo / Cash App</div>
-                                    <div style={{ fontSize: "1.5rem", fontWeight: 900, color: "#fbbf24", letterSpacing: "-0.5px" }}>${baseAmt.toFixed(2)}</div>
-                                    <div style={{ fontSize: "0.68rem", color: "#f59e0b", marginTop: 2, marginBottom: 10 }}>No fee</div>
-                                    <button
-                                      onClick={() => {
-                                        navigator.clipboard.writeText(baseAmt.toFixed(2));
-                                        setCopiedKey(`${b.rowIndex}-base`);
-                                        setTimeout(() => setCopiedKey(null), 2500);
-                                      }}
-                                      style={{ width: "100%", background: copiedKey === `${b.rowIndex}-base` ? "#059669" : "#111827", color: "#fff", border: "none", borderRadius: 10, padding: "10px 8px", fontSize: "0.8rem", fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, transition: "background 0.2s ease" }}
-                                    >
-                                      {copiedKey === `${b.rowIndex}-base` ? (
-                                        <><span>✓</span> Copied</>
-                                      ) : (
-                                        <><span>⎘</span> Copy Amount</>
-                                      )}
-                                    </button>
-                                  </div>
-                                  <div style={{ width: 1, background: "#fde047", alignSelf: "stretch" }} />
-                                  <div style={{ flex: 1, textAlign: "center" as const }}>
-                                    <div style={{ fontSize: "0.72rem", color: "#fbbf24", marginBottom: 3 }}>Square (Card)</div>
-                                    <div style={{ fontSize: "1.5rem", fontWeight: 900, color: "#fbbf24", letterSpacing: "-0.5px" }}>${squareAmt}</div>
-                                    <div style={{ fontSize: "0.68rem", color: "#f59e0b", marginTop: 2, marginBottom: 10 }}>+4% fee</div>
-                                    <button
-                                      onClick={() => {
-                                        navigator.clipboard.writeText(squareAmt);
-                                        setCopiedKey(`${b.rowIndex}-square`);
-                                        setTimeout(() => setCopiedKey(null), 2500);
-                                      }}
-                                      style={{ width: "100%", background: copiedKey === `${b.rowIndex}-square` ? "#059669" : "#111827", color: "#fff", border: "none", borderRadius: 10, padding: "10px 8px", fontSize: "0.8rem", fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, transition: "background 0.2s ease" }}
-                                    >
-                                      {copiedKey === `${b.rowIndex}-square` ? (
-                                        <><span>✓</span> Copied</>
-                                      ) : (
-                                        <><span>⎘</span> Copy Amount</>
-                                      )}
-                                    </button>
-                                  </div>
+                              {/* Venmo / Cash App bubble */}
+                              <div style={{ background: "rgba(251,191,36,0.12)", border: "1px solid #fde047", borderRadius: 12, padding: "14px 16px", marginBottom: 12 }}>
+                                <div style={{ textAlign: "center" as const }}>
+                                  <div style={{ fontSize: "0.72rem", color: "#fbbf24", marginBottom: 3 }}>Venmo / Cash App</div>
+                                  <div style={{ fontSize: "1.5rem", fontWeight: 900, color: "#fbbf24", letterSpacing: "-0.5px" }}>${baseAmt.toFixed(2)}</div>
+                                  <div style={{ fontSize: "0.68rem", color: "#f59e0b", marginTop: 2, marginBottom: 10 }}>No fee</div>
+                                  <button
+                                    onClick={() => {
+                                      navigator.clipboard.writeText(baseAmt.toFixed(2));
+                                      setCopiedKey(`${b.rowIndex}-base`);
+                                      setTimeout(() => setCopiedKey(null), 2500);
+                                    }}
+                                    style={{ width: "100%", background: copiedKey === `${b.rowIndex}-base` ? "#059669" : "#111827", color: "#fff", border: "none", borderRadius: 10, padding: "10px 8px", fontSize: "0.8rem", fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, transition: "background 0.2s ease" }}
+                                  >
+                                    {copiedKey === `${b.rowIndex}-base` ? (
+                                      <><span>✓</span> Copied</>
+                                    ) : (
+                                      <><span>⎘</span> Copy Amount</>
+                                    )}
+                                  </button>
                                 </div>
                                 {copiedKey === `${b.rowIndex}-base` && (
                                   <div style={{ fontSize: "0.78rem", color: "#059669", textAlign: "center" as const, marginTop: 8 }}>
                                     Now open Venmo or Cash App and paste into the amount field
                                   </div>
                                 )}
-                                {copiedKey === `${b.rowIndex}-square` && (
-                                  <div style={{ fontSize: "0.78rem", color: "#059669", textAlign: "center" as const, marginTop: 8 }}>
-                                    Now open Square (Card) and paste into the amount field
-                                  </div>
-                                )}
+                                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 12 }}>
+                                  <a href={VENMO_URL} target="_blank" rel="noopener noreferrer" style={{ display: "block", background: "#008CFF", color: "#fff", borderRadius: 10, padding: "8px 6px", textAlign: "center", textDecoration: "none", fontWeight: 700, fontSize: "0.82rem" }}>Venmo</a>
+                                  <a href={CASHAPP_URL} target="_blank" rel="noopener noreferrer" style={{ display: "block", background: "#00C244", color: "#fff", borderRadius: 10, padding: "8px 6px", textAlign: "center", textDecoration: "none", fontWeight: 700, fontSize: "0.82rem" }}>Cash App</a>
+                                </div>
                               </div>
 
-                              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
-                                <div>
-                                  <a href={VENMO_URL} target="_blank" rel="noopener noreferrer" style={{ display: "block", background: "#008CFF", color: "#fff", borderRadius: 10, padding: "8px 6px", textAlign: "center", textDecoration: "none", fontWeight: 700, fontSize: "0.82rem" }}>Venmo</a>
-                                  <div style={{ fontSize: "0.72rem", color: "rgba(255,255,255,0.45)", textAlign: "center" as const, marginTop: 3 }}>${baseAmt.toFixed(2)}</div>
+                              {/* Card payment bubble — visually distinct from Venmo/Cash App */}
+                              <div style={{ background: "linear-gradient(135deg, rgba(30,41,59,0.7), rgba(15,23,42,0.7))", border: "1px solid rgba(96,165,250,0.3)", borderRadius: 12, padding: "16px 18px", boxShadow: "0 8px 24px rgba(0,0,0,0.25)" }}>
+                                <div style={{ fontSize: "0.68rem", fontWeight: 700, letterSpacing: "0.08em", color: "#60a5fa", textTransform: "uppercase" as const, marginBottom: 8 }}>Secure Card Payment</div>
+                                <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 14 }}>
+                                  <div style={{ fontSize: "0.78rem", color: "rgba(219,234,254,0.6)" }}>Includes 4% processing fee</div>
+                                  <div style={{ fontSize: "1.6rem", fontWeight: 900, color: "#eff6ff", letterSpacing: "-0.5px" }}>${squareAmt}</div>
                                 </div>
-                                <div>
-                                  <a href={CASHAPP_URL} target="_blank" rel="noopener noreferrer" style={{ display: "block", background: "#00C244", color: "#fff", borderRadius: 10, padding: "8px 6px", textAlign: "center", textDecoration: "none", fontWeight: 700, fontSize: "0.82rem" }}>Cash App</a>
-                                  <div style={{ fontSize: "0.72rem", color: "rgba(255,255,255,0.45)", textAlign: "center" as const, marginTop: 3 }}>${baseAmt.toFixed(2)}</div>
-                                </div>
-                                <div>
-                                  <button onClick={() => handleSquareRequest(b)} style={{ display: "block", width: "100%", background: "#111827", color: "#fff", border: "none", borderRadius: 10, padding: "8px 6px", fontWeight: 700, fontSize: "0.82rem", cursor: "pointer" }}>Invoice Link</button>
-                                  <div style={{ fontSize: "0.72rem", color: "rgba(255,255,255,0.45)", textAlign: "center" as const, marginTop: 3 }}>${squareAmt}</div>
-                                </div>
+                                <button
+                                  onClick={() => { setCardPaymentBooking(b); setCardPaymentError(""); setCardPaymentOpen(true); }}
+                                  style={{ width: "100%", background: "linear-gradient(135deg, #3b82f6, #1d4ed8)", color: "#fff", border: "none", borderRadius: 10, padding: "12px 8px", fontWeight: 700, fontSize: "0.9rem", cursor: "pointer", boxShadow: "0 4px 18px rgba(37,99,235,0.4)" }}
+                                >
+                                  Pay ${squareAmt} with Card
+                                </button>
+                                <div style={{ fontSize: "0.66rem", color: "rgba(255,255,255,0.3)", textAlign: "center" as const, marginTop: 9 }}>Powered by Square · Encrypted checkout</div>
                               </div>
-                              <button
-                                onClick={() => { setCardPaymentBooking(b); setCardPaymentError(""); setCardPaymentOpen(true); }}
-                                style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, width: "100%", background: "linear-gradient(135deg, #3b82f6, #2563eb)", color: "#fff", border: "none", borderRadius: 10, padding: "11px 8px", fontWeight: 700, fontSize: "0.88rem", cursor: "pointer", marginTop: 10 }}
-                              >
-                                Pay with Card (in-app) — ${squareAmt}
-                              </button>
                             </div>
                             );
                           })}
@@ -2451,7 +2390,6 @@ export default function App() {
         </div>
         <div style={S.container}>
           <Header />
-          <SquarePopup />
           <div style={S.card} key={step}>
             <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 24, flexWrap: "wrap" as const }}>
               <button onClick={() => setView("myBookings")} style={{ ...S.secondary, padding: "9px 14px", fontSize: "0.9rem" }}>Back</button>
@@ -4729,7 +4667,6 @@ export default function App() {
         ))}
       </div>
       <div style={S.container}>
-        <SquarePopup />
         <SignInPromptPopup />
         <Header />
         {step > 0 && step < TOTAL_STEPS - 1 && <ProgressBar />}
