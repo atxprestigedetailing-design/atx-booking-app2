@@ -147,6 +147,26 @@ function isUpcoming(dateStr: string) {
   return new Date(y, m - 1, d) >= today;
 }
 
+// A slot is bookable only if its date+time hasn't already happened — this catches
+// same-day slots whose time has passed today, which a date-only check would miss.
+function isSlotInPast(dateStr: string, timeStr: string): boolean {
+  if (!dateStr) return true;
+  const parts = dateStr.split("-").map(Number);
+  if (parts.length !== 3) return true;
+  const [y, m, d] = parts;
+  let hour = 9, minute = 0;
+  if (timeStr) {
+    const lower = timeStr.toLowerCase();
+    const nums = timeStr.replace(/[^0-9:]/g, "").split(":");
+    hour = parseInt(nums[0], 10) || 0;
+    minute = parseInt(nums[1], 10) || 0;
+    if (lower.includes("pm") && hour !== 12) hour += 12;
+    if (lower.includes("am") && hour === 12) hour = 0;
+  }
+  const slotDateTime = new Date(y, m - 1, d, hour, minute);
+  return slotDateTime <= new Date();
+}
+
 // Calculate recurring schedule dates from a start date
 function calcRecurringDates(startDateStr: string, freq: string, count: number = 6): string[] {
   if (!startDateStr || !freq) return [];
@@ -399,14 +419,14 @@ function BookingCard({ booking, upcoming, onCancel, onBookAgain, isEditing, edit
                 min={new Date().toISOString().split("T")[0]}
                 onChange={(e) => {
                   const newDate = e.target.value;
-                  const slotsForNewDate = (allAvailableSlots || []).filter(s => s.date === newDate);
+                  const slotsForNewDate = (allAvailableSlots || []).filter(s => s.date === newDate && !isSlotInPast(s.date, s.time));
                   const defaultTime = newDate === booking.date ? booking.time : (slotsForNewDate[0]?.time || "");
                   onEditField?.({ date: newDate, time: defaultTime });
                 }}
                 style={editInputStyle}
               />
               {(() => {
-                const slotsForDate = (allAvailableSlots || []).filter(s => s.date === (editFields.date ?? booking.date));
+                const slotsForDate = (allAvailableSlots || []).filter(s => s.date === (editFields.date ?? booking.date) && !isSlotInPast(s.date, s.time));
                 const sameDate = (editFields.date ?? booking.date) === booking.date;
                 return slotsForDate.length > 0 || sameDate ? (
                   <select value={editFields.time ?? booking.time} onChange={(e) => onEditField?.({ time: e.target.value })} style={{ ...editInputStyle, backgroundColor: "rgba(255,255,255,0.06)" }}>
@@ -1419,7 +1439,7 @@ export default function App() {
 
   useEffect(() => {
     if (!selectedDate) { setAvailableSlots([]); return; }
-    setAvailableSlots(allAvailableSlots.filter((s) => s.date === selectedDate));
+    setAvailableSlots(allAvailableSlots.filter((s) => s.date === selectedDate && !isSlotInPast(s.date, s.time)));
   }, [selectedDate, allAvailableSlots]);
 
   const selectedVehicle = vehicleOptions.find((v) => v.id === vehicle);
@@ -2565,7 +2585,7 @@ export default function App() {
 
                                   {/* Time slots */}
                                   {qDate && (() => {
-                                    const slots = allAvailableSlots.filter(s => s.date === qDate);
+                                    const slots = allAvailableSlots.filter(s => s.date === qDate && !isSlotInPast(s.date, s.time));
                                     return (
                                       <div style={{ marginBottom: 14 }}>
                                         <div style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.45)", marginBottom: 8, textTransform: "uppercase" as const, letterSpacing: "0.06em" }}>Available Times — {formatDateLabel(qDate)}</div>
@@ -3009,7 +3029,7 @@ export default function App() {
                                     <div>
                                       <div style={{ fontSize: "0.72rem", color: "rgba(255,255,255,0.35)", marginBottom: 3 }}>New Time</div>
                                       {(() => {
-                                        const slotsForDate = allAvailableSlots.filter(s => s.date === (editFields.date || b.date));
+                                        const slotsForDate = allAvailableSlots.filter(s => s.date === (editFields.date || b.date) && !isSlotInPast(s.date, s.time));
                                         return slotsForDate.length > 0 ? (
                                           <select
                                             style={{ ...S.input, padding: "8px 10px", fontSize: "0.85rem", backgroundColor: "transparent" }}
