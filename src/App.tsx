@@ -191,6 +191,62 @@ function isSlotInPast(dateStr: string, timeStr: string): boolean {
   return slotDateTime <= new Date();
 }
 
+function daysInMonth(year: number, month: number): number {
+  return new Date(year, month + 1, 0).getDate();
+}
+
+function dateToStr(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+// A recurring expense's "date" is its start date — this expands it into every
+// occurrence between rangeStart and rangeEnd, so a subscription added late still
+// counts for every month (or week/year) it's actually been running, automatically,
+// with no need to re-enter it or wait on a scheduled job.
+function getExpenseOccurrences(e: Expense, rangeStart: Date, rangeEnd: Date): { date: string; amount: number }[] {
+  const amt = parseFloat(e.amount || "0");
+  if (!e.date || !amt) return [];
+  const parts = e.date.split("-").map(Number);
+  if (parts.length !== 3) return [];
+  const [ay, am, ad] = parts;
+  const anchor = new Date(ay, am - 1, ad);
+  if (isNaN(anchor.getTime())) return [];
+
+  if (!e.recurring) {
+    return (anchor >= rangeStart && anchor <= rangeEnd) ? [{ date: e.date, amount: amt }] : [];
+  }
+  if (anchor > rangeEnd) return [];
+
+  const occurrences: { date: string; amount: number }[] = [];
+  if (e.frequency === "weekly") {
+    let cursor = new Date(anchor);
+    while (cursor <= rangeEnd) {
+      if (cursor >= rangeStart) occurrences.push({ date: dateToStr(cursor), amount: amt });
+      cursor = new Date(cursor.getFullYear(), cursor.getMonth(), cursor.getDate() + 7);
+    }
+  } else if (e.frequency === "yearly") {
+    let y = ay;
+    while (true) {
+      const day = Math.min(ad, daysInMonth(y, am - 1));
+      const occ = new Date(y, am - 1, day);
+      if (occ > rangeEnd) break;
+      if (occ >= rangeStart) occurrences.push({ date: dateToStr(occ), amount: amt });
+      y++;
+    }
+  } else {
+    let y = ay, m = am - 1;
+    while (true) {
+      const day = Math.min(ad, daysInMonth(y, m));
+      const occ = new Date(y, m, day);
+      if (occ > rangeEnd) break;
+      if (occ >= rangeStart) occurrences.push({ date: dateToStr(occ), amount: amt });
+      m++;
+      if (m > 11) { m = 0; y++; }
+    }
+  }
+  return occurrences;
+}
+
 // Calculate recurring schedule dates from a start date
 function calcRecurringDates(startDateStr: string, freq: string, count: number = 6): string[] {
   if (!startDateStr || !freq) return [];
@@ -4386,8 +4442,20 @@ export default function App() {
                   const yearStr = String(financesYear);
                   const yearIncome = adminBookings.filter(b => b.invoiceStatus === "paid" && (b.datePaid || b.date || "").startsWith(yearStr));
                   const totalIncome = yearIncome.reduce((sum, b) => sum + parseFloat(b.invoiceAmount || "0"), 0);
-                  const yearExpenseRows = expenses.filter(e => (e.date || "").startsWith(yearStr));
-                  const totalExpenses = yearExpenseRows.reduce((sum, e) => sum + parseFloat(e.amount || "0"), 0);
+
+                  // A recurring expense's stored date is its start date — expand it into every
+                  // occurrence between Jan 1 and today (or Dec 31 for a past year), so a
+                  // subscription entered late still counts for every month it's actually run.
+                  const rangeStart = new Date(financesYear, 0, 1);
+                  const today = new Date(); today.setHours(0, 0, 0, 0);
+                  const yearEnd = new Date(financesYear, 11, 31);
+                  const rangeEnd = today < yearEnd ? today : yearEnd;
+                  const rangeEndStr = dateToStr(rangeEnd);
+
+                  const expenseOccurrences = expenses.flatMap(e =>
+                    getExpenseOccurrences(e, rangeStart, rangeEnd).map(o => ({ ...o, category: e.category }))
+                  );
+                  const totalExpenses = expenseOccurrences.reduce((sum, o) => sum + o.amount, 0);
                   const netProfit = totalIncome - totalExpenses;
                   const margin = totalIncome > 0 ? (netProfit / totalIncome) * 100 : 0;
 
@@ -4399,26 +4467,33 @@ export default function App() {
                     const m = parseInt(d.split("-")[1], 10) - 1;
                     if (m >= 0 && m < 12) monthlyIncome[m] += parseFloat(b.invoiceAmount || "0");
                   });
-                  yearExpenseRows.forEach(e => {
-                    const m = parseInt((e.date || "").split("-")[1], 10) - 1;
-                    if (m >= 0 && m < 12) monthlyExpenses[m] += parseFloat(e.amount || "0");
+                  expenseOccurrences.forEach(o => {
+                    const m = parseInt(o.date.split("-")[1], 10) - 1;
+                    if (m >= 0 && m < 12) monthlyExpenses[m] += o.amount;
                   });
                   const maxMonthly = Math.max(1, ...monthlyIncome, ...monthlyExpenses);
 
                   const categoryTotals: Record<string, number> = {};
-                  yearExpenseRows.forEach(e => {
-                    const cat = e.category || "Other";
-                    categoryTotals[cat] = (categoryTotals[cat] || 0) + parseFloat(e.amount || "0");
+                  expenseOccurrences.forEach(o => {
+                    const cat = o.category || "Other";
+                    categoryTotals[cat] = (categoryTotals[cat] || 0) + o.amount;
                   });
                   const categoryList = Object.entries(categoryTotals).sort((a, b) => b[1] - a[1]);
 
-                  const recurringExpenses = yearExpenseRows.filter(e => e.recurring);
-                  const recurringMonthlyTotal = recurringExpenses.reduce((sum, e) => {
+                  // Recurring expenses whose start date has arrived by the end of this window —
+                  // regardless of what year they were originally entered in, since they're ongoing.
+                  const activeRecurringExpenses = expenses.filter(e => e.recurring && (e.date || "") <= rangeEndStr);
+                  const recurringMonthlyTotal = activeRecurringExpenses.reduce((sum, e) => {
                     const amt = parseFloat(e.amount || "0");
                     if (e.frequency === "weekly") return sum + amt * 4.33;
                     if (e.frequency === "yearly") return sum + amt / 12;
                     return sum + amt;
                   }, 0);
+
+                  // One-time expenses dated this year, plus any recurring expense currently
+                  // active in this window (even if it started in an earlier year) — this is
+                  // the "manage" list, so the single row driving the auto-included totals is visible.
+                  const visibleExpenseRows = expenses.filter(e => e.recurring ? (e.date || "") <= rangeEndStr : (e.date || "").startsWith(yearStr));
 
                   const jobCount = yearIncome.length;
                   const avgRevenuePerJob = jobCount > 0 ? totalIncome / jobCount : 0;
@@ -4462,14 +4537,18 @@ export default function App() {
                       </div>
 
                       {/* Monthly chart */}
-                      <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: 20, marginBottom: 24 }}>
+                      <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: 20, marginBottom: 24, overflowX: "auto" as const }}>
                         <div style={{ fontWeight: 700, color: "rgba(255,255,255,0.7)", marginBottom: 16, fontSize: "0.9rem" }}>Monthly Income vs Expenses</div>
-                        <div style={{ display: "flex", alignItems: "flex-end", gap: 6, height: 160 }}>
+                        <div style={{ display: "flex", alignItems: "flex-end", gap: 6, height: 210, minWidth: 560 }}>
                           {monthLabels.map((label, i) => (
                             <div key={label} style={{ flex: 1, display: "flex", flexDirection: "column" as const, alignItems: "center", gap: 4 }}>
+                              <div style={{ display: "flex", flexDirection: "column" as const, alignItems: "center", gap: 1, marginBottom: 4 }}>
+                                <span style={{ fontSize: "0.62rem", fontWeight: 700, color: "#6ee7b7" }}>{monthlyIncome[i] > 0 ? `$${monthlyIncome[i].toFixed(0)}` : ""}</span>
+                                <span style={{ fontSize: "0.62rem", fontWeight: 700, color: "#fca5a5" }}>{monthlyExpenses[i] > 0 ? `$${monthlyExpenses[i].toFixed(0)}` : ""}</span>
+                              </div>
                               <div style={{ display: "flex", alignItems: "flex-end", gap: 2, height: 130, width: "100%", justifyContent: "center" }}>
-                                <div title={`Income: $${monthlyIncome[i].toFixed(0)}`} style={{ width: 8, height: `${(monthlyIncome[i] / maxMonthly) * 130}px`, background: "#34d399", borderRadius: "3px 3px 0 0", minHeight: monthlyIncome[i] > 0 ? 2 : 0 }} />
-                                <div title={`Expenses: $${monthlyExpenses[i].toFixed(0)}`} style={{ width: 8, height: `${(monthlyExpenses[i] / maxMonthly) * 130}px`, background: "#f87171", borderRadius: "3px 3px 0 0", minHeight: monthlyExpenses[i] > 0 ? 2 : 0 }} />
+                                <div style={{ width: 8, height: `${(monthlyIncome[i] / maxMonthly) * 130}px`, background: "#34d399", borderRadius: "3px 3px 0 0", minHeight: monthlyIncome[i] > 0 ? 2 : 0 }} />
+                                <div style={{ width: 8, height: `${(monthlyExpenses[i] / maxMonthly) * 130}px`, background: "#f87171", borderRadius: "3px 3px 0 0", minHeight: monthlyExpenses[i] > 0 ? 2 : 0 }} />
                               </div>
                               <div style={{ fontSize: "0.65rem", color: "rgba(255,255,255,0.4)" }}>{label}</div>
                             </div>
@@ -4516,13 +4595,14 @@ export default function App() {
                       </div>
 
                       {/* Recurring expenses */}
-                      {recurringExpenses.length > 0 && (
+                      {activeRecurringExpenses.length > 0 && (
                         <div style={{ background: "rgba(167,139,250,0.06)", border: "1px solid rgba(167,139,250,0.25)", borderRadius: 16, padding: 18, marginBottom: 24 }}>
-                          <div style={{ fontWeight: 700, color: "#c4b5fd", marginBottom: 12, fontSize: "0.9rem" }}>Recurring Expenses</div>
+                          <div style={{ fontWeight: 700, color: "#c4b5fd", marginBottom: 4, fontSize: "0.9rem" }}>Recurring Expenses</div>
+                          <div style={{ color: "rgba(255,255,255,0.35)", fontSize: "0.72rem", marginBottom: 12 }}>Auto-counted every period since their start date — no need to re-enter each month.</div>
                           <div style={{ display: "grid", gap: 8 }}>
-                            {recurringExpenses.map(e => (
+                            {activeRecurringExpenses.map(e => (
                               <div key={e.rowIndex} style={{ display: "flex", justifyContent: "space-between", fontSize: "0.85rem", padding: "8px 0", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
-                                <span style={{ color: "rgba(255,255,255,0.7)" }}>{e.description || e.category} <span style={{ color: "rgba(255,255,255,0.35)" }}>({e.frequency})</span></span>
+                                <span style={{ color: "rgba(255,255,255,0.7)" }}>{e.description || e.category} <span style={{ color: "rgba(255,255,255,0.35)" }}>({e.frequency} since {formatDateLabel(e.date)})</span></span>
                                 <span style={{ fontWeight: 700, color: "#f1f5f9" }}>${parseFloat(e.amount || "0").toFixed(0)}</span>
                               </div>
                             ))}
@@ -4552,9 +4632,14 @@ export default function App() {
                             <div style={{ fontSize: "0.72rem", color: "rgba(255,255,255,0.45)", marginBottom: 4 }}>Description</div>
                             <input placeholder="e.g. Chemical Guys restock" value={newExpenseDescription} onChange={e => setNewExpenseDescription(e.target.value)} style={{ ...S.input, padding: "8px 12px", width: "100%" }} />
                           </div>
-                          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                            <input type="checkbox" checked={newExpenseRecurring} onChange={e => setNewExpenseRecurring(e.target.checked)} id="recurring-check" />
-                            <label htmlFor="recurring-check" style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.6)" }}>Recurring</label>
+                          <div style={{ display: "flex", flexDirection: "column" as const, gap: 2 }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                              <input type="checkbox" checked={newExpenseRecurring} onChange={e => setNewExpenseRecurring(e.target.checked)} id="recurring-check" />
+                              <label htmlFor="recurring-check" style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.6)" }}>Recurring</label>
+                            </div>
+                            {newExpenseRecurring && (
+                              <div style={{ fontSize: "0.68rem", color: "rgba(255,255,255,0.35)", maxWidth: 180 }}>Date above = when it started. It'll auto-count for every period since then, including past months.</div>
+                            )}
                           </div>
                           {newExpenseRecurring && (
                             <div>
@@ -4578,18 +4663,20 @@ export default function App() {
                       <div style={{ fontWeight: 700, color: "rgba(255,255,255,0.7)", marginBottom: 12, fontSize: "0.9rem" }}>All Expenses — {yearStr}</div>
                       {expensesLoading ? (
                         <div style={{ textAlign: "center", padding: 40, color: "rgba(255,255,255,0.45)" }}>Loading expenses...</div>
-                      ) : yearExpenseRows.length === 0 ? (
+                      ) : visibleExpenseRows.length === 0 ? (
                         <div style={{ textAlign: "center", padding: 40, color: "rgba(255,255,255,0.45)" }}>No expenses logged for {yearStr} yet.</div>
                       ) : (
                         <div style={{ display: "grid", gap: 8 }}>
-                          {[...yearExpenseRows].sort((a, b) => (b.date || "").localeCompare(a.date || "")).map(e => (
+                          {[...visibleExpenseRows].sort((a, b) => (b.date || "").localeCompare(a.date || "")).map(e => (
                             <div key={e.rowIndex} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, padding: "10px 14px", gap: 10, flexWrap: "wrap" as const }}>
                               <div style={{ display: "flex", flexDirection: "column" as const }}>
                                 <span style={{ fontWeight: 700, color: "#f1f5f9", fontSize: "0.88rem" }}>{e.description || e.category}</span>
-                                <span style={{ fontSize: "0.72rem", color: "rgba(255,255,255,0.4)" }}>{formatDateLabel(e.date)} · {e.category}{e.recurring ? ` · Recurring (${e.frequency})` : ""}</span>
+                                <span style={{ fontSize: "0.72rem", color: "rgba(255,255,255,0.4)" }}>
+                                  {e.recurring ? `Recurring ${e.frequency} since ${formatDateLabel(e.date)}` : formatDateLabel(e.date)} · {e.category}
+                                </span>
                               </div>
                               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                                <span style={{ fontWeight: 800, color: "#f87171" }}>${parseFloat(e.amount || "0").toFixed(2)}</span>
+                                <span style={{ fontWeight: 800, color: "#f87171" }}>${parseFloat(e.amount || "0").toFixed(2)}{e.recurring ? ` /${e.frequency === "weekly" ? "wk" : e.frequency === "yearly" ? "yr" : "mo"}` : ""}</span>
                                 <button onClick={() => handleDeleteExpense(e.rowIndex)} style={{ background: "rgba(239,68,68,0.12)", color: "#f87171", border: "1px solid rgba(239,68,68,0.3)", borderRadius: 8, padding: "5px 10px", fontSize: "0.75rem", fontWeight: 700, cursor: "pointer" }}>Delete</button>
                               </div>
                             </div>
