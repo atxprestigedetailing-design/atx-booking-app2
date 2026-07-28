@@ -12,7 +12,7 @@ const GOOGLE_CLIENT_ID =
   "447699234633-ivo2e1c2q843scj32k5323o2rkq6h7dp.apps.googleusercontent.com";
 
 const SCRIPT_URL =
-  "https://script.google.com/macros/s/AKfycbweGeM_Jg5Su2pPvdUy216SeGfXtJKsdaJ_FFKC6y18dherADW4GPAj91fYsCN5F0f2Cg/exec";
+  "https://script.google.com/macros/s/AKfycbxyoAoAY41I520P4wwvRzyMk5Rh_qamQJhanL0nTNao_QgcHow1ev0G1ciiBHx6pi5nFg/exec";
 
 // Sandbox credentials — replace with your Square Sandbox Application ID / Location ID
 // (Dashboard → Sandbox → your app → Locations). These are not secret and are safe here;
@@ -89,7 +89,31 @@ type Booking = {
   rowIndex: number;
   smsConsent?: string | boolean;
   smsMarketingConsent?: string | boolean;
+  datePaid?: string;
 };
+
+type Expense = {
+  rowIndex: number;
+  date: string;
+  category: string;
+  amount: string;
+  description: string;
+  recurring: boolean;
+  frequency: string;
+};
+
+const EXPENSE_CATEGORIES = [
+  "Supplies & Chemicals",
+  "Equipment",
+  "Vehicle/Fuel",
+  "Insurance",
+  "Software/Subscriptions",
+  "Marketing",
+  "Contractor/Labor",
+  "Bank/Processing Fees",
+  "Taxes",
+  "Other",
+];
 
 // Sheet-backed booleans can come back as real booleans, or as "true"/"TRUE" strings
 function isConsentGiven(v: string | boolean | undefined): boolean {
@@ -580,7 +604,7 @@ export default function App() {
   const [splashDone, setSplashDone]                     = useState(false);
   const [splashPhase, setSplashPhase]                   = useState(0); // 0=logo, 1=tagline, 2=fadeout
   const [view, setView]                                 = useState<"booking" | "myBookings" | "admin" | "balance" | "inventory">("booking");
-  const [adminTab, setAdminTab]                         = useState<"bookings" | "invoices" | "revenue" | "availability" | "clients">("bookings");
+  const [adminTab, setAdminTab]                         = useState<"bookings" | "invoices" | "revenue" | "availability" | "clients" | "finances">("bookings");
   const [clientSearch, setClientSearch]                 = useState("");
   const [selectedClientKey, setSelectedClientKey]       = useState<string | null>(null);
   const [clientNotesOpen, setClientNotesOpen]           = useState(false);
@@ -589,6 +613,16 @@ export default function App() {
   const [newNoteDate, setNewNoteDate]                   = useState(() => new Date().toISOString().split("T")[0]);
   const [newNoteText, setNewNoteText]                   = useState("");
   const [addingNote, setAddingNote]                     = useState(false);
+  const [expenses, setExpenses]                         = useState<Expense[]>([]);
+  const [expensesLoading, setExpensesLoading]           = useState(false);
+  const [financesYear, setFinancesYear]                 = useState(new Date().getFullYear());
+  const [newExpenseDate, setNewExpenseDate]             = useState(() => new Date().toISOString().split("T")[0]);
+  const [newExpenseCategory, setNewExpenseCategory]     = useState(EXPENSE_CATEGORIES[0]);
+  const [newExpenseAmount, setNewExpenseAmount]         = useState("");
+  const [newExpenseDescription, setNewExpenseDescription] = useState("");
+  const [newExpenseRecurring, setNewExpenseRecurring]   = useState(false);
+  const [newExpenseFrequency, setNewExpenseFrequency]   = useState("monthly");
+  const [addingExpense, setAddingExpense]               = useState(false);
   const [adminBookings, setAdminBookings]               = useState<Booking[]>([]);
   const [adminLoading, setAdminLoading]                 = useState(false);
   const [adminFilter, setAdminFilter]                   = useState<"all" | "upcoming" | "past" | "maintenance">("all");
@@ -1059,6 +1093,65 @@ export default function App() {
       }
     } catch { alert("Something went wrong saving that note."); }
     finally { setAddingNote(false); }
+  }
+
+  async function loadExpenses() {
+    setExpensesLoading(true);
+    try {
+      const res = await fetch(`${SCRIPT_URL}?action=getExpenses`);
+      const data = await res.json();
+      setExpenses(data.expenses || []);
+    } catch (e) { console.error("Failed to load expenses", e); }
+    finally { setExpensesLoading(false); }
+  }
+
+  async function handleAddExpense() {
+    if (!newExpenseDate || !newExpenseAmount) return;
+    setAddingExpense(true);
+    try {
+      const res = await fetch(SCRIPT_URL, {
+        method: "POST",
+        body: JSON.stringify({
+          action: "addExpense",
+          date: newExpenseDate,
+          category: newExpenseCategory,
+          amount: newExpenseAmount,
+          description: newExpenseDescription.trim(),
+          recurring: newExpenseRecurring,
+          frequency: newExpenseRecurring ? newExpenseFrequency : "",
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setNewExpenseAmount("");
+        setNewExpenseDescription("");
+        setNewExpenseRecurring(false);
+        await loadExpenses();
+      } else {
+        alert("Something went wrong saving that expense.");
+      }
+    } catch { alert("Something went wrong saving that expense."); }
+    finally { setAddingExpense(false); }
+  }
+
+  async function handleDeleteExpense(rowIndex: number) {
+    if (!window.confirm("Delete this expense?")) return;
+    const prev = expenses;
+    setExpenses(p => p.filter(e => e.rowIndex !== rowIndex));
+    try {
+      const res = await fetch(SCRIPT_URL, {
+        method: "POST",
+        body: JSON.stringify({ action: "deleteExpense", rowIndex }),
+      });
+      const data = await res.json();
+      if (!data.success) {
+        setExpenses(prev);
+        alert("Something went wrong deleting that expense.");
+      }
+    } catch {
+      setExpenses(prev);
+      alert("Something went wrong deleting that expense.");
+    }
   }
 
   const loadInventory = useCallback(async () => {
@@ -2441,6 +2534,7 @@ export default function App() {
               <button onClick={() => { setAdminTab("revenue"); }} style={{ background: "none", border: "none", cursor: "pointer", padding: "10px 18px", fontSize: "0.95rem", fontWeight: 700, color: adminTab === "revenue" ? "#059669" : "#9ca3af", borderBottom: adminTab === "revenue" ? "3px solid #059669" : "3px solid transparent", marginBottom: -2 }}>Revenue</button>
               <button onClick={() => { setAdminTab("availability"); if (availSlots.length === 0) { setAvailLoading(true); fetch(`${SCRIPT_URL}?action=getAllAvailability`).then(r => r.json()).then(d => { setAvailSlots(d.slots || []); setAvailLoading(false); }).catch(() => setAvailLoading(false)); } }} style={{ background: "none", border: "none", cursor: "pointer", padding: "10px 18px", fontSize: "0.95rem", fontWeight: 700, color: adminTab === "availability" ? "#2563eb" : "#9ca3af", borderBottom: adminTab === "availability" ? "3px solid #2563eb" : "3px solid transparent", marginBottom: -2 }}>Availability</button>
               <button onClick={() => { setAdminTab("clients"); setSelectedClientKey(null); setClientSearch(""); }} style={{ background: "none", border: "none", cursor: "pointer", padding: "10px 18px", fontSize: "0.95rem", fontWeight: 700, color: adminTab === "clients" ? "#a78bfa" : "#9ca3af", borderBottom: adminTab === "clients" ? "3px solid #a78bfa" : "3px solid transparent", marginBottom: -2 }}>Clients</button>
+              <button onClick={() => { setAdminTab("finances"); if (expenses.length === 0) loadExpenses(); }} style={{ background: "none", border: "none", cursor: "pointer", padding: "10px 18px", fontSize: "0.95rem", fontWeight: 700, color: adminTab === "finances" ? "#34d399" : "#9ca3af", borderBottom: adminTab === "finances" ? "3px solid #34d399" : "3px solid transparent", marginBottom: -2 }}>Finances</button>
             </div>
 
             {adminLoading ? (
@@ -4281,6 +4375,224 @@ export default function App() {
                                 <div style={{ fontWeight: 800, color: "#34d399", fontSize: "1rem" }}>${c.totalPaid.toFixed(0)}</div>
                               </div>
                             </button>
+                          ))}
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
+
+                {adminTab === "finances" && (() => {
+                  const yearStr = String(financesYear);
+                  const yearIncome = adminBookings.filter(b => b.invoiceStatus === "paid" && (b.datePaid || b.date || "").startsWith(yearStr));
+                  const totalIncome = yearIncome.reduce((sum, b) => sum + parseFloat(b.invoiceAmount || "0"), 0);
+                  const yearExpenseRows = expenses.filter(e => (e.date || "").startsWith(yearStr));
+                  const totalExpenses = yearExpenseRows.reduce((sum, e) => sum + parseFloat(e.amount || "0"), 0);
+                  const netProfit = totalIncome - totalExpenses;
+                  const margin = totalIncome > 0 ? (netProfit / totalIncome) * 100 : 0;
+
+                  const monthLabels = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+                  const monthlyIncome = new Array(12).fill(0);
+                  const monthlyExpenses = new Array(12).fill(0);
+                  yearIncome.forEach(b => {
+                    const d = b.datePaid || b.date || "";
+                    const m = parseInt(d.split("-")[1], 10) - 1;
+                    if (m >= 0 && m < 12) monthlyIncome[m] += parseFloat(b.invoiceAmount || "0");
+                  });
+                  yearExpenseRows.forEach(e => {
+                    const m = parseInt((e.date || "").split("-")[1], 10) - 1;
+                    if (m >= 0 && m < 12) monthlyExpenses[m] += parseFloat(e.amount || "0");
+                  });
+                  const maxMonthly = Math.max(1, ...monthlyIncome, ...monthlyExpenses);
+
+                  const categoryTotals: Record<string, number> = {};
+                  yearExpenseRows.forEach(e => {
+                    const cat = e.category || "Other";
+                    categoryTotals[cat] = (categoryTotals[cat] || 0) + parseFloat(e.amount || "0");
+                  });
+                  const categoryList = Object.entries(categoryTotals).sort((a, b) => b[1] - a[1]);
+
+                  const recurringExpenses = yearExpenseRows.filter(e => e.recurring);
+                  const recurringMonthlyTotal = recurringExpenses.reduce((sum, e) => {
+                    const amt = parseFloat(e.amount || "0");
+                    if (e.frequency === "weekly") return sum + amt * 4.33;
+                    if (e.frequency === "yearly") return sum + amt / 12;
+                    return sum + amt;
+                  }, 0);
+
+                  const jobCount = yearIncome.length;
+                  const avgRevenuePerJob = jobCount > 0 ? totalIncome / jobCount : 0;
+                  const monthsWithActivity = monthLabels.filter((_, i) => monthlyIncome[i] > 0 || monthlyExpenses[i] > 0).length;
+                  const profitableMonths = monthLabels.filter((_, i) => monthlyIncome[i] - monthlyExpenses[i] > 0).length;
+                  const topCategory = categoryList[0];
+
+                  const availableYears = Array.from(new Set([
+                    ...adminBookings.map(b => (b.datePaid || b.date || "").slice(0, 4)),
+                    ...expenses.map(e => (e.date || "").slice(0, 4)),
+                    String(new Date().getFullYear()),
+                  ])).filter(Boolean).sort().reverse();
+
+                  return (
+                    <>
+                      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20, flexWrap: "wrap" as const }}>
+                        <select value={financesYear} onChange={e => setFinancesYear(parseInt(e.target.value, 10))} style={{ ...S.input, width: "auto", padding: "8px 14px" }}>
+                          {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
+                        </select>
+                        <button onClick={loadExpenses} style={{ ...S.secondary, padding: "8px 14px", fontSize: "0.85rem" }}>Refresh</button>
+                      </div>
+
+                      {/* YTD summary cards */}
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px,1fr))", gap: 12, marginBottom: 24 }}>
+                        <div style={{ background: "rgba(16,185,129,0.1)", border: "1px solid rgba(16,185,129,0.3)", borderRadius: 14, padding: 16 }}>
+                          <div style={{ fontSize: "0.75rem", color: "#6ee7b7", marginBottom: 6 }}>Total Income</div>
+                          <div style={{ fontSize: "1.5rem", fontWeight: 900, color: "#34d399" }}>${totalIncome.toFixed(0)}</div>
+                        </div>
+                        <div style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.3)", borderRadius: 14, padding: 16 }}>
+                          <div style={{ fontSize: "0.75rem", color: "#fca5a5", marginBottom: 6 }}>Total Expenses</div>
+                          <div style={{ fontSize: "1.5rem", fontWeight: 900, color: "#f87171" }}>${totalExpenses.toFixed(0)}</div>
+                        </div>
+                        <div style={{ background: netProfit >= 0 ? "rgba(59,130,246,0.1)" : "rgba(239,68,68,0.1)", border: `1px solid ${netProfit >= 0 ? "rgba(59,130,246,0.3)" : "rgba(239,68,68,0.3)"}`, borderRadius: 14, padding: 16 }}>
+                          <div style={{ fontSize: "0.75rem", color: netProfit >= 0 ? "#93c5fd" : "#fca5a5", marginBottom: 6 }}>Net Profit</div>
+                          <div style={{ fontSize: "1.5rem", fontWeight: 900, color: netProfit >= 0 ? "#60a5fa" : "#f87171" }}>${netProfit.toFixed(0)}</div>
+                        </div>
+                        <div style={{ background: "rgba(167,139,250,0.1)", border: "1px solid rgba(167,139,250,0.3)", borderRadius: 14, padding: 16 }}>
+                          <div style={{ fontSize: "0.75rem", color: "#c4b5fd", marginBottom: 6 }}>Profit Margin</div>
+                          <div style={{ fontSize: "1.5rem", fontWeight: 900, color: "#a78bfa" }}>{margin.toFixed(1)}%</div>
+                        </div>
+                      </div>
+
+                      {/* Monthly chart */}
+                      <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: 20, marginBottom: 24 }}>
+                        <div style={{ fontWeight: 700, color: "rgba(255,255,255,0.7)", marginBottom: 16, fontSize: "0.9rem" }}>Monthly Income vs Expenses</div>
+                        <div style={{ display: "flex", alignItems: "flex-end", gap: 6, height: 160 }}>
+                          {monthLabels.map((label, i) => (
+                            <div key={label} style={{ flex: 1, display: "flex", flexDirection: "column" as const, alignItems: "center", gap: 4 }}>
+                              <div style={{ display: "flex", alignItems: "flex-end", gap: 2, height: 130, width: "100%", justifyContent: "center" }}>
+                                <div title={`Income: $${monthlyIncome[i].toFixed(0)}`} style={{ width: 8, height: `${(monthlyIncome[i] / maxMonthly) * 130}px`, background: "#34d399", borderRadius: "3px 3px 0 0", minHeight: monthlyIncome[i] > 0 ? 2 : 0 }} />
+                                <div title={`Expenses: $${monthlyExpenses[i].toFixed(0)}`} style={{ width: 8, height: `${(monthlyExpenses[i] / maxMonthly) * 130}px`, background: "#f87171", borderRadius: "3px 3px 0 0", minHeight: monthlyExpenses[i] > 0 ? 2 : 0 }} />
+                              </div>
+                              <div style={{ fontSize: "0.65rem", color: "rgba(255,255,255,0.4)" }}>{label}</div>
+                            </div>
+                          ))}
+                        </div>
+                        <div style={{ display: "flex", gap: 16, marginTop: 12, justifyContent: "center" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 6 }}><div style={{ width: 10, height: 10, borderRadius: 3, background: "#34d399" }} /><span style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.5)" }}>Income</span></div>
+                          <div style={{ display: "flex", alignItems: "center", gap: 6 }}><div style={{ width: 10, height: 10, borderRadius: 3, background: "#f87171" }} /><span style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.5)" }}>Expenses</span></div>
+                        </div>
+                      </div>
+
+                      {/* Key metrics + category breakdown */}
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px,1fr))", gap: 16, marginBottom: 24 }}>
+                        <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: 18 }}>
+                          <div style={{ fontWeight: 700, color: "rgba(255,255,255,0.7)", marginBottom: 14, fontSize: "0.9rem" }}>Key Metrics</div>
+                          <div style={{ display: "grid", gap: 10 }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.85rem" }}><span style={{ color: "rgba(255,255,255,0.5)" }}>Jobs Paid</span><span style={{ fontWeight: 700, color: "#f1f5f9" }}>{jobCount}</span></div>
+                            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.85rem" }}><span style={{ color: "rgba(255,255,255,0.5)" }}>Avg Revenue / Job</span><span style={{ fontWeight: 700, color: "#f1f5f9" }}>${avgRevenuePerJob.toFixed(0)}</span></div>
+                            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.85rem" }}><span style={{ color: "rgba(255,255,255,0.5)" }}>Profitable Months</span><span style={{ fontWeight: 700, color: "#f1f5f9" }}>{profitableMonths} / {monthsWithActivity}</span></div>
+                            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.85rem" }}><span style={{ color: "rgba(255,255,255,0.5)" }}>Top Expense Category</span><span style={{ fontWeight: 700, color: "#f1f5f9" }}>{topCategory ? topCategory[0] : "—"}</span></div>
+                            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.85rem" }}><span style={{ color: "rgba(255,255,255,0.5)" }}>Recurring Monthly Burn</span><span style={{ fontWeight: 700, color: "#f1f5f9" }}>${recurringMonthlyTotal.toFixed(0)}</span></div>
+                          </div>
+                        </div>
+                        <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: 18 }}>
+                          <div style={{ fontWeight: 700, color: "rgba(255,255,255,0.7)", marginBottom: 14, fontSize: "0.9rem" }}>Expenses by Category</div>
+                          {categoryList.length === 0 ? (
+                            <div style={{ color: "rgba(255,255,255,0.4)", fontSize: "0.85rem" }}>No expenses logged for {yearStr} yet.</div>
+                          ) : (
+                            <div style={{ display: "grid", gap: 10 }}>
+                              {categoryList.map(([cat, amt]) => (
+                                <div key={cat}>
+                                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.82rem", marginBottom: 4 }}>
+                                    <span style={{ color: "rgba(255,255,255,0.6)" }}>{cat}</span>
+                                    <span style={{ fontWeight: 700, color: "#f1f5f9" }}>${amt.toFixed(0)} <span style={{ color: "rgba(255,255,255,0.35)", fontWeight: 400 }}>({totalExpenses > 0 ? ((amt / totalExpenses) * 100).toFixed(0) : 0}%)</span></span>
+                                  </div>
+                                  <div style={{ height: 6, background: "rgba(255,255,255,0.08)", borderRadius: 3, overflow: "hidden" }}>
+                                    <div style={{ height: "100%", width: `${totalExpenses > 0 ? (amt / totalExpenses) * 100 : 0}%`, background: "#f87171" }} />
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Recurring expenses */}
+                      {recurringExpenses.length > 0 && (
+                        <div style={{ background: "rgba(167,139,250,0.06)", border: "1px solid rgba(167,139,250,0.25)", borderRadius: 16, padding: 18, marginBottom: 24 }}>
+                          <div style={{ fontWeight: 700, color: "#c4b5fd", marginBottom: 12, fontSize: "0.9rem" }}>Recurring Expenses</div>
+                          <div style={{ display: "grid", gap: 8 }}>
+                            {recurringExpenses.map(e => (
+                              <div key={e.rowIndex} style={{ display: "flex", justifyContent: "space-between", fontSize: "0.85rem", padding: "8px 0", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+                                <span style={{ color: "rgba(255,255,255,0.7)" }}>{e.description || e.category} <span style={{ color: "rgba(255,255,255,0.35)" }}>({e.frequency})</span></span>
+                                <span style={{ fontWeight: 700, color: "#f1f5f9" }}>${parseFloat(e.amount || "0").toFixed(0)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Add expense form */}
+                      <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: 18, marginBottom: 24 }}>
+                        <div style={{ fontWeight: 700, color: "rgba(255,255,255,0.7)", marginBottom: 14, fontSize: "0.9rem" }}>Add Expense</div>
+                        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" as const, alignItems: "flex-end" }}>
+                          <div>
+                            <div style={{ fontSize: "0.72rem", color: "rgba(255,255,255,0.45)", marginBottom: 4 }}>Date</div>
+                            <input type="date" value={newExpenseDate} onChange={e => setNewExpenseDate(e.target.value)} style={{ ...S.input, padding: "8px 12px", width: "auto" }} />
+                          </div>
+                          <div>
+                            <div style={{ fontSize: "0.72rem", color: "rgba(255,255,255,0.45)", marginBottom: 4 }}>Category</div>
+                            <select value={newExpenseCategory} onChange={e => setNewExpenseCategory(e.target.value)} style={{ ...S.input, padding: "8px 12px", width: "auto", backgroundColor: "transparent" }}>
+                              {EXPENSE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                            </select>
+                          </div>
+                          <div>
+                            <div style={{ fontSize: "0.72rem", color: "rgba(255,255,255,0.45)", marginBottom: 4 }}>Amount</div>
+                            <input type="number" placeholder="0.00" value={newExpenseAmount} onChange={e => setNewExpenseAmount(e.target.value)} style={{ ...S.input, padding: "8px 12px", width: 100 }} />
+                          </div>
+                          <div style={{ flex: 1, minWidth: 160 }}>
+                            <div style={{ fontSize: "0.72rem", color: "rgba(255,255,255,0.45)", marginBottom: 4 }}>Description</div>
+                            <input placeholder="e.g. Chemical Guys restock" value={newExpenseDescription} onChange={e => setNewExpenseDescription(e.target.value)} style={{ ...S.input, padding: "8px 12px", width: "100%" }} />
+                          </div>
+                          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                            <input type="checkbox" checked={newExpenseRecurring} onChange={e => setNewExpenseRecurring(e.target.checked)} id="recurring-check" />
+                            <label htmlFor="recurring-check" style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.6)" }}>Recurring</label>
+                          </div>
+                          {newExpenseRecurring && (
+                            <div>
+                              <div style={{ fontSize: "0.72rem", color: "rgba(255,255,255,0.45)", marginBottom: 4 }}>Frequency</div>
+                              <select value={newExpenseFrequency} onChange={e => setNewExpenseFrequency(e.target.value)} style={{ ...S.input, padding: "8px 12px", width: "auto", backgroundColor: "transparent" }}>
+                                <option value="monthly">Monthly</option>
+                                <option value="weekly">Weekly</option>
+                                <option value="yearly">Yearly</option>
+                              </select>
+                            </div>
+                          )}
+                          <button disabled={!newExpenseDate || !newExpenseAmount || addingExpense}
+                            onClick={handleAddExpense}
+                            style={{ background: "linear-gradient(135deg, #3b82f6, #1d4ed8)", color: "#fff", border: "none", borderRadius: 10, padding: "9px 18px", fontWeight: 700, fontSize: "0.88rem", cursor: "pointer", opacity: !newExpenseDate || !newExpenseAmount ? 0.4 : 1 }}>
+                            {addingExpense ? "Adding..." : "+ Add Expense"}
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Expense list */}
+                      <div style={{ fontWeight: 700, color: "rgba(255,255,255,0.7)", marginBottom: 12, fontSize: "0.9rem" }}>All Expenses — {yearStr}</div>
+                      {expensesLoading ? (
+                        <div style={{ textAlign: "center", padding: 40, color: "rgba(255,255,255,0.45)" }}>Loading expenses...</div>
+                      ) : yearExpenseRows.length === 0 ? (
+                        <div style={{ textAlign: "center", padding: 40, color: "rgba(255,255,255,0.45)" }}>No expenses logged for {yearStr} yet.</div>
+                      ) : (
+                        <div style={{ display: "grid", gap: 8 }}>
+                          {[...yearExpenseRows].sort((a, b) => (b.date || "").localeCompare(a.date || "")).map(e => (
+                            <div key={e.rowIndex} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, padding: "10px 14px", gap: 10, flexWrap: "wrap" as const }}>
+                              <div style={{ display: "flex", flexDirection: "column" as const }}>
+                                <span style={{ fontWeight: 700, color: "#f1f5f9", fontSize: "0.88rem" }}>{e.description || e.category}</span>
+                                <span style={{ fontSize: "0.72rem", color: "rgba(255,255,255,0.4)" }}>{formatDateLabel(e.date)} · {e.category}{e.recurring ? ` · Recurring (${e.frequency})` : ""}</span>
+                              </div>
+                              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                                <span style={{ fontWeight: 800, color: "#f87171" }}>${parseFloat(e.amount || "0").toFixed(2)}</span>
+                                <button onClick={() => handleDeleteExpense(e.rowIndex)} style={{ background: "rgba(239,68,68,0.12)", color: "#f87171", border: "1px solid rgba(239,68,68,0.3)", borderRadius: 8, padding: "5px 10px", fontSize: "0.75rem", fontWeight: 700, cursor: "pointer" }}>Delete</button>
+                              </div>
+                            </div>
                           ))}
                         </div>
                       )}
