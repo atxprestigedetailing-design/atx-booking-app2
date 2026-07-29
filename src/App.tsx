@@ -50,7 +50,8 @@ type AddOn =
   | "Wet Sanding"
   | "Interior Deep Extraction"
   | "Sealant & Protection Upgrade"
-  | "Engine Compartment Detail";
+  | "Engine Compartment Detail"
+  | "Seat & Floor Mat Extraction";
 
 type GoogleUser = {
   name: string;
@@ -136,6 +137,7 @@ const addOnOptions: { label: AddOn; priceText: string; fixedPrice?: number }[] =
   { label: "Steam Cleaning",           priceText: "$60",  fixedPrice: 60  },
   { label: "Ceramic Coating",          priceText: "Need consultation" },
   { label: "Engine Compartment Detail",priceText: "$75",  fixedPrice: 75  },
+  { label: "Seat & Floor Mat Extraction", priceText: "$120", fixedPrice: 120 },
 ];
 
 const marineAddOnOptions: { label: AddOn; priceText: string; fixedPrice?: number }[] = [
