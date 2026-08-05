@@ -12,7 +12,7 @@ const GOOGLE_CLIENT_ID =
   "447699234633-ivo2e1c2q843scj32k5323o2rkq6h7dp.apps.googleusercontent.com";
 
 const SCRIPT_URL =
-  "https://script.google.com/macros/s/AKfycbyf_aiMvIFlcKJzOYLy7zVH_FVVgzw7ZlVeIBG-8FVe56yWfKsaDLL7AuCrOeq1xfzsuw/exec";
+  "https://script.google.com/macros/s/AKfycbwv5Sva_CWwgJQAUEOZJiuWM-IK4wTUxlEGLd-QcI59_FbqL_qHOqhbGrnFPTGCKj-r8Q/exec";
 
 // Sandbox credentials — replace with your Square Sandbox Application ID / Location ID
 // (Dashboard → Sandbox → your app → Locations). These are not secret and are safe here;
@@ -181,6 +181,60 @@ const LVISD_EVENT: EventConfig = {
   emailDomain: "lagovistaisd.net",
   dropoffAddress: "20703 Paseo De Vaca St, Lago Vista, TX 78645",
   rainPolicy: "If weather forces us to reschedule, we'll reach out directly to get you set up for a new time.",
+};
+
+// Static vehicle make/model data — shared by the main booking flow and the LVISD event flow.
+const CAR_MAKES = [
+  "Acura","Alfa Romeo","Audi","BMW","Buick","Cadillac","Chevrolet","Chrysler",
+  "Dodge","Ferrari","Fiat","Ford","Genesis","GMC","Honda","Hyundai","Infiniti",
+  "Jaguar","Jeep","Kia","Lamborghini","Land Rover","Lexus","Lincoln","Maserati",
+  "Mazda","Mercedes-Benz","Mini","Mitsubishi","Nissan","Porsche","Ram","Rivian",
+  "Rolls-Royce","Subaru","Tesla","Toyota","Volkswagen","Volvo",
+];
+const TRUCK_MAKES = [
+  "Chevrolet","Ford","GMC","Ram","Toyota","Nissan","Honda","Jeep",
+  "Land Rover","Lexus","Lincoln","Cadillac","Rivian","Mercedes-Benz",
+];
+const VEHICLE_MODEL_MAP: Record<string, string[]> = {
+  "Toyota": ["Camry","Corolla","RAV4","Tacoma","Tundra","Highlander","4Runner","Sienna","Prius","Avalon","Sequoia","Land Cruiser","Venza","C-HR"],
+  "Ford": ["F-150","F-250","F-350","Mustang","Explorer","Escape","Edge","Bronco","Bronco Sport","Expedition","Ranger","Maverick","EcoSport"],
+  "Chevrolet": ["Silverado 1500","Silverado 2500","Tahoe","Suburban","Equinox","Traverse","Blazer","Malibu","Camaro","Corvette","Colorado","Trax","Trailblazer"],
+  "Honda": ["Civic","Accord","CR-V","Pilot","Odyssey","HR-V","Ridgeline","Passport","Insight"],
+  "Nissan": ["Altima","Sentra","Maxima","Rogue","Murano","Pathfinder","Frontier","Titan","Armada","Kicks","Versa"],
+  "Hyundai": ["Elantra","Sonata","Tucson","Santa Fe","Palisade","Kona","Ioniq 5","Ioniq 6","Santa Cruz","Venue"],
+  "Kia": ["Forte","K5","Telluride","Sorento","Sportage","Soul","Stinger","EV6","Carnival","Seltos"],
+  "Jeep": ["Wrangler","Grand Cherokee","Cherokee","Compass","Gladiator","Renegade","Wagoneer","Grand Wagoneer"],
+  "GMC": ["Sierra 1500","Sierra 2500","Yukon","Yukon XL","Terrain","Acadia","Canyon","Envoy"],
+  "Ram": ["1500","2500","3500","ProMaster","ProMaster City"],
+  "Dodge": ["Charger","Challenger","Durango","Journey"],
+  "Subaru": ["Outback","Forester","Crosstrek","Impreza","Legacy","Ascent","WRX","BRZ","Solterra"],
+  "BMW": ["3 Series","5 Series","7 Series","X3","X5","X7","M3","M5","i4","iX","4 Series","2 Series"],
+  "Mercedes-Benz": ["C-Class","E-Class","S-Class","GLC","GLE","GLS","A-Class","CLA","AMG GT","EQS","EQE"],
+  "Audi": ["A3","A4","A6","A8","Q3","Q5","Q7","Q8","e-tron","RS3","RS6"],
+  "Lexus": ["ES","IS","GS","LS","RX","NX","GX","LX","UX","LC"],
+  "Cadillac": ["CT4","CT5","Escalade","Escalade ESV","XT4","XT5","XT6","Lyriq"],
+  "Lincoln": ["Navigator","Aviator","Corsair","Nautilus","Continental"],
+  "Acura": ["ILX","TLX","RLX","MDX","RDX","NSX"],
+  "Infiniti": ["Q50","Q60","QX50","QX60","QX80"],
+  "Volkswagen": ["Jetta","Passat","Golf","Tiguan","Atlas","Taos","ID.4","Arteon"],
+  "Mazda": ["Mazda3","Mazda6","CX-3","CX-5","CX-9","CX-30","CX-50","MX-5 Miata"],
+  "Volvo": ["S60","S90","V60","V90","XC40","XC60","XC90","C40"],
+  "Porsche": ["911","Cayenne","Macan","Panamera","Taycan","718"],
+  "Tesla": ["Model 3","Model S","Model X","Model Y","Cybertruck"],
+  "Land Rover": ["Defender","Discovery","Range Rover","Range Rover Sport","Range Rover Evoque","Range Rover Velar"],
+  "Jaguar": ["F-Pace","E-Pace","I-Pace","XE","XF","F-Type"],
+  "Genesis": ["G70","G80","G90","GV70","GV80","GV60"],
+  "Mitsubishi": ["Outlander","Eclipse Cross","Galant","Mirage","Outlander Sport"],
+  "Buick": ["Enclave","Encore","Encore GX","Envision","LaCrosse"],
+  "Chrysler": ["300","Pacifica","Voyager"],
+  "Rivian": ["R1T","R1S"],
+  "Mini": ["Cooper","Countryman","Clubman","Paceman"],
+  "Fiat": ["500","500X","500L"],
+  "Alfa Romeo": ["Giulia","Stelvio","Tonale"],
+  "Maserati": ["Ghibli","Quattroporte","Levante","Grecale"],
+  "Ferrari": ["Roma","Portofino","SF90","F8"],
+  "Lamborghini": ["Urus","Huracan","Aventador"],
+  "Rolls-Royce": ["Ghost","Phantom","Cullinan","Wraith","Dawn"],
 };
 
 function formatDateLabel(dateStr: string) {
@@ -839,6 +893,8 @@ export default function App() {
   const [lvisdYear, setLvisdYear]                       = useState("");
   const [lvisdMake, setLvisdMake]                       = useState("");
   const [lvisdModel, setLvisdModel]                     = useState("");
+  const [lvisdMakeOptions, setLvisdMakeOptions]         = useState<string[]>([]);
+  const [lvisdModelOptions, setLvisdModelOptions]       = useState<string[]>([]);
   const [lvisdSubmitting, setLvisdSubmitting]           = useState(false);
 
   // ── Splash screen sequencing ──
@@ -1294,23 +1350,28 @@ export default function App() {
     if (!selectedAdminBooking) return;
     if (processingRows.has(selectedAdminBooking.rowIndex)) return; // double-click guard
     const savedBooking = selectedAdminBooking;
+    const isFreeEvent = !!savedBooking.event;
     const rate = parseFloat(savedBooking.hourlyRate || "0");
-    const finalAmount = savedBooking.clientType !== "maintenance" && completeHours
+    const finalAmount = isFreeEvent
+      ? (completeAmount || "0")
+      : savedBooking.clientType !== "maintenance" && completeHours
       ? String((parseFloat(completeHours) * rate).toFixed(2))
       : completeAmount;
-    if (!finalAmount || parseFloat(finalAmount) <= 0) { alert("Please enter the hours or amount."); return; }
+    if (!isFreeEvent && (!finalAmount || parseFloat(finalAmount) <= 0)) { alert("Please enter the hours or amount."); return; }
+    // Free event bookings settle immediately at $0 — no pending invoice to release.
+    const finalInvoiceStatus = isFreeEvent ? "paid" : "pending";
     setProcessingRows(prev => new Set([...prev, savedBooking.rowIndex]));
     setCompleteLoading(true);
     // Optimistic UI update
     setAdminBookings(prev => prev.map(b => b.rowIndex === savedBooking.rowIndex
-      ? { ...b, status: "Completed", invoiceAmount: finalAmount, invoiceStatus: "pending", invoiceNote: completeNote }
+      ? { ...b, status: "Completed", invoiceAmount: finalAmount, invoiceStatus: finalInvoiceStatus, invoiceNote: completeNote }
       : b));
     setSelectedAdminBooking(null); setCompleteAmount(""); setCompleteHours(""); setCompleteNote("");
     try {
       const ok = await updateBooking(savedBooking.rowIndex, {
         status: "Completed",
         invoiceAmount: finalAmount,
-        invoiceStatus: "pending",
+        invoiceStatus: finalInvoiceStatus,
         invoiceNote: completeNote,
       });
       if (ok) {
@@ -1532,66 +1593,24 @@ export default function App() {
   // Static vehicle data — reliable curated list
   useEffect(() => {
     if (!vehicle || vehicle === "boat") { setMakeOptions([]); return; }
-    const carMakes = [
-      "Acura","Alfa Romeo","Audi","BMW","Buick","Cadillac","Chevrolet","Chrysler",
-      "Dodge","Ferrari","Fiat","Ford","Genesis","GMC","Honda","Hyundai","Infiniti",
-      "Jaguar","Jeep","Kia","Lamborghini","Land Rover","Lexus","Lincoln","Maserati",
-      "Mazda","Mercedes-Benz","Mini","Mitsubishi","Nissan","Porsche","Ram","Rivian",
-      "Rolls-Royce","Subaru","Tesla","Toyota","Volkswagen","Volvo",
-    ];
-    const truckMakes = [
-      "Chevrolet","Ford","GMC","Ram","Toyota","Nissan","Honda","Jeep",
-      "Land Rover","Lexus","Lincoln","Cadillac","Rivian","Mercedes-Benz",
-    ];
-    setMakeOptions(vehicle === "truckSuv" ? truckMakes : carMakes);
+    setMakeOptions(vehicle === "truckSuv" ? TRUCK_MAKES : CAR_MAKES);
   }, [vehicle]);
 
   useEffect(() => {
     if (!make || !vehicle || vehicle === "boat") { setModelOptions([]); return; }
-    const modelMap: Record<string, string[]> = {
-      "Toyota": ["Camry","Corolla","RAV4","Tacoma","Tundra","Highlander","4Runner","Sienna","Prius","Avalon","Sequoia","Land Cruiser","Venza","C-HR"],
-      "Ford": ["F-150","F-250","F-350","Mustang","Explorer","Escape","Edge","Bronco","Bronco Sport","Expedition","Ranger","Maverick","EcoSport"],
-      "Chevrolet": ["Silverado 1500","Silverado 2500","Tahoe","Suburban","Equinox","Traverse","Blazer","Malibu","Camaro","Corvette","Colorado","Trax","Trailblazer"],
-      "Honda": ["Civic","Accord","CR-V","Pilot","Odyssey","HR-V","Ridgeline","Passport","Insight"],
-      "Nissan": ["Altima","Sentra","Maxima","Rogue","Murano","Pathfinder","Frontier","Titan","Armada","Kicks","Versa"],
-      "Hyundai": ["Elantra","Sonata","Tucson","Santa Fe","Palisade","Kona","Ioniq 5","Ioniq 6","Santa Cruz","Venue"],
-      "Kia": ["Forte","K5","Telluride","Sorento","Sportage","Soul","Stinger","EV6","Carnival","Seltos"],
-      "Jeep": ["Wrangler","Grand Cherokee","Cherokee","Compass","Gladiator","Renegade","Wagoneer","Grand Wagoneer"],
-      "GMC": ["Sierra 1500","Sierra 2500","Yukon","Yukon XL","Terrain","Acadia","Canyon","Envoy"],
-      "Ram": ["1500","2500","3500","ProMaster","ProMaster City"],
-      "Dodge": ["Charger","Challenger","Durango","Journey"],
-      "Subaru": ["Outback","Forester","Crosstrek","Impreza","Legacy","Ascent","WRX","BRZ","Solterra"],
-      "BMW": ["3 Series","5 Series","7 Series","X3","X5","X7","M3","M5","i4","iX","4 Series","2 Series"],
-      "Mercedes-Benz": ["C-Class","E-Class","S-Class","GLC","GLE","GLS","A-Class","CLA","AMG GT","EQS","EQE"],
-      "Audi": ["A3","A4","A6","A8","Q3","Q5","Q7","Q8","e-tron","RS3","RS6"],
-      "Lexus": ["ES","IS","GS","LS","RX","NX","GX","LX","UX","LC"],
-      "Cadillac": ["CT4","CT5","Escalade","Escalade ESV","XT4","XT5","XT6","Lyriq"],
-      "Lincoln": ["Navigator","Aviator","Corsair","Nautilus","Continental"],
-      "Acura": ["ILX","TLX","RLX","MDX","RDX","NSX"],
-      "Infiniti": ["Q50","Q60","QX50","QX60","QX80"],
-      "Volkswagen": ["Jetta","Passat","Golf","Tiguan","Atlas","Taos","ID.4","Arteon"],
-      "Mazda": ["Mazda3","Mazda6","CX-3","CX-5","CX-9","CX-30","CX-50","MX-5 Miata"],
-      "Volvo": ["S60","S90","V60","V90","XC40","XC60","XC90","C40"],
-      "Porsche": ["911","Cayenne","Macan","Panamera","Taycan","718"],
-      "Tesla": ["Model 3","Model S","Model X","Model Y","Cybertruck"],
-      "Land Rover": ["Defender","Discovery","Range Rover","Range Rover Sport","Range Rover Evoque","Range Rover Velar"],
-      "Jaguar": ["F-Pace","E-Pace","I-Pace","XE","XF","F-Type"],
-      "Genesis": ["G70","G80","G90","GV70","GV80","GV60"],
-      "Mitsubishi": ["Outlander","Eclipse Cross","Galant","Mirage","Outlander Sport"],
-      "Buick": ["Enclave","Encore","Encore GX","Envision","LaCrosse"],
-      "Chrysler": ["300","Pacifica","Voyager"],
-      "Rivian": ["R1T","R1S"],
-      "Mini": ["Cooper","Countryman","Clubman","Paceman"],
-      "Fiat": ["500","500X","500L"],
-      "Alfa Romeo": ["Giulia","Stelvio","Tonale"],
-      "Maserati": ["Ghibli","Quattroporte","Levante","Grecale"],
-      "Ferrari": ["Roma","Portofino","SF90","F8"],
-      "Lamborghini": ["Urus","Huracan","Aventador"],
-      "Rolls-Royce": ["Ghost","Phantom","Cullinan","Wraith","Dawn"],
-    };
-    const models = modelMap[make] || [];
-    setModelOptions(models.sort((a, b) => a.localeCompare(b)));
+    setModelOptions((VEHICLE_MODEL_MAP[make] || []).slice().sort((a, b) => a.localeCompare(b)));
   }, [make, vehicle]);
+
+  // Same make/model autocomplete for the separate LVISD event flow
+  useEffect(() => {
+    if (!lvisdVehicle) { setLvisdMakeOptions([]); return; }
+    setLvisdMakeOptions(lvisdVehicle === "truckSuv" ? TRUCK_MAKES : CAR_MAKES);
+  }, [lvisdVehicle]);
+
+  useEffect(() => {
+    if (!lvisdMake || !lvisdVehicle) { setLvisdModelOptions([]); return; }
+    setLvisdModelOptions((VEHICLE_MODEL_MAP[lvisdMake] || []).slice().sort((a, b) => a.localeCompare(b)));
+  }, [lvisdMake, lvisdVehicle]);
 
   useEffect(() => {
     if (step !== 5 || serviceType !== "mobile") return;
@@ -2769,7 +2788,7 @@ export default function App() {
                     <h2 style={S.title}>Confirm Eligibility</h2>
                     <p style={S.subtitle}>This wash is reserved for Lago Vista ISD teachers and staff. Confirm one of the following.</p>
                     <div style={S.addOnGrid}>
-                      <div style={S.addOnRow} onClick={() => setLvisdEligibility("email")}>
+                      <div style={{ ...S.addOnRow, ...(lvisdEligibility === "email" ? S.selectedCard : {}) }} onClick={() => setLvisdEligibility("email")}>
                         <div>
                           <div style={{ fontWeight: 700, color: "#f1f5f9" }}>School email address</div>
                           <div style={{ fontSize: "0.85rem", color: "rgba(255,255,255,0.5)" }}>Must end in @{LVISD_EVENT.emailDomain}</div>
@@ -2781,7 +2800,7 @@ export default function App() {
                           value={lvisdEligibilityEmail} onChange={(e) => setLvisdEligibilityEmail(e.target.value)} />
                       )}
 
-                      <div style={S.addOnRow} onClick={() => setLvisdEligibility("photo")}>
+                      <div style={{ ...S.addOnRow, ...(lvisdEligibility === "photo" ? S.selectedCard : {}) }} onClick={() => setLvisdEligibility("photo")}>
                         <div>
                           <div style={{ fontWeight: 700, color: "#f1f5f9" }}>Upload proof</div>
                           <div style={{ fontSize: "0.85rem", color: "rgba(255,255,255,0.5)" }}>Staff ID, pay stub, or similar</div>
@@ -2789,14 +2808,27 @@ export default function App() {
                         <input type="radio" checked={lvisdEligibility === "photo"} onChange={() => setLvisdEligibility("photo")} />
                       </div>
                       {lvisdEligibility === "photo" && (
-                        <label style={{ ...S.secondary, textAlign: "center" as const, display: "block", cursor: "pointer" }}>
-                          {lvisdProofFileName || "Choose a photo"}
-                          <input type="file" accept="image/*" style={{ display: "none" }}
-                            onChange={(e) => { const f = e.target.files?.[0]; if (f) handleLvisdProofFile(f); }} />
-                        </label>
+                        lvisdProofBase64 ? (
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, background: "rgba(16,185,129,0.1)", border: "1.5px solid #34d399", borderRadius: 14, padding: "12px 16px" }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 8, color: "#34d399", fontWeight: 700, fontSize: "0.9rem" }}>
+                              <span>✓</span> Uploaded: {lvisdProofFileName}
+                            </div>
+                            <label style={{ color: "#93c5fd", fontSize: "0.82rem", fontWeight: 600, cursor: "pointer", textDecoration: "underline" }}>
+                              Change
+                              <input type="file" accept="image/*" style={{ display: "none" }}
+                                onChange={(e) => { const f = e.target.files?.[0]; if (f) handleLvisdProofFile(f); }} />
+                            </label>
+                          </div>
+                        ) : (
+                          <label style={{ ...S.secondary, textAlign: "center" as const, display: "block", cursor: "pointer" }}>
+                            Choose a photo
+                            <input type="file" accept="image/*" style={{ display: "none" }}
+                              onChange={(e) => { const f = e.target.files?.[0]; if (f) handleLvisdProofFile(f); }} />
+                          </label>
+                        )
                       )}
 
-                      <div style={S.addOnRow} onClick={() => setLvisdEligibility("attest")}>
+                      <div style={{ ...S.addOnRow, ...(lvisdEligibility === "attest" ? S.selectedCard : {}) }} onClick={() => setLvisdEligibility("attest")}>
                         <div>
                           <div style={{ fontWeight: 700, color: "#f1f5f9" }}>I'll bring proof to the appointment</div>
                           <div style={{ fontSize: "0.85rem", color: "rgba(255,255,255,0.5)" }}>Staff ID or pay stub, shown at drop-off</div>
@@ -2843,12 +2875,32 @@ export default function App() {
                     <p style={S.subtitle}>We'll send your confirmation and drop-off address to this contact info.</p>
                     <div style={{ display: "grid", gap: 14 }}>
                       <input style={S.input} placeholder="Full Name" value={lvisdName} onChange={(e) => setLvisdName(e.target.value)} />
-                      <input style={S.input} placeholder="Phone" value={lvisdPhone} onChange={(e) => setLvisdPhone(e.target.value)} />
+                      <input style={S.input} placeholder="(512) 000-0000" value={lvisdPhone} type="tel" inputMode="numeric"
+                        onChange={(e) => {
+                          const raw = e.target.value.replace(/\D/g, "").slice(0, 10);
+                          const fmt = raw.length > 6 ? `(${raw.slice(0,3)}) ${raw.slice(3,6)}-${raw.slice(6)}` : raw.length > 3 ? `(${raw.slice(0,3)}) ${raw.slice(3)}` : raw;
+                          setLvisdPhone(fmt);
+                        }} />
                       <input style={S.input} type="email" placeholder="Email" value={lvisdEmail} onChange={(e) => setLvisdEmail(e.target.value)} />
                       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(100px, 1fr))", gap: 10 }}>
-                        <input style={S.input} placeholder="Year" value={lvisdYear} onChange={(e) => setLvisdYear(e.target.value)} />
-                        <input style={S.input} placeholder="Make" value={lvisdMake} onChange={(e) => setLvisdMake(e.target.value)} />
-                        <input style={S.input} placeholder="Model" value={lvisdModel} onChange={(e) => setLvisdModel(e.target.value)} />
+                        <div>
+                          <input style={S.input} placeholder="Year" value={lvisdYear}
+                            onChange={(e) => { setLvisdYear(e.target.value); setLvisdModel(""); }}
+                            list="lvisd-year-options" />
+                          <datalist id="lvisd-year-options">{yearOptions.map((yr) => <option key={yr} value={yr} />)}</datalist>
+                        </div>
+                        <div>
+                          <input style={S.input} placeholder="Make" value={lvisdMake}
+                            onChange={(e) => { setLvisdMake(e.target.value); setLvisdModel(""); }}
+                            list="lvisd-make-options" autoComplete="off" />
+                          <datalist id="lvisd-make-options">{lvisdMakeOptions.map((mk) => <option key={mk} value={mk} />)}</datalist>
+                        </div>
+                        <div>
+                          <input style={S.input} placeholder="Model" value={lvisdModel}
+                            onChange={(e) => setLvisdModel(e.target.value)}
+                            list="lvisd-model-options" autoComplete="off" />
+                          <datalist id="lvisd-model-options">{lvisdModelOptions.map((mdl) => <option key={mdl} value={mdl} />)}</datalist>
+                        </div>
                       </div>
                     </div>
 
@@ -3831,7 +3883,12 @@ export default function App() {
                                   </div>
                                 )}
 
-                                {b.clientType !== "maintenance" ? (
+                                {b.event ? (
+                                  /* Free event booking — no amount to enter, settles at $0 immediately */
+                                  <div style={{ background: "rgba(217,119,6,0.1)", border: "1.5px solid rgba(217,119,6,0.35)", borderRadius: 10, padding: "10px 14px", marginBottom: 12, fontSize: "0.85rem", color: "#fbbf24" }}>
+                                    🎉 Free event booking — completing this marks it done at $0, no invoice to release.
+                                  </div>
+                                ) : b.clientType !== "maintenance" ? (
                                   /* Non-maintenance: hourly or flat rate toggle */
                                   <div style={{ marginBottom: 10 }}>
                                     {/* Mode toggle */}
@@ -3941,11 +3998,13 @@ export default function App() {
                                   </div>
                                 )}
 
-                                <div style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.35)", marginBottom: 10 }}>This creates a pending invoice. You must release it from the Invoices tab before the client can see it.</div>
+                                {!b.event && (
+                                  <div style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.35)", marginBottom: 10 }}>This creates a pending invoice. You must release it from the Invoices tab before the client can see it.</div>
+                                )}
                                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" as const }}>
-                                  <button onClick={handleMarkComplete} disabled={completeLoading || (!completeAmount && !completeHours)}
-                                    style={{ background: "#059669", color: "#fff", border: "none", borderRadius: 8, padding: "9px 18px", fontWeight: 700, fontSize: "0.88rem", cursor: "pointer", opacity: completeLoading || (!completeAmount && !completeHours) ? 0.5 : 1 }}>
-                                    {completeLoading ? "Saving..." : "Confirm Complete"}
+                                  <button onClick={handleMarkComplete} disabled={completeLoading || (!b.event && !completeAmount && !completeHours)}
+                                    style={{ background: "#059669", color: "#fff", border: "none", borderRadius: 8, padding: "9px 18px", fontWeight: 700, fontSize: "0.88rem", cursor: "pointer", opacity: completeLoading || (!b.event && !completeAmount && !completeHours) ? 0.5 : 1 }}>
+                                    {completeLoading ? "Saving..." : b.event ? "Confirm Complete — Free" : "Confirm Complete"}
                                   </button>
                                   <button onClick={async () => {
                                     if (!b.phone) { alert("No phone number on file."); return; }
