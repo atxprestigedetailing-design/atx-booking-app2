@@ -12,7 +12,7 @@ const GOOGLE_CLIENT_ID =
   "447699234633-ivo2e1c2q843scj32k5323o2rkq6h7dp.apps.googleusercontent.com";
 
 const SCRIPT_URL =
-  "https://script.google.com/macros/s/AKfycbwv5Sva_CWwgJQAUEOZJiuWM-IK4wTUxlEGLd-QcI59_FbqL_qHOqhbGrnFPTGCKj-r8Q/exec";
+  "https://script.google.com/macros/s/AKfycbyuP0H9R9DDc-BIuLahBXhxxQh-4e8x_TRG-BjZ6iPLgaIgdIgaI6k0DWpHlRkI3tvfUg/exec";
 
 // Sandbox credentials — replace with your Square Sandbox Application ID / Location ID
 // (Dashboard → Sandbox → your app → Locations). These are not secret and are safe here;
@@ -862,6 +862,7 @@ export default function App() {
   const [selectedDate, setSelectedDate]                 = useState("");
   const [availableSlots, setAvailableSlots]             = useState<AvailabilitySlot[]>([]);
   const [allAvailableSlots, setAllAvailableSlots]       = useState<AvailabilitySlot[]>([]);
+  const [lvisdRawSlots, setLvisdRawSlots]               = useState<AvailabilitySlot[]>([]);
   const [availableDates, setAvailableDates]             = useState<string[]>([]);
   const [calMonth, setCalMonth]                         = useState(() => new Date().getMonth());
   const [calYear, setCalYear]                           = useState(() => new Date().getFullYear());
@@ -1657,8 +1658,13 @@ export default function App() {
 
   useEffect(() => {
     fetchAllAvailability().then((slots) => {
-      setAllAvailableSlots(slots);
-      const dates = [...new Set(slots.map((s) => s.date))];
+      // Slots reserved for a one-off promo event (e.g. LVISD) are excluded from the
+      // standard flow entirely — they're only ever offered through that event's own
+      // booking flow (see lvisdRawSlots below), never as a normal detail slot.
+      const standardSlots = slots.filter((s) => s.date !== LVISD_EVENT.date);
+      setAllAvailableSlots(standardSlots);
+      setLvisdRawSlots(slots.filter((s) => s.date === LVISD_EVENT.date));
+      const dates = [...new Set(standardSlots.map((s) => s.date))];
       setAvailableDates(dates);
       // Auto-advance calendar to first available month
       if (dates.length > 0) {
@@ -1713,8 +1719,8 @@ export default function App() {
 
   // ── LVISD event: derived capacity + navigation ──
   const lvisdOpenSlots = useMemo(
-    () => allAvailableSlots.filter((s) => s.date === LVISD_EVENT.date),
-    [allAvailableSlots]
+    () => lvisdRawSlots.filter((s) => s.date === LVISD_EVENT.date),
+    [lvisdRawSlots]
   );
   const lvisdEventDatePassed = useMemo(() => {
     const [y, m, d] = LVISD_EVENT.date.split("-").map(Number);
@@ -4008,13 +4014,16 @@ export default function App() {
                                   </button>
                                   <button onClick={async () => {
                                     if (!b.phone) { alert("No phone number on file."); return; }
-                                    try { await fetch(SCRIPT_URL, { method: "POST", body: JSON.stringify({ action: "sendJobStartedSMS", customerName: b.name, customerPhone: b.phone, serviceDate: b.date }) }); alert("Job started text sent!"); } catch (e) { alert("SMS failed"); }
+                                    try { await fetch(SCRIPT_URL, { method: "POST", body: JSON.stringify({ action: "sendJobStartedSMS", customerName: b.name, customerPhone: b.phone, serviceDate: b.date, event: b.event || "", eventLabel: b.event === LVISD_EVENT.id ? LVISD_EVENT.label : "" }) }); alert("Job started text sent!"); } catch (e) { alert("SMS failed"); }
                                   }} style={{ background: "#2563eb", color: "#fff", border: "none", borderRadius: 8, padding: "9px 14px", fontWeight: 600, fontSize: "0.82rem", cursor: "pointer" }}>
                                     📱 Text: Job Started
                                   </button>
                                   <button onClick={async () => {
                                     if (!b.phone) { alert("No phone number on file."); return; }
-                                    try { await fetch(SCRIPT_URL, { method: "POST", body: JSON.stringify({ action: "sendJobCompletedSMS", customerName: b.name, customerPhone: b.phone, serviceDate: b.date }) }); alert("Job done text sent!"); } catch (e) { alert("SMS failed"); }
+                                    try {
+                                      await fetch(SCRIPT_URL, { method: "POST", body: JSON.stringify({ action: "sendJobCompletedSMS", customerName: b.name, customerPhone: b.phone, customerEmail: b.email, serviceDate: b.date, event: b.event || "", eventLabel: b.event === LVISD_EVENT.id ? LVISD_EVENT.label : "" }) });
+                                      alert(b.event ? "Job done text and email sent!" : "Job done text sent!");
+                                    } catch (e) { alert("SMS failed"); }
                                   }} style={{ background: "#7c3aed", color: "#fff", border: "none", borderRadius: 8, padding: "9px 14px", fontWeight: 600, fontSize: "0.82rem", cursor: "pointer" }}>
                                     📱 Text: Job Done
                                   </button>

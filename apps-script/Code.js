@@ -1260,7 +1260,9 @@ function sendJobStartedSMS(data) {
     if (!customerPhone) {
       return ContentService.createTextOutput(JSON.stringify({ success: false, error: "No phone" })).setMimeType(ContentService.MimeType.JSON);
     }
-    var msg = "Hi " + customerName + "! Your ATX Prestige Detailing service has started. We will notify you when it is complete. Thank you for your patience!";
+    var msg = data.event
+      ? "Hi " + customerName + "! We're starting your free " + (data.eventLabel || "event") + " wash now. We'll text you when it's done. Thank you for being a part of educating our future!"
+      : "Hi " + customerName + "! Your ATX Prestige Detailing service has started. We will notify you when it is complete. Thank you for your patience!";
     sendSMS(customerPhone, msg);
     return ContentService.createTextOutput(JSON.stringify({ success: true })).setMimeType(ContentService.MimeType.JSON);
   } catch (err) {
@@ -1278,8 +1280,44 @@ function sendJobCompletedSMS(data) {
     if (!customerPhone) {
       return ContentService.createTextOutput(JSON.stringify({ success: false, error: "No phone" })).setMimeType(ContentService.MimeType.JSON);
     }
-    var msg = "Hi " + customerName + "! Your ATX Prestige Detailing service is complete. Your invoice will be sent shortly. Thank you for choosing us!";
+    var msg = data.event
+      ? "Hi " + customerName + "! Your free " + (data.eventLabel || "event") + " wash is complete. We're honored to help start your school year off with a clean car. Thank you for everything you do!"
+      : "Hi " + customerName + "! Your ATX Prestige Detailing service is complete. Your invoice will be sent shortly. Thank you for choosing us!";
     sendSMS(customerPhone, msg);
+
+    if (data.event && data.customerEmail && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.customerEmail)) {
+      try {
+        var doneSubject = (data.eventLabel || "Event") + " Wash Complete | ATX Prestige Detailing";
+        var doneBody =
+          "Hi " + customerName + ",\n\n" +
+          "Your free " + (data.eventLabel || "event") + " wash is complete! We're honored to help start your school year off with a clean car.\n\n" +
+          "Thank you for everything you do for our students.\n\n" +
+          "Thank you,\nATX Prestige Detailing";
+        var doneHtml =
+          "<!DOCTYPE html><html><head><meta charset='UTF-8'></head><body>" +
+          "<div style='margin:0;padding:0;background-color:#f4f4f4;font-family:Arial,sans-serif;color:#222;'>" +
+          "<div style='max-width:640px;margin:0 auto;padding:32px 16px;'>" +
+          "<div style='background-color:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 14px rgba(0,0,0,0.08);'>" +
+          "<div style='background-color:#111;color:#fff;padding:24px 28px;'>" +
+          "<div style='font-size:26px;font-weight:700;'>ATX Prestige Detailing</div>" +
+          "<div style='font-size:14px;opacity:0.9;margin-top:6px;'>" + (data.eventLabel || "Event") + " Wash Complete</div>" +
+          "</div>" +
+          "<div style='padding:28px;'>" +
+          "<p style='margin:0 0 16px;font-size:16px;'>Hi " + customerName + ",</p>" +
+          "<p style='margin:0 0 16px;font-size:15px;color:#444;'>Your free " + (data.eventLabel || "event") + " wash is complete! We're honored to help start your school year off with a clean car.</p>" +
+          "<p style='margin:0;font-size:15px;color:#444;'>Thank you for everything you do for our students.</p>" +
+          "</div>" +
+          "<div style='padding:0 28px 28px;'>" +
+          "<p style='margin:0;font-size:15px;color:#444;'>Thank you,<br><strong>ATX Prestige Detailing</strong></p>" +
+          "</div></div></div></div></body></html>";
+        GmailApp.sendEmail(data.customerEmail, doneSubject, doneBody, {
+          from: "atxprestigedetailing@gmail.com",
+          name: "ATX Prestige Detailing",
+          htmlBody: doneHtml,
+          charset: "UTF-8",
+        });
+      } catch (doneEmailErr) { Logger.log("Event job-done email failed: " + doneEmailErr); }
+    }
     return ContentService.createTextOutput(JSON.stringify({ success: true })).setMimeType(ContentService.MimeType.JSON);
   } catch (err) {
     Logger.log("sendJobCompletedSMS error: " + err);
@@ -1669,8 +1707,8 @@ function sendEventBookingConfirmation(o) {
   if (o.phone) {
     var smsMsg =
       "Hi " + o.customerName + "! You're confirmed for the free wash " + dateLabel +
-      " at " + o.requestedTime + ". Please be on time — appointments are back-to-back. " +
-      "We'll email/text the drop-off address and details shortly. Thank you for being an educator!";
+      " at " + o.requestedTime + ". Drop-off address: " + (o.eventAddress || "we'll follow up by email") + ". " +
+      "Please be on time, appointments are back to back. Thank you for being a part of educating our future!";
     sendSMS(o.phone, smsMsg);
   }
 
@@ -1703,7 +1741,7 @@ function sendEventBookingConfirmation(o) {
 
   if (o.looksLikeValidEmail) {
     try {
-      var subject = (o.eventLabel || "Free Wash") + " — Booking Confirmed | ATX Prestige Detailing";
+      var subject = (o.eventLabel || "Free Wash") + " Booking Confirmed | ATX Prestige Detailing";
 
       var plainBody =
         "Hi " + o.customerName + ",\n\n" +
@@ -1712,9 +1750,9 @@ function sendEventBookingConfirmation(o) {
         "Date: " + dateLabel + "\n" +
         "Time: " + o.requestedTime + "\n" +
         "Vehicle: " + o.vehicle + "\n\n" +
-        "Drop-off address: " + (o.eventAddress || "TBD — we'll follow up with the address") + "\n\n" +
+        "Drop-off address: " + (o.eventAddress || "we'll follow up with the address") + "\n\n" +
         "Since this is a home address, it works best if someone else drives you and either waits in another car or drops the vehicle and leaves, rather than waiting around at the property.\n\n" +
-        "Please be on time — appointments are back-to-back with limited buffer between them.\n\n" +
+        "Please be on time, appointments are back to back with limited buffer between them.\n\n" +
         (o.eventRainPolicy || "If weather forces us to reschedule, we'll reach out directly.") + "\n\n" +
         "Thank you,\nATX Prestige Detailing";
 
@@ -1725,7 +1763,7 @@ function sendEventBookingConfirmation(o) {
         "<div style='background-color:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 14px rgba(0,0,0,0.08);'>" +
         "<div style='background-color:#111;color:#fff;padding:24px 28px;'>" +
         "<div style='font-size:26px;font-weight:700;'>ATX Prestige Detailing</div>" +
-        "<div style='font-size:14px;opacity:0.9;margin-top:6px;'>" + (o.eventLabel || "Free Wash") + " — Confirmed</div>" +
+        "<div style='font-size:14px;opacity:0.9;margin-top:6px;'>" + (o.eventLabel || "Free Wash") + " Confirmed</div>" +
         "</div>" +
         "<div style='padding:28px;'>" +
         "<p style='margin:0 0 16px;font-size:16px;'>Hi " + o.customerName + ",</p>" +
@@ -1735,13 +1773,13 @@ function sendEventBookingConfirmation(o) {
         "<tr><td style='padding:8px 0;font-weight:600;width:140px;'>Date:</td><td style='padding:8px 0;'>" + dateLabel + "</td></tr>" +
         "<tr><td style='padding:8px 0;font-weight:600;'>Time:</td><td style='padding:8px 0;'>" + o.requestedTime + "</td></tr>" +
         "<tr><td style='padding:8px 0;font-weight:600;'>Vehicle:</td><td style='padding:8px 0;'>" + o.vehicle + "</td></tr>" +
-        "<tr><td style='padding:8px 0;font-weight:600;'>Drop-off Address:</td><td style='padding:8px 0;'>" + (o.eventAddress || "TBD — we'll follow up") + "</td></tr>" +
+        "<tr><td style='padding:8px 0;font-weight:600;'>Drop-off Address:</td><td style='padding:8px 0;'>" + (o.eventAddress || "we'll follow up") + "</td></tr>" +
         "</table></div>" +
         "<div style='background:#fff8e8;border:1px solid #f0dfae;border-radius:12px;padding:16px 18px;margin-bottom:16px;'>" +
         "<div style='font-size:14px;color:#5a4a1f;'>Since this is a home address, it works best if someone else drives you and either waits in another car or drops the vehicle and leaves, rather than waiting around at the property.</div>" +
         "</div>" +
         "<div style='background:#fff8e8;border:1px solid #f0dfae;border-radius:12px;padding:16px 18px;margin-bottom:16px;'>" +
-        "<div style='font-size:14px;color:#5a4a1f;'>Please be on time — appointments are back-to-back with limited buffer between them.</div>" +
+        "<div style='font-size:14px;color:#5a4a1f;'>Please be on time, appointments are back to back with limited buffer between them.</div>" +
         "</div>" +
         "<div style='background:#f9fafb;border:1px solid #e5e7eb;border-radius:12px;padding:16px 18px;margin-bottom:20px;'>" +
         "<div style='font-size:14px;color:#374151;'>" + (o.eventRainPolicy || "If weather forces us to reschedule, we'll reach out directly.") + "</div>" +
