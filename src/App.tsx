@@ -12,7 +12,7 @@ const GOOGLE_CLIENT_ID =
   "447699234633-ivo2e1c2q843scj32k5323o2rkq6h7dp.apps.googleusercontent.com";
 
 const SCRIPT_URL =
-  "https://script.google.com/macros/s/AKfycbxyoAoAY41I520P4wwvRzyMk5Rh_qamQJhanL0nTNao_QgcHow1ev0G1ciiBHx6pi5nFg/exec";
+  "https://script.google.com/macros/s/AKfycbyf_aiMvIFlcKJzOYLy7zVH_FVVgzw7ZlVeIBG-8FVe56yWfKsaDLL7AuCrOeq1xfzsuw/exec";
 
 // Sandbox credentials — replace with your Square Sandbox Application ID / Location ID
 // (Dashboard → Sandbox → your app → Locations). These are not secret and are safe here;
@@ -179,9 +179,7 @@ const LVISD_EVENT: EventConfig = {
   ],
   slotTimes: ["8:00 AM", "8:45 AM", "9:30 AM", "10:15 AM", "11:00 AM", "11:45 AM", "12:30 PM", "1:15 PM", "2:00 PM", "2:45 PM"],
   emailDomain: "lagovistaisd.net",
-  // TODO(owner): fill in the actual drop-off address before this goes live — left blank
-  // on purpose rather than guessed, since it's a home address.
-  dropoffAddress: "",
+  dropoffAddress: "20703 Paseo De Vaca St, Lago Vista, TX 78645",
   rainPolicy: "If weather forces us to reschedule, we'll reach out directly to get you set up for a new time.",
 };
 
