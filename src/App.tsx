@@ -91,6 +91,9 @@ type Booking = {
   smsConsent?: string | boolean;
   smsMarketingConsent?: string | boolean;
   datePaid?: string;
+  event?: string;
+  eligibilityMethod?: string;
+  eligibilityProofUrl?: string;
 };
 
 type Expense = {
@@ -147,6 +150,40 @@ const marineAddOnOptions: { label: AddOn; priceText: string; fixedPrice?: number
   { label: "Interior Deep Extraction",     priceText: "$120", fixedPrice: 120 },
   { label: "Sealant & Protection Upgrade", priceText: "$80",  fixedPrice: 80  },
 ];
+
+// ─── Promo / community-event booking config ───────────────────────────────────
+// One-off free-service flows (like the LVISD staff wash below) key off this
+// object instead of being hardcoded inline, so a future event just needs a
+// new config here rather than touching the flow logic itself.
+type EventConfig = {
+  id: string;
+  label: string;
+  shortLabel: string;
+  date: string; // YYYY-MM-DD
+  vehicleOptions: { id: VehicleType; label: string }[];
+  slotTimes: string[];
+  emailDomain: string;
+  dropoffAddress: string;
+  rainPolicy: string;
+};
+
+const LVISD_EVENT: EventConfig = {
+  id: "lvisd-aug-2026",
+  label: "Lago Vista ISD Teacher/Staff Appreciation Wash",
+  shortLabel: "LVISD Teacher/Staff Free Wash",
+  date: "2026-08-08",
+  vehicleOptions: [
+    { id: "truckSuv", label: "Truck / SUV" },
+    { id: "sedan",    label: "Sedan" },
+    { id: "coupe",    label: "Coupe" },
+  ],
+  slotTimes: ["8:00 AM", "8:45 AM", "9:30 AM", "10:15 AM", "11:00 AM", "11:45 AM", "12:30 PM", "1:15 PM", "2:00 PM", "2:45 PM"],
+  emailDomain: "lagovistaisd.net",
+  // TODO(owner): fill in the actual drop-off address before this goes live — left blank
+  // on purpose rather than guessed, since it's a home address.
+  dropoffAddress: "",
+  rainPolicy: "If weather forces us to reschedule, we'll reach out directly to get you set up for a new time.",
+};
 
 function formatDateLabel(dateStr: string) {
   if (!dateStr) return "N/A";
@@ -400,6 +437,9 @@ function BookingCard({ booking, upcoming, onCancel, onBookAgain, isEditing, edit
 
   const isCancelled = booking.status === "Cancelled";
   const isSkipped = booking.status === "Skipped";
+  // Promo/community-event bookings (e.g. LVISD free wash) can't be rescheduled or
+  // have their package/service changed through self-service — only vehicle info.
+  const isEventBooking = !!booking.event;
 
   return (
     <div style={{ background: isCancelled ? "rgba(239,68,68,0.05)" : "rgba(255,255,255,0.05)", border: isCancelled ? "1px solid rgba(239,68,68,0.3)" : isSkipped ? "1px solid rgba(59,130,246,0.3)" : upcoming ? "1px solid rgba(59,130,246,0.45)" : "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: 18, position: "relative" as const, opacity: isCancelled || isSkipped ? 0.8 : 1 }}>
@@ -479,10 +519,17 @@ function BookingCard({ booking, upcoming, onCancel, onBookAgain, isEditing, edit
         )}
       </div>
 
-      {/* Inline edit form — date/time, package, vehicle details, name (email stays tied to the Google account) */}
+      {/* Inline edit form — date/time, package, vehicle details, name (email stays tied to the Google account).
+          Event bookings (isEventBooking) only expose the vehicle-details fields below — no reschedule,
+          package, or name changes, matching the promo's self-service lock-down. */}
       {isEditing && editFields && (
         <div style={{ marginTop: 14, background: "rgba(59,130,246,0.06)", border: "1px solid rgba(59,130,246,0.2)", borderRadius: 14, padding: 16, display: "grid", gap: 12 }}>
-          {((editFields.date && editFields.date !== booking.date) || (editFields.time && editFields.time !== booking.time)) && (
+          {isEventBooking && (
+            <div style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.5)" }}>
+              This is a free-event booking — date, time, and service are fixed. You can update your vehicle info below.
+            </div>
+          )}
+          {!isEventBooking && ((editFields.date && editFields.date !== booking.date) || (editFields.time && editFields.time !== booking.time)) && (
             <div style={{ background: "rgba(251,191,36,0.08)", border: "1.5px solid #f59e0b", borderRadius: 10, padding: "12px 14px" }}>
               <div style={{ fontWeight: 700, color: "#fbbf24", fontSize: "0.85rem", marginBottom: 4 }}>Reschedule Detected</div>
               <div style={{ fontSize: "0.82rem", color: "#fbbf24" }}>
@@ -492,58 +539,64 @@ function BookingCard({ booking, upcoming, onCancel, onBookAgain, isEditing, edit
               </div>
             </div>
           )}
-          <div>
-            <div style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.45)", marginBottom: 4 }}>Date &amp; Time</div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-              <input
-                type="date"
-                value={editFields.date ?? booking.date}
-                min={new Date().toISOString().split("T")[0]}
-                onChange={(e) => {
-                  const newDate = e.target.value;
-                  const slotsForNewDate = (allAvailableSlots || []).filter(s => s.date === newDate && !isSlotInPast(s.date, s.time));
-                  const defaultTime = newDate === booking.date ? booking.time : (slotsForNewDate[0]?.time || "");
-                  onEditField?.({ date: newDate, time: defaultTime });
-                }}
-                style={editInputStyle}
-              />
-              {(() => {
-                const slotsForDate = (allAvailableSlots || []).filter(s => s.date === (editFields.date ?? booking.date) && !isSlotInPast(s.date, s.time));
-                const sameDate = (editFields.date ?? booking.date) === booking.date;
-                return slotsForDate.length > 0 || sameDate ? (
-                  <select value={editFields.time ?? booking.time} onChange={(e) => onEditField?.({ time: e.target.value })} style={{ ...editInputStyle, backgroundColor: "rgba(255,255,255,0.06)" }}>
-                    {sameDate && <option value={booking.time}>{booking.time} (current)</option>}
-                    {slotsForDate.filter(s => s.time !== booking.time).map(s => (
-                      <option key={s.time} value={s.time}>{s.time}</option>
-                    ))}
-                  </select>
-                ) : (
-                  <div style={{ display: "flex", alignItems: "center", padding: "0 12px", background: "rgba(239,68,68,0.1)", border: "1px solid #fca5a5", borderRadius: 10, fontSize: "0.8rem", color: "#f87171" }}>
-                    No open slots that day
-                  </div>
-                );
-              })()}
+          {!isEventBooking && (
+            <div>
+              <div style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.45)", marginBottom: 4 }}>Date &amp; Time</div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                <input
+                  type="date"
+                  value={editFields.date ?? booking.date}
+                  min={new Date().toISOString().split("T")[0]}
+                  onChange={(e) => {
+                    const newDate = e.target.value;
+                    const slotsForNewDate = (allAvailableSlots || []).filter(s => s.date === newDate && !isSlotInPast(s.date, s.time));
+                    const defaultTime = newDate === booking.date ? booking.time : (slotsForNewDate[0]?.time || "");
+                    onEditField?.({ date: newDate, time: defaultTime });
+                  }}
+                  style={editInputStyle}
+                />
+                {(() => {
+                  const slotsForDate = (allAvailableSlots || []).filter(s => s.date === (editFields.date ?? booking.date) && !isSlotInPast(s.date, s.time));
+                  const sameDate = (editFields.date ?? booking.date) === booking.date;
+                  return slotsForDate.length > 0 || sameDate ? (
+                    <select value={editFields.time ?? booking.time} onChange={(e) => onEditField?.({ time: e.target.value })} style={{ ...editInputStyle, backgroundColor: "rgba(255,255,255,0.06)" }}>
+                      {sameDate && <option value={booking.time}>{booking.time} (current)</option>}
+                      {slotsForDate.filter(s => s.time !== booking.time).map(s => (
+                        <option key={s.time} value={s.time}>{s.time}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <div style={{ display: "flex", alignItems: "center", padding: "0 12px", background: "rgba(239,68,68,0.1)", border: "1px solid #fca5a5", borderRadius: 10, fontSize: "0.8rem", color: "#f87171" }}>
+                      No open slots that day
+                    </div>
+                  );
+                })()}
+              </div>
             </div>
-          </div>
-          <div>
-            <div style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.45)", marginBottom: 4 }}>Full Name</div>
-            <input value={editFields.name ?? booking.name} onChange={(e) => onEditField?.({ name: e.target.value })} style={editInputStyle} />
-          </div>
-          <div>
-            <div style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.45)", marginBottom: 4 }}>Package</div>
-            <select value={editFields.packageType ?? booking.packageType} onChange={(e) => onEditField?.({ packageType: e.target.value })} style={{ ...editInputStyle, backgroundColor: "rgba(255,255,255,0.06)" }}>
-              <option value="basic">Basic Detail</option>
-              <option value="premium">Premium Detail</option>
-              {booking.vehicle !== "boat" && (
-                <>
-                  <option value="exterior">Exterior Only — Basic</option>
-                  <option value="exteriorPremium">Exterior Only — Premium</option>
-                  <option value="interior">Interior Only — Basic</option>
-                  <option value="interiorPremium">Interior Only — Premium</option>
-                </>
-              )}
-            </select>
-          </div>
+          )}
+          {!isEventBooking && (
+            <div>
+              <div style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.45)", marginBottom: 4 }}>Full Name</div>
+              <input value={editFields.name ?? booking.name} onChange={(e) => onEditField?.({ name: e.target.value })} style={editInputStyle} />
+            </div>
+          )}
+          {!isEventBooking && (
+            <div>
+              <div style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.45)", marginBottom: 4 }}>Package</div>
+              <select value={editFields.packageType ?? booking.packageType} onChange={(e) => onEditField?.({ packageType: e.target.value })} style={{ ...editInputStyle, backgroundColor: "rgba(255,255,255,0.06)" }}>
+                <option value="basic">Basic Detail</option>
+                <option value="premium">Premium Detail</option>
+                {booking.vehicle !== "boat" && (
+                  <>
+                    <option value="exterior">Exterior Only — Basic</option>
+                    <option value="exteriorPremium">Exterior Only — Premium</option>
+                    <option value="interior">Interior Only — Basic</option>
+                    <option value="interiorPremium">Interior Only — Premium</option>
+                  </>
+                )}
+              </select>
+            </div>
+          )}
           <div>
             <div style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.45)", marginBottom: 4 }}>{booking.vehicle === "boat" ? "Boat Details" : "Vehicle Details"}</div>
             {booking.vehicle === "boat" ? (
@@ -661,7 +714,7 @@ export default function App() {
   const [googleScriptLoaded, setGoogleScriptLoaded]     = useState(false);
   const [splashDone, setSplashDone]                     = useState(false);
   const [splashPhase, setSplashPhase]                   = useState(0); // 0=logo, 1=tagline, 2=fadeout
-  const [view, setView]                                 = useState<"booking" | "myBookings" | "admin" | "balance" | "inventory">("booking");
+  const [view, setView]                                 = useState<"booking" | "myBookings" | "admin" | "balance" | "inventory" | "lvisdEvent">("booking");
   const [adminTab, setAdminTab]                         = useState<"bookings" | "invoices" | "revenue" | "availability" | "clients" | "finances">("bookings");
   const [clientSearch, setClientSearch]                 = useState("");
   const [selectedClientKey, setSelectedClientKey]       = useState<string | null>(null);
@@ -772,6 +825,23 @@ export default function App() {
   const [addressSelected, setAddressSelected]           = useState(false);
   const [makeOptions, setMakeOptions]                   = useState<string[]>([]);
   const [modelOptions, setModelOptions]                 = useState<string[]>([]);
+
+  // ── LVISD free-wash event flow (separate from the standard booking wizard) ──
+  const [lvisdStep, setLvisdStep]                       = useState(0);
+  const [lvisdVehicle, setLvisdVehicle]                 = useState<VehicleType>("");
+  const [lvisdEligibility, setLvisdEligibility]         = useState<"" | "email" | "photo" | "attest">("");
+  const [lvisdEligibilityEmail, setLvisdEligibilityEmail] = useState("");
+  const [lvisdProofBase64, setLvisdProofBase64]         = useState("");
+  const [lvisdProofMimeType, setLvisdProofMimeType]     = useState("");
+  const [lvisdProofFileName, setLvisdProofFileName]     = useState("");
+  const [lvisdTime, setLvisdTime]                       = useState("");
+  const [lvisdName, setLvisdName]                       = useState("");
+  const [lvisdPhone, setLvisdPhone]                     = useState("");
+  const [lvisdEmail, setLvisdEmail]                     = useState("");
+  const [lvisdYear, setLvisdYear]                       = useState("");
+  const [lvisdMake, setLvisdMake]                       = useState("");
+  const [lvisdModel, setLvisdModel]                     = useState("");
+  const [lvisdSubmitting, setLvisdSubmitting]           = useState(false);
 
   // ── Splash screen sequencing ──
   useEffect(() => {
@@ -1623,6 +1693,26 @@ export default function App() {
   }
   function next() { setStep((s) => s + 1); }
   function back() { setStep((s) => s - 1); }
+
+  // ── LVISD event: derived capacity + navigation ──
+  const lvisdOpenSlots = useMemo(
+    () => allAvailableSlots.filter((s) => s.date === LVISD_EVENT.date),
+    [allAvailableSlots]
+  );
+  const lvisdEventDatePassed = useMemo(() => {
+    const [y, m, d] = LVISD_EVENT.date.split("-").map(Number);
+    const cutoff = new Date(y, m - 1, d, 23, 59, 59);
+    return new Date() > cutoff;
+  }, []);
+  const lvisdBookable = !lvisdEventDatePassed && lvisdOpenSlots.length > 0;
+
+  function lvisdNext() { setLvisdStep((s) => s + 1); }
+  function lvisdBack() { setLvisdStep((s) => s - 1); }
+  function resetLvisdFlow() {
+    setLvisdStep(0); setLvisdVehicle(""); setLvisdEligibility(""); setLvisdEligibilityEmail("");
+    setLvisdProofBase64(""); setLvisdProofMimeType(""); setLvisdProofFileName(""); setLvisdTime("");
+    setLvisdName(""); setLvisdPhone(""); setLvisdEmail(""); setLvisdYear(""); setLvisdMake(""); setLvisdModel("");
+  }
 
   const vehicleSummary =
     vehicle === "boat"
@@ -2514,6 +2604,292 @@ export default function App() {
               </>
             )}
 
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // LVISD FREE-WASH EVENT VIEW — separate flow from the standard booking wizard:
+  // fewer steps (no service-plan or add-ons pages, no pricing, no payment), a
+  // fixed date/slot list, and an eligibility check instead of a package picker.
+  if (view === "lvisdEvent") {
+    const LVISD_STEPS = 5; // 0 vehicle, 1 package, 2 eligibility, 3 scheduling, 4 details+submit
+    const lvisdVehicleLabel = LVISD_EVENT.vehicleOptions.find(v => v.id === lvisdVehicle)?.label || "N/A";
+    const lvisdEligibilityValid =
+      lvisdEligibility === "email" ? lvisdEligibilityEmail.trim().toLowerCase().endsWith("@" + LVISD_EVENT.emailDomain)
+      : lvisdEligibility === "photo" ? !!lvisdProofBase64
+      : lvisdEligibility === "attest";
+    const lvisdDetailsValid = !!lvisdName && !!lvisdPhone && !!lvisdEmail && !!lvisdYear && !!lvisdMake && !!lvisdModel;
+
+    async function handleLvisdProofFile(file: File) {
+      const compressed = await new Promise<{ base64: string; mimeType: string }>((resolve) => {
+        const img = new Image();
+        const url = URL.createObjectURL(file);
+        img.onload = () => {
+          URL.revokeObjectURL(url);
+          const MAX = 1200;
+          const scale = Math.min(1, MAX / Math.max(img.width, img.height));
+          const canvas = document.createElement("canvas");
+          canvas.width = Math.round(img.width * scale);
+          canvas.height = Math.round(img.height * scale);
+          canvas.getContext("2d")!.drawImage(img, 0, 0, canvas.width, canvas.height);
+          const dataUrl = canvas.toDataURL("image/jpeg", 0.78);
+          resolve({ base64: dataUrl.split(",")[1], mimeType: "image/jpeg" });
+        };
+        img.src = url;
+      });
+      setLvisdProofBase64(compressed.base64);
+      setLvisdProofMimeType(compressed.mimeType);
+      setLvisdProofFileName(file.name);
+    }
+
+    async function submitLvisdBooking() {
+      setLvisdSubmitting(true);
+      const tid = showToast("Submitting your booking...", "loading");
+      try {
+        const res = await fetch(SCRIPT_URL, {
+          method: "POST",
+          body: JSON.stringify({
+            action: "bookAppointment",
+            event: LVISD_EVENT.id,
+            eventLabel: LVISD_EVENT.label,
+            eventAddress: LVISD_EVENT.dropoffAddress,
+            eventRainPolicy: LVISD_EVENT.rainPolicy,
+            name: lvisdName, phone: lvisdPhone, email: lvisdEmail,
+            date: LVISD_EVENT.date, displayDate: LVISD_EVENT.date, time: lvisdTime,
+            year: lvisdYear, make: lvisdMake, model: lvisdModel,
+            vehicle: lvisdVehicle, packageType: "lvisdFreeWash", hourlyRate: "",
+            addOns: "", addOnEstimate: 0,
+            serviceType: "dropoff",
+            avgTime: "", notes: "",
+            clientType: "oneTime",
+            eligibilityMethod: lvisdEligibility,
+            proofBase64: lvisdEligibility === "photo" ? lvisdProofBase64 : "",
+            proofMimeType: lvisdEligibility === "photo" ? lvisdProofMimeType : "",
+          }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          updateToast(tid, "Booking confirmed!", "success", 3000);
+          lvisdNext();
+        } else {
+          updateToast(tid, data.error || "That time slot was just taken — please pick another.", "error", 5000);
+          if (data.error) setLvisdStep(3);
+        }
+      } catch {
+        updateToast(tid, "Something went wrong. Please try again.", "error", 4000);
+      } finally {
+        setLvisdSubmitting(false);
+      }
+    }
+
+    return (
+      <div style={S.page}>
+        <div className="atx-bg">
+          <div className="atx-grid" />
+          <div className="atx-orb atx-orb-1" />
+          <div className="atx-orb atx-orb-2" />
+          <div className="atx-orb atx-orb-3" />
+        </div>
+        <div style={{ position: "fixed" as const, bottom: 100, right: 24, zIndex: 9999, display: "flex", flexDirection: "column" as const, gap: 10, alignItems: "flex-end" }}>
+          {toasts.map(t => (
+            <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 10, background: t.type === "error" ? "rgba(239,68,68,0.12)" : t.type === "success" ? "#f0fdf4" : "#1e293b", color: t.type === "error" ? "#dc2626" : t.type === "success" ? "#065f46" : "#fff", border: t.type === "error" ? "1.5px solid #fca5a5" : t.type === "success" ? "1.5px solid #6ee7b7" : "none", borderRadius: 14, padding: "12px 18px", fontSize: "0.88rem", fontWeight: 600, boxShadow: "0 4px 20px rgba(0,0,0,0.18)", animation: "toastIn 0.25s ease", maxWidth: 320, cursor: "pointer" }} onClick={() => dismissToast(t.id)}>
+              {t.type === "loading" && <div style={{ width: 16, height: 16, border: "2.5px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", borderRadius: "50%", animation: "spin 0.7s linear infinite", flexShrink: 0 }} />}
+              {t.type === "success" && <span style={{ fontSize: "1rem" }}>✓</span>}
+              {t.type === "error" && <span style={{ fontSize: "1rem" }}>✕</span>}
+              <span>{t.message}</span>
+            </div>
+          ))}
+        </div>
+        <div style={S.container}>
+          <Header />
+          {lvisdStep < LVISD_STEPS && (
+            <p style={{ textAlign: "center" as const, color: "#fbbf24", fontSize: "0.8rem", margin: "0 0 16px" }}>
+              {LVISD_EVENT.shortLabel} — Step {lvisdStep + 1} of {LVISD_STEPS}
+            </p>
+          )}
+          <div style={S.card} key={lvisdStep}>
+
+            {/* Guard: if slots filled up or the date passed while mid-flow */}
+            {!lvisdBookable && lvisdStep < LVISD_STEPS ? (
+              <>
+                <h2 style={S.title}>{lvisdEventDatePassed ? "Event Has Passed" : "Fully Booked"}</h2>
+                <p style={S.subtitle}>
+                  {lvisdEventDatePassed
+                    ? "This event's date has already passed. Thank you for your interest!"
+                    : "All appointment slots for this event have been claimed. Thank you for your interest!"}
+                </p>
+                <div style={S.buttonRow}>
+                  <button style={S.secondary} onClick={() => { resetLvisdFlow(); setView("booking"); }}>Back to Home</button>
+                </div>
+              </>
+            ) : (
+              <>
+                {lvisdStep === 0 && (
+                  <>
+                    <h2 style={S.title}>Vehicle Type</h2>
+                    <p style={S.subtitle}>Select the vehicle you're bringing.</p>
+                    <div style={S.optionGrid}>
+                      {LVISD_EVENT.vehicleOptions.map(option => (
+                        <button key={option.id} style={{ ...S.optionCard, ...(lvisdVehicle === option.id ? S.selectedCard : {}) }}
+                          onClick={() => setLvisdVehicle(option.id)}>
+                          <div style={S.optionTitle}>{option.label}</div>
+                        </button>
+                      ))}
+                    </div>
+                    <div style={S.buttonRow}>
+                      <button style={S.secondary} onClick={() => { resetLvisdFlow(); setView("booking"); }}>Cancel</button>
+                      <div style={S.rightButtons}>
+                        <button style={{ ...S.primary, ...(!lvisdVehicle ? S.disabled : {}) }} disabled={!lvisdVehicle} onClick={lvisdNext}>Next</button>
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {lvisdStep === 1 && (
+                  <>
+                    <h2 style={S.title}>Service</h2>
+                    <p style={S.subtitle}>This event includes one complimentary service.</p>
+                    <div style={S.optionGrid}>
+                      <button style={{ ...S.optionCard, ...S.selectedCard }} onClick={lvisdNext}>
+                        <div style={S.optionTitle}>Free Exterior Wash</div>
+                        <div style={S.optionMeta}>Teacher/Staff Appreciation — complimentary, no cost.</div>
+                      </button>
+                    </div>
+                    <div style={S.buttonRow}>
+                      <button style={S.secondary} onClick={lvisdBack}>Back</button>
+                      <div style={S.rightButtons}>
+                        <button style={S.primary} onClick={lvisdNext}>Next</button>
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {lvisdStep === 2 && (
+                  <>
+                    <h2 style={S.title}>Confirm Eligibility</h2>
+                    <p style={S.subtitle}>This wash is reserved for Lago Vista ISD teachers and staff. Confirm one of the following.</p>
+                    <div style={S.addOnGrid}>
+                      <div style={S.addOnRow} onClick={() => setLvisdEligibility("email")}>
+                        <div>
+                          <div style={{ fontWeight: 700, color: "#f1f5f9" }}>School email address</div>
+                          <div style={{ fontSize: "0.85rem", color: "rgba(255,255,255,0.5)" }}>Must end in @{LVISD_EVENT.emailDomain}</div>
+                        </div>
+                        <input type="radio" checked={lvisdEligibility === "email"} onChange={() => setLvisdEligibility("email")} />
+                      </div>
+                      {lvisdEligibility === "email" && (
+                        <input style={S.input} type="email" placeholder={`name@${LVISD_EVENT.emailDomain}`}
+                          value={lvisdEligibilityEmail} onChange={(e) => setLvisdEligibilityEmail(e.target.value)} />
+                      )}
+
+                      <div style={S.addOnRow} onClick={() => setLvisdEligibility("photo")}>
+                        <div>
+                          <div style={{ fontWeight: 700, color: "#f1f5f9" }}>Upload proof</div>
+                          <div style={{ fontSize: "0.85rem", color: "rgba(255,255,255,0.5)" }}>Staff ID, pay stub, or similar</div>
+                        </div>
+                        <input type="radio" checked={lvisdEligibility === "photo"} onChange={() => setLvisdEligibility("photo")} />
+                      </div>
+                      {lvisdEligibility === "photo" && (
+                        <label style={{ ...S.secondary, textAlign: "center" as const, display: "block", cursor: "pointer" }}>
+                          {lvisdProofFileName || "Choose a photo"}
+                          <input type="file" accept="image/*" style={{ display: "none" }}
+                            onChange={(e) => { const f = e.target.files?.[0]; if (f) handleLvisdProofFile(f); }} />
+                        </label>
+                      )}
+
+                      <div style={S.addOnRow} onClick={() => setLvisdEligibility("attest")}>
+                        <div>
+                          <div style={{ fontWeight: 700, color: "#f1f5f9" }}>I'll bring proof to the appointment</div>
+                          <div style={{ fontSize: "0.85rem", color: "rgba(255,255,255,0.5)" }}>Staff ID or pay stub, shown at drop-off</div>
+                        </div>
+                        <input type="radio" checked={lvisdEligibility === "attest"} onChange={() => setLvisdEligibility("attest")} />
+                      </div>
+                    </div>
+                    <div style={S.buttonRow}>
+                      <button style={S.secondary} onClick={lvisdBack}>Back</button>
+                      <div style={S.rightButtons}>
+                        <button style={{ ...S.primary, ...(!lvisdEligibilityValid ? S.disabled : {}) }} disabled={!lvisdEligibilityValid} onClick={lvisdNext}>Next</button>
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {lvisdStep === 3 && (
+                  <>
+                    <h2 style={S.title}>Pick a Time</h2>
+                    <p style={S.subtitle}>{formatDateLabel(LVISD_EVENT.date)} — drop-off only.</p>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(100px, 1fr))", gap: 10 }}>
+                      {lvisdOpenSlots.map((slot, i) => (
+                        <button key={i} onClick={() => setLvisdTime(slot.time)}
+                          style={{ padding: "13px 8px", borderRadius: 12,
+                            border: lvisdTime === slot.time ? "2px solid #111827" : "1.5px solid #e5e7eb",
+                            background: lvisdTime === slot.time ? "#111827" : "#fff",
+                            color: lvisdTime === slot.time ? "#fff" : "#374151",
+                            fontSize: "0.9rem", fontWeight: 700, cursor: "pointer", textAlign: "center" as const }}
+                        >{slot.time}</button>
+                      ))}
+                    </div>
+                    <div style={S.buttonRow}>
+                      <button style={S.secondary} onClick={lvisdBack}>Back</button>
+                      <div style={S.rightButtons}>
+                        <button style={{ ...S.primary, ...(!lvisdTime ? S.disabled : {}) }} disabled={!lvisdTime} onClick={lvisdNext}>Next</button>
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {lvisdStep === 4 && (
+                  <>
+                    <h2 style={S.title}>Your Details</h2>
+                    <p style={S.subtitle}>We'll send your confirmation and drop-off address to this contact info.</p>
+                    <div style={{ display: "grid", gap: 14 }}>
+                      <input style={S.input} placeholder="Full Name" value={lvisdName} onChange={(e) => setLvisdName(e.target.value)} />
+                      <input style={S.input} placeholder="Phone" value={lvisdPhone} onChange={(e) => setLvisdPhone(e.target.value)} />
+                      <input style={S.input} type="email" placeholder="Email" value={lvisdEmail} onChange={(e) => setLvisdEmail(e.target.value)} />
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(100px, 1fr))", gap: 10 }}>
+                        <input style={S.input} placeholder="Year" value={lvisdYear} onChange={(e) => setLvisdYear(e.target.value)} />
+                        <input style={S.input} placeholder="Make" value={lvisdMake} onChange={(e) => setLvisdMake(e.target.value)} />
+                        <input style={S.input} placeholder="Model" value={lvisdModel} onChange={(e) => setLvisdModel(e.target.value)} />
+                      </div>
+                    </div>
+
+                    <div style={S.summaryGrid}>
+                      <div style={S.summaryCard}><div style={S.summaryHeading}>Appointment</div><div style={S.summaryValue}>{formatDateLabel(LVISD_EVENT.date)}<br />{lvisdTime}</div></div>
+                      <div style={S.summaryCard}><div style={S.summaryHeading}>Vehicle</div><div style={S.summaryValue}>{lvisdVehicleLabel}</div></div>
+                      <div style={S.summaryCard}><div style={S.summaryHeading}>Service</div><div style={S.summaryValue}>Free Exterior Wash</div></div>
+                      <div style={S.summaryCard}><div style={S.summaryHeading}>Total Due</div><div style={S.summaryValue}>$0 — Complimentary</div></div>
+                    </div>
+
+                    <div style={S.buttonRow}>
+                      <button style={S.secondary} onClick={lvisdBack}>Back</button>
+                      <div style={S.rightButtons}>
+                        <button style={{ ...S.primary, ...((!lvisdDetailsValid || lvisdSubmitting) ? S.disabled : {}) }}
+                          disabled={!lvisdDetailsValid || lvisdSubmitting} onClick={submitLvisdBooking}>
+                          {lvisdSubmitting ? "Submitting..." : "Submit Booking"}
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {lvisdStep === 5 && (
+                  <div style={S.successWrap}>
+                    <div style={{ width: 56, height: 56, background: "#0f0f0f", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 18px" }}>
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                        <polyline points="4,12 9,17 20,6" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    </div>
+                    <h2 style={S.title}>You're Booked!</h2>
+                    <p style={S.successText}>
+                      Thank you for being an educator! Your free wash is confirmed for {formatDateLabel(LVISD_EVENT.date)} at {lvisdTime}.
+                      Check your email for the drop-off address and a few notes to make the day go smoothly.
+                    </p>
+                    <button style={S.primary} onClick={() => { resetLvisdFlow(); setView("booking"); }}>Back to Home</button>
+                  </div>
+                )}
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -3911,8 +4287,11 @@ export default function App() {
 
                 {/* ── REVENUE TAB ── */}
                 {adminTab === "revenue" && (() => {
-                  const paid = adminBookings.filter(b => b.invoiceStatus === "paid" && b.invoiceAmount);
-                  const upcoming = adminBookings.filter(b => b.status === "Booked" && isUpcoming(b.date));
+                  // Free promo/event bookings (e.g. LVISD) are $0 by design and excluded from
+                  // every revenue metric below — a $0 "paid" job would still inflate job counts
+                  // and drag down avg-per-job even though nothing was actually earned.
+                  const paid = adminBookings.filter(b => b.invoiceStatus === "paid" && b.invoiceAmount && !b.event);
+                  const upcoming = adminBookings.filter(b => b.status === "Booked" && isUpcoming(b.date) && !b.event);
                   const now = new Date();
                   const thisMonth = now.getMonth();
                   const thisYear = now.getFullYear();
@@ -4269,8 +4648,9 @@ export default function App() {
                     if (!clientMap[key]) clientMap[key] = { key, name: b.name, email: b.email, phone: b.phone, bookings: [], totalPaid: 0, totalPending: 0, lastDate: "" };
                     const c = clientMap[key];
                     c.bookings.push(b);
-                    if (b.invoiceStatus === "paid") c.totalPaid += parseFloat(b.invoiceAmount || "0");
-                    if (b.invoiceStatus === "released") c.totalPending += parseFloat(b.invoiceAmount || "0");
+                    // Free event bookings stay visible in the client's history but don't count toward $ totals.
+                    if (b.invoiceStatus === "paid" && !b.event) c.totalPaid += parseFloat(b.invoiceAmount || "0");
+                    if (b.invoiceStatus === "released" && !b.event) c.totalPending += parseFloat(b.invoiceAmount || "0");
                     if (!c.phone && b.phone) c.phone = b.phone;
                     if (b.date && (!c.lastDate || b.date > c.lastDate)) c.lastDate = b.date;
                   });
@@ -4442,7 +4822,9 @@ export default function App() {
 
                 {adminTab === "finances" && (() => {
                   const yearStr = String(financesYear);
-                  const yearIncome = adminBookings.filter(b => b.invoiceStatus === "paid" && (b.datePaid || b.date || "").startsWith(yearStr));
+                  // Free promo/event bookings are excluded — they're $0 by design and would
+                  // otherwise skew net profit/margin even though no money actually moved.
+                  const yearIncome = adminBookings.filter(b => b.invoiceStatus === "paid" && (b.datePaid || b.date || "").startsWith(yearStr) && !b.event);
                   const totalIncome = yearIncome.reduce((sum, b) => sum + parseFloat(b.invoiceAmount || "0"), 0);
 
                   // A recurring expense's stored date is its start date — expand it into every
@@ -5141,6 +5523,26 @@ export default function App() {
                   <span key={tag} style={{ background: "rgba(255,255,255,0.06)", borderRadius: 999, padding: "6px 16px", fontSize: "0.82rem", color: "rgba(255,255,255,0.5)", fontWeight: 500, border: "1px solid rgba(255,255,255,0.10)" }}>{tag}</span>
                 ))}
               </div>
+
+              {!lvisdEventDatePassed && (
+                <div style={{ marginTop: 24, borderTop: "1px solid rgba(255,255,255,0.07)", paddingTop: 24, textAlign: "center" as const }}>
+                  <div style={{ display: "inline-block", fontSize: "0.68rem", fontWeight: 700, letterSpacing: "0.14em", color: "#fbbf24", textTransform: "uppercase" as const, marginBottom: 10, background: "rgba(251,191,36,0.1)", border: "1px solid rgba(251,191,36,0.3)", borderRadius: 999, padding: "4px 14px" }}>Community Event</div>
+                  <h3 style={{ fontSize: "1.3rem", fontWeight: 800, color: "#f1f5f9", margin: "0 0 6px" }}>{LVISD_EVENT.shortLabel}</h3>
+                  <p style={{ fontSize: "0.9rem", color: "rgba(255,255,255,0.5)", margin: "0 0 16px" }}>
+                    Free exterior wash for Lago Vista ISD teachers and staff — {formatDateLabel(LVISD_EVENT.date)}, drop-off only.
+                  </p>
+                  {lvisdBookable ? (
+                    <button style={{ ...S.primary, background: "linear-gradient(135deg, #d97706, #b45309)", padding: "14px 28px" }}
+                      onClick={() => { resetLvisdFlow(); setView("lvisdEvent"); }}>
+                      {LVISD_EVENT.shortLabel} →
+                    </button>
+                  ) : (
+                    <div style={{ display: "inline-block", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 999, padding: "12px 24px", color: "rgba(255,255,255,0.45)", fontWeight: 700, fontSize: "0.95rem" }}>
+                      Fully booked — thank you!
+                    </div>
+                  )}
+                </div>
+              )}
             </>
           )}
 
