@@ -1656,8 +1656,11 @@ export default function App() {
     return () => { if (listener) window.google.maps.event.removeListener(listener); };
   }, [quickBookClient]);
 
-  useEffect(() => {
-    fetchAllAvailability().then((slots) => {
+  // Pulled out so it can be re-run on demand (e.g. re-entering the LVISD flow)
+  // rather than only once on mount — otherwise a slot booked earlier in the same
+  // browser session keeps showing as open until a full page reload.
+  function loadAvailability() {
+    return fetchAllAvailability().then((slots) => {
       // Slots reserved for a one-off promo event (e.g. LVISD) are excluded from the
       // standard flow entirely — they're only ever offered through that event's own
       // booking flow (see lvisdRawSlots below), never as a normal detail slot.
@@ -1678,7 +1681,11 @@ export default function App() {
           setCalYear(y);
         }
       }
-    }).catch(console.error);
+    });
+  }
+
+  useEffect(() => {
+    loadAvailability().catch(console.error);
   }, []);
 
   useEffect(() => {
@@ -2729,7 +2736,7 @@ export default function App() {
           <Header />
           {lvisdStep < LVISD_STEPS && (
             <p style={{ textAlign: "center" as const, color: "#fbbf24", fontSize: "0.8rem", margin: "0 0 16px" }}>
-              {LVISD_EVENT.shortLabel} — Step {lvisdStep + 1} of {LVISD_STEPS}
+              {LVISD_EVENT.shortLabel}, Step {lvisdStep + 1} of {LVISD_STEPS}
             </p>
           )}
           <div style={S.card} key={lvisdStep}>
@@ -2854,7 +2861,7 @@ export default function App() {
                 {lvisdStep === 3 && (
                   <>
                     <h2 style={S.title}>Pick a Time</h2>
-                    <p style={S.subtitle}>{formatDateLabel(LVISD_EVENT.date)} — drop-off only.</p>
+                    <p style={S.subtitle}>{formatDateLabel(LVISD_EVENT.date)}, drop-off only.</p>
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(100px, 1fr))", gap: 10 }}>
                       {lvisdOpenSlots.map((slot, i) => (
                         <button key={i} onClick={() => setLvisdTime(slot.time)}
@@ -5595,16 +5602,16 @@ export default function App() {
                   <div style={{ display: "inline-block", fontSize: "0.68rem", fontWeight: 700, letterSpacing: "0.14em", color: "#fbbf24", textTransform: "uppercase" as const, marginBottom: 10, background: "rgba(251,191,36,0.1)", border: "1px solid rgba(251,191,36,0.3)", borderRadius: 999, padding: "4px 14px" }}>Community Event</div>
                   <h3 style={{ fontSize: "1.3rem", fontWeight: 800, color: "#f1f5f9", margin: "0 0 6px" }}>{LVISD_EVENT.shortLabel}</h3>
                   <p style={{ fontSize: "0.9rem", color: "rgba(255,255,255,0.5)", margin: "0 0 16px" }}>
-                    Free exterior wash for Lago Vista ISD teachers and staff — {formatDateLabel(LVISD_EVENT.date)}, drop-off only.
+                    Free exterior wash for Lago Vista ISD teachers and staff, {formatDateLabel(LVISD_EVENT.date)}, drop-off only.
                   </p>
                   {lvisdBookable ? (
                     <button style={{ ...S.primary, background: "linear-gradient(135deg, #d97706, #b45309)", padding: "14px 28px" }}
-                      onClick={() => { resetLvisdFlow(); setView("lvisdEvent"); }}>
+                      onClick={() => { resetLvisdFlow(); setView("lvisdEvent"); loadAvailability().catch(console.error); }}>
                       {LVISD_EVENT.shortLabel} →
                     </button>
                   ) : (
                     <div style={{ display: "inline-block", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 999, padding: "12px 24px", color: "rgba(255,255,255,0.45)", fontWeight: 700, fontSize: "0.95rem" }}>
-                      Fully booked — thank you!
+                      Fully booked, thank you!
                     </div>
                   )}
                 </div>
