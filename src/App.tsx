@@ -2816,7 +2816,7 @@ export default function App() {
                       <div style={{ ...S.addOnRow, ...(lvisdEligibility === "photo" ? S.selectedCard : {}) }} onClick={() => setLvisdEligibility("photo")}>
                         <div>
                           <div style={{ fontWeight: 700, color: "#f1f5f9" }}>Upload proof</div>
-                          <div style={{ fontSize: "0.85rem", color: "rgba(255,255,255,0.5)" }}>Staff ID, pay stub, or similar</div>
+                          <div style={{ fontSize: "0.85rem", color: "rgba(255,255,255,0.5)" }}>Staff ID or similar</div>
                         </div>
                         <input type="radio" checked={lvisdEligibility === "photo"} onChange={() => setLvisdEligibility("photo")} />
                       </div>
@@ -2844,7 +2844,7 @@ export default function App() {
                       <div style={{ ...S.addOnRow, ...(lvisdEligibility === "attest" ? S.selectedCard : {}) }} onClick={() => setLvisdEligibility("attest")}>
                         <div>
                           <div style={{ fontWeight: 700, color: "#f1f5f9" }}>I'll bring proof to the appointment</div>
-                          <div style={{ fontSize: "0.85rem", color: "rgba(255,255,255,0.5)" }}>Staff ID or pay stub, shown at drop-off</div>
+                          <div style={{ fontSize: "0.85rem", color: "rgba(255,255,255,0.5)" }}>Staff ID, shown at drop-off</div>
                         </div>
                         <input type="radio" checked={lvisdEligibility === "attest"} onChange={() => setLvisdEligibility("attest")} />
                       </div>
