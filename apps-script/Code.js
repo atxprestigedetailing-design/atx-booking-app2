@@ -411,10 +411,12 @@ function updateBookingFields(data) {
     var fields = data.fields || {};
 
     // Promo event bookings (e.g. LVISD free wash) can't be rescheduled or have
-    // their package/service type changed through self-service edits — enforced
-    // here too, not just hidden in the UI, since this endpoint takes raw field writes.
+    // their package/service type changed through CUSTOMER self-service edits —
+    // enforced here too, not just hidden in the UI, since this endpoint takes raw
+    // field writes. Admin edits (editedBy === "admin") are exempt — staff still
+    // need to be able to move a teacher between event slots.
     var isEventBooking = String(sheet.getRange(row, EVENT_COL).getValue() || "").trim() !== "";
-    if (isEventBooking) {
+    if (isEventBooking && data.editedBy !== "admin") {
       ["date", "time", "packageType", "serviceType", "addOns"].forEach(function(key) {
         delete fields[key];
       });
@@ -440,6 +442,9 @@ function updateBookingFields(data) {
       var pkgType    = String(data.packageType   || "").trim();
       var svcType    = String(data.serviceType   || "").trim();
       var address    = String(data.address       || "").trim();
+      var eventLabel       = String(data.eventLabel       || "").trim();
+      var eventAddress     = String(data.eventAddress     || "").trim();
+      var eventRainPolicy  = String(data.eventRainPolicy  || "").trim();
 
       // 1. Update availability — unblock old slot, block new slot
       try {
@@ -485,7 +490,7 @@ function updateBookingFields(data) {
           }
           var newStart = new Date(yr2, mo2, dy2, startHour2, startMin2, 0);
           var newEnd   = new Date(yr2, mo2, dy2, startHour2 + 3, startMin2, 0);
-          var pkgLabel2 = pkgType === "basic" ? "Basic Detail" : pkgType === "premium" ? "Premium Detail" : pkgType === "exterior" ? "Exterior Only - Basic" : pkgType === "exteriorPremium" ? "Exterior Only - Premium" : pkgType === "interior" ? "Interior Only - Basic" : pkgType === "interiorPremium" ? "Interior Only - Premium" : "Detail";
+          var pkgLabel2 = pkgType === "basic" ? "Basic Detail" : pkgType === "premium" ? "Premium Detail" : pkgType === "exterior" ? "Exterior Only - Basic" : pkgType === "exteriorPremium" ? "Exterior Only - Premium" : pkgType === "interior" ? "Interior Only - Basic" : pkgType === "interiorPremium" ? "Interior Only - Premium" : pkgType === "lvisdFreeWash" ? "Free Wash (Event)" : "Detail";
           var evTitle = pkgLabel2 + " - " + custName + " (Rescheduled)";
           var evDesc  = "Client: " + custName + "\nVehicle: " + vehicle + "\nPackage: " + pkgLabel2 + "\nService: " + svcType + (address ? "\nAddress: " + address : "");
           calendar.createEvent(evTitle, newStart, newEnd, { description: evDesc, location: address });
@@ -495,61 +500,131 @@ function updateBookingFields(data) {
 
       // 3. Send reschedule notification to customer
       try {
-        if (custEmail && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(custEmail)) {
-          var oldDateLabel = friendlyDate(oldDate);
-          var newDateLabel = friendlyDate(newDate);
-          var pkgLabelEmail = pkgType === "basic" ? "Basic Detail" : pkgType === "premium" ? "Premium Detail" : pkgType === "exterior" ? "Exterior Only - Basic" : pkgType === "exteriorPremium" ? "Exterior Only - Premium" : pkgType === "interior" ? "Interior Only - Basic" : pkgType === "interiorPremium" ? "Interior Only - Premium" : pkgType || "Detail";
-          var subject3 = "Appointment Rescheduled | ATX Prestige Detailing";
-          var plainMsg =
-            "Hi " + custName + ",\n\nYour appointment has been rescheduled.\n\n" +
-            "Service: " + pkgLabelEmail + "\nVehicle: " + vehicle + "\n\n" +
-            "Original: " + oldDateLabel + " at " + oldTime + "\nNew Date: " + newDateLabel + " at " + newTime + "\n\n" +
-            "If you have any questions, please contact us.\n\nThank you,\nATX Prestige Detailing\nbook.atxprestigedetailing.com";
-          var htmlMsg =
-            "<!DOCTYPE html><html><head><meta charset='UTF-8'></head><body>" +
-            "<div style='max-width:600px;margin:0 auto;padding:32px 16px;font-family:Arial,sans-serif;'>" +
-            "<div style='background:#0f0f0f;border-radius:16px 16px 0 0;padding:24px 32px;'>" +
-            "<div style='font-size:20px;font-weight:800;color:#fff;'>ATX Prestige Detailing</div>" +
-            "<div style='font-size:12px;color:rgba(255,255,255,0.5);margin-top:4px;'>Appointment Rescheduled</div>" +
-            "</div>" +
-            "<div style='background:#fff;padding:32px;border:1px solid #e5e7eb;'>" +
-            "<p style='font-size:15px;color:#374151;margin:0 0 20px;'>Hi " + custName + ",</p>" +
-            "<p style='font-size:15px;color:#374151;margin:0 0 24px;'>Your appointment has been rescheduled. Here are your updated details:</p>" +
-            "<div style='background:#f9fafb;border:1px solid #e5e7eb;border-radius:12px;padding:16px 20px;margin-bottom:20px;'>" +
-            "<div style='font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:12px;'>Service Details</div>" +
-            "<table style='width:100%;border-collapse:collapse;font-size:14px;'>" +
-            "<tr><td style='padding:5px 0;color:#6b7280;width:120px;'>Service</td><td style='padding:5px 0;font-weight:600;color:#111;'>" + pkgLabelEmail + "</td></tr>" +
-            "<tr style='border-top:1px solid #f3f4f6;'><td style='padding:5px 0;color:#6b7280;'>Vehicle</td><td style='padding:5px 0;font-weight:600;color:#111;'>" + vehicle + "</td></tr>" +
-            (address ? "<tr style='border-top:1px solid #f3f4f6;'><td style='padding:5px 0;color:#6b7280;'>Location</td><td style='padding:5px 0;font-weight:600;color:#111;'>" + address + "</td></tr>" : "") +
-            "</table></div>" +
-            "<div style='margin-bottom:24px;'>" +
-            "<div style='background:#fef2f2;border:1px solid #fca5a5;border-radius:10px;padding:14px 16px;margin-bottom:8px;'>" +
-            "<div style='font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:6px;'>Original Appointment</div>" +
-            "<div style='font-size:15px;font-weight:700;color:#991b1b;text-decoration:line-through;'>" + oldDateLabel + " at " + oldTime + "</div>" +
-            "</div>" +
-            "<div style='background:#f0fdf4;border:1px solid #6ee7b7;border-radius:10px;padding:14px 16px;'>" +
-            "<div style='font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:6px;'>New Appointment</div>" +
-            "<div style='font-size:18px;font-weight:800;color:#065f46;'>" + newDateLabel + "</div>" +
-            "<div style='font-size:15px;color:#047857;margin-top:4px;'>" + newTime + "</div>" +
-            "</div></div>" +
-            "<a href='https://book.atxprestigedetailing.com' style='display:inline-block;background:#0f0f0f;color:#fff;border-radius:10px;padding:12px 22px;font-size:14px;font-weight:700;text-decoration:none;'>View My Bookings</a>" +
-            "</div>" +
-            "<div style='background:#f5f4f2;border-radius:0 0 16px 16px;padding:14px 32px;text-align:center;'>" +
-            "<p style='margin:0;font-size:11px;color:#9ca3af;'>ATX Prestige Detailing | Lago Vista, TX | atxprestigedetailing.com</p>" +
-            "</div></div></body></html>";
-          GmailApp.sendEmail(custEmail, subject3, plainMsg, {
-            from: "atxprestigedetailing@gmail.com",
-            name: "ATX Prestige Detailing",
-            htmlBody: htmlMsg,
-            charset: "UTF-8",
-          });
-          Logger.log("Reschedule email sent to " + custEmail);
-        }
+        var oldDateLabel = friendlyDate(oldDate);
+        var newDateLabel = friendlyDate(newDate);
 
-        // SMS reschedule notification
-        if (custPhone) {
-          var smsReschedule = "Hi " + custName + "! Your ATX Prestige Detailing appointment has been updated to " + friendlyDate(newDate) + " at " + newTime + ". See you then!";
-          sendSMS(custPhone, smsReschedule);
+        if (isEventBooking) {
+          // ── Event booking reschedule — warm, event-specific copy ──
+          if (custPhone) {
+            var smsEventReschedule =
+              "Hi " + custName + "! Your free wash has been moved to " +
+              newDateLabel + " at " + newTime + ". Drop-off address: " + (eventAddress || "see your confirmation email") +
+              ". Please be on time, appointments are back to back. Thank you for being a part of educating our future!";
+            sendSMS(custPhone, smsEventReschedule);
+          }
+
+          if (custEmail && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(custEmail)) {
+            var subjectEvent = (eventLabel || "Free Wash") + " Rescheduled | ATX Prestige Detailing";
+            var plainMsgEvent =
+              "Hi " + custName + ",\n\n" +
+              "Your free wash has been rescheduled.\n\n" +
+              "New appointment:\nDate: " + newDateLabel + "\nTime: " + newTime + "\n" +
+              "(Previously " + oldDateLabel + " at " + oldTime + ")\n\n" +
+              "Drop-off address: " + (eventAddress || "see your original confirmation email") + "\n\n" +
+              "Since this is a home address, it works best if someone else drives you and either waits in another car or drops the vehicle and leaves, rather than waiting around at the property.\n\n" +
+              "Please be on time, appointments are back to back with limited buffer between them.\n\n" +
+              (eventRainPolicy || "If weather forces us to reschedule, we'll reach out directly.") + "\n\n" +
+              "Thank you,\nATX Prestige Detailing";
+            var htmlMsgEvent =
+              "<!DOCTYPE html><html><head><meta charset='UTF-8'></head><body>" +
+              "<div style='margin:0;padding:0;background-color:#f4f4f4;font-family:Arial,sans-serif;color:#222;'>" +
+              "<div style='max-width:640px;margin:0 auto;padding:32px 16px;'>" +
+              "<div style='background-color:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 14px rgba(0,0,0,0.08);'>" +
+              "<div style='background-color:#111;color:#fff;padding:24px 28px;'>" +
+              "<div style='font-size:26px;font-weight:700;'>ATX Prestige Detailing</div>" +
+              "<div style='font-size:14px;opacity:0.9;margin-top:6px;'>" + (eventLabel || "Free Wash") + " Rescheduled</div>" +
+              "</div>" +
+              "<div style='padding:28px;'>" +
+              "<p style='margin:0 0 16px;font-size:16px;'>Hi " + custName + ",</p>" +
+              "<p style='margin:0 0 20px;font-size:15px;color:#444;'>Your free wash has been rescheduled.</p>" +
+              "<div style='margin-bottom:20px;'>" +
+              "<div style='background:#fef2f2;border:1px solid #fca5a5;border-radius:10px;padding:14px 16px;margin-bottom:8px;'>" +
+              "<div style='font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:6px;'>Previous Time</div>" +
+              "<div style='font-size:15px;font-weight:700;color:#991b1b;text-decoration:line-through;'>" + oldDateLabel + " at " + oldTime + "</div>" +
+              "</div>" +
+              "<div style='background:#f0fdf4;border:1px solid #6ee7b7;border-radius:10px;padding:14px 16px;'>" +
+              "<div style='font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:6px;'>New Time</div>" +
+              "<div style='font-size:18px;font-weight:800;color:#065f46;'>" + newDateLabel + "</div>" +
+              "<div style='font-size:15px;color:#047857;margin-top:4px;'>" + newTime + "</div>" +
+              "</div></div>" +
+              "<div style='background:#f9f9f9;border:1px solid #e8e8e8;border-radius:12px;padding:16px 20px;margin-bottom:20px;'>" +
+              "<table style='width:100%;border-collapse:collapse;font-size:14px;color:#333;'>" +
+              "<tr><td style='padding:6px 0;font-weight:600;width:140px;'>Drop-off Address:</td><td style='padding:6px 0;'>" + (eventAddress || "See your original confirmation email") + "</td></tr>" +
+              "</table></div>" +
+              "<div style='background:#fff8e8;border:1px solid #f0dfae;border-radius:12px;padding:16px 18px;margin-bottom:16px;'>" +
+              "<div style='font-size:14px;color:#5a4a1f;'>Since this is a home address, it works best if someone else drives you and either waits in another car or drops the vehicle and leaves, rather than waiting around at the property.</div>" +
+              "</div>" +
+              "<div style='background:#fff8e8;border:1px solid #f0dfae;border-radius:12px;padding:16px 18px;margin-bottom:16px;'>" +
+              "<div style='font-size:14px;color:#5a4a1f;'>Please be on time, appointments are back to back with limited buffer between them.</div>" +
+              "</div>" +
+              "<div style='background:#f9fafb;border:1px solid #e5e7eb;border-radius:12px;padding:16px 18px;margin-bottom:20px;'>" +
+              "<div style='font-size:14px;color:#374151;'>" + (eventRainPolicy || "If weather forces us to reschedule, we'll reach out directly.") + "</div>" +
+              "</div>" +
+              "<p style='margin:0;font-size:15px;color:#444;'>Thank you,<br><strong>ATX Prestige Detailing</strong></p>" +
+              "</div></div></div></div></body></html>";
+            GmailApp.sendEmail(custEmail, subjectEvent, plainMsgEvent, {
+              from: "atxprestigedetailing@gmail.com",
+              name: "ATX Prestige Detailing",
+              htmlBody: htmlMsgEvent,
+              charset: "UTF-8",
+            });
+            Logger.log("Event reschedule email sent to " + custEmail);
+          }
+        } else {
+          // ── Standard paid-booking reschedule ──
+          if (custEmail && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(custEmail)) {
+            var pkgLabelEmail = pkgType === "basic" ? "Basic Detail" : pkgType === "premium" ? "Premium Detail" : pkgType === "exterior" ? "Exterior Only - Basic" : pkgType === "exteriorPremium" ? "Exterior Only - Premium" : pkgType === "interior" ? "Interior Only - Basic" : pkgType === "interiorPremium" ? "Interior Only - Premium" : (pkgType || "Detail");
+            var subject3 = "Appointment Rescheduled | ATX Prestige Detailing";
+            var plainMsg =
+              "Hi " + custName + ",\n\nYour appointment has been rescheduled.\n\n" +
+              "Service: " + pkgLabelEmail + "\nVehicle: " + vehicle + "\n\n" +
+              "Original: " + oldDateLabel + " at " + oldTime + "\nNew Date: " + newDateLabel + " at " + newTime + "\n\n" +
+              "If you have any questions, please contact us.\n\nThank you,\nATX Prestige Detailing\nbook.atxprestigedetailing.com";
+            var htmlMsg =
+              "<!DOCTYPE html><html><head><meta charset='UTF-8'></head><body>" +
+              "<div style='max-width:600px;margin:0 auto;padding:32px 16px;font-family:Arial,sans-serif;'>" +
+              "<div style='background:#0f0f0f;border-radius:16px 16px 0 0;padding:24px 32px;'>" +
+              "<div style='font-size:20px;font-weight:800;color:#fff;'>ATX Prestige Detailing</div>" +
+              "<div style='font-size:12px;color:rgba(255,255,255,0.5);margin-top:4px;'>Appointment Rescheduled</div>" +
+              "</div>" +
+              "<div style='background:#fff;padding:32px;border:1px solid #e5e7eb;'>" +
+              "<p style='font-size:15px;color:#374151;margin:0 0 20px;'>Hi " + custName + ",</p>" +
+              "<p style='font-size:15px;color:#374151;margin:0 0 24px;'>Your appointment has been rescheduled. Here are your updated details:</p>" +
+              "<div style='background:#f9fafb;border:1px solid #e5e7eb;border-radius:12px;padding:16px 20px;margin-bottom:20px;'>" +
+              "<div style='font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:12px;'>Service Details</div>" +
+              "<table style='width:100%;border-collapse:collapse;font-size:14px;'>" +
+              "<tr><td style='padding:5px 0;color:#6b7280;width:120px;'>Service</td><td style='padding:5px 0;font-weight:600;color:#111;'>" + pkgLabelEmail + "</td></tr>" +
+              "<tr style='border-top:1px solid #f3f4f6;'><td style='padding:5px 0;color:#6b7280;'>Vehicle</td><td style='padding:5px 0;font-weight:600;color:#111;'>" + vehicle + "</td></tr>" +
+              (address ? "<tr style='border-top:1px solid #f3f4f6;'><td style='padding:5px 0;color:#6b7280;'>Location</td><td style='padding:5px 0;font-weight:600;color:#111;'>" + address + "</td></tr>" : "") +
+              "</table></div>" +
+              "<div style='margin-bottom:24px;'>" +
+              "<div style='background:#fef2f2;border:1px solid #fca5a5;border-radius:10px;padding:14px 16px;margin-bottom:8px;'>" +
+              "<div style='font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:6px;'>Original Appointment</div>" +
+              "<div style='font-size:15px;font-weight:700;color:#991b1b;text-decoration:line-through;'>" + oldDateLabel + " at " + oldTime + "</div>" +
+              "</div>" +
+              "<div style='background:#f0fdf4;border:1px solid #6ee7b7;border-radius:10px;padding:14px 16px;'>" +
+              "<div style='font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:6px;'>New Appointment</div>" +
+              "<div style='font-size:18px;font-weight:800;color:#065f46;'>" + newDateLabel + "</div>" +
+              "<div style='font-size:15px;color:#047857;margin-top:4px;'>" + newTime + "</div>" +
+              "</div></div>" +
+              "<a href='https://book.atxprestigedetailing.com' style='display:inline-block;background:#0f0f0f;color:#fff;border-radius:10px;padding:12px 22px;font-size:14px;font-weight:700;text-decoration:none;'>View My Bookings</a>" +
+              "</div>" +
+              "<div style='background:#f5f4f2;border-radius:0 0 16px 16px;padding:14px 32px;text-align:center;'>" +
+              "<p style='margin:0;font-size:11px;color:#9ca3af;'>ATX Prestige Detailing | Lago Vista, TX | atxprestigedetailing.com</p>" +
+              "</div></div></body></html>";
+            GmailApp.sendEmail(custEmail, subject3, plainMsg, {
+              from: "atxprestigedetailing@gmail.com",
+              name: "ATX Prestige Detailing",
+              htmlBody: htmlMsg,
+              charset: "UTF-8",
+            });
+            Logger.log("Reschedule email sent to " + custEmail);
+          }
+
+          if (custPhone) {
+            var smsReschedule = "Hi " + custName + "! Your ATX Prestige Detailing appointment has been updated to " + newDateLabel + " at " + newTime + ". See you then!";
+            sendSMS(custPhone, smsReschedule);
+          }
         }
       } catch (notifyErr) { Logger.log("Reschedule notification error: " + notifyErr); }
     }
@@ -1261,7 +1336,7 @@ function sendJobStartedSMS(data) {
       return ContentService.createTextOutput(JSON.stringify({ success: false, error: "No phone" })).setMimeType(ContentService.MimeType.JSON);
     }
     var msg = data.event
-      ? "Hi " + customerName + "! We're starting your free " + (data.eventLabel || "event") + " wash now. We'll text you when it's done. Thank you for being a part of educating our future!"
+      ? "Hi " + customerName + "! We're starting your free wash now. We'll text you when it's done. Thank you for being a part of educating our future!"
       : "Hi " + customerName + "! Your ATX Prestige Detailing service has started. We will notify you when it is complete. Thank you for your patience!";
     sendSMS(customerPhone, msg);
     return ContentService.createTextOutput(JSON.stringify({ success: true })).setMimeType(ContentService.MimeType.JSON);
@@ -1281,16 +1356,16 @@ function sendJobCompletedSMS(data) {
       return ContentService.createTextOutput(JSON.stringify({ success: false, error: "No phone" })).setMimeType(ContentService.MimeType.JSON);
     }
     var msg = data.event
-      ? "Hi " + customerName + "! Your free " + (data.eventLabel || "event") + " wash is complete. We're honored to help start your school year off with a clean car. Thank you for everything you do!"
+      ? "Hi " + customerName + "! Your free wash is complete. We're honored to help start your school year off with a clean car. Thank you for everything you do!"
       : "Hi " + customerName + "! Your ATX Prestige Detailing service is complete. Your invoice will be sent shortly. Thank you for choosing us!";
     sendSMS(customerPhone, msg);
 
     if (data.event && data.customerEmail && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.customerEmail)) {
       try {
-        var doneSubject = (data.eventLabel || "Event") + " Wash Complete | ATX Prestige Detailing";
+        var doneSubject = "Free Wash Complete | ATX Prestige Detailing";
         var doneBody =
           "Hi " + customerName + ",\n\n" +
-          "Your free " + (data.eventLabel || "event") + " wash is complete! We're honored to help start your school year off with a clean car.\n\n" +
+          "Your free wash is complete! We're honored to help start your school year off with a clean car.\n\n" +
           "Thank you for everything you do for our students.\n\n" +
           "Thank you,\nATX Prestige Detailing";
         var doneHtml =
@@ -1300,11 +1375,11 @@ function sendJobCompletedSMS(data) {
           "<div style='background-color:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 14px rgba(0,0,0,0.08);'>" +
           "<div style='background-color:#111;color:#fff;padding:24px 28px;'>" +
           "<div style='font-size:26px;font-weight:700;'>ATX Prestige Detailing</div>" +
-          "<div style='font-size:14px;opacity:0.9;margin-top:6px;'>" + (data.eventLabel || "Event") + " Wash Complete</div>" +
+          "<div style='font-size:14px;opacity:0.9;margin-top:6px;'>Free Wash Complete</div>" +
           "</div>" +
           "<div style='padding:28px;'>" +
           "<p style='margin:0 0 16px;font-size:16px;'>Hi " + customerName + ",</p>" +
-          "<p style='margin:0 0 16px;font-size:15px;color:#444;'>Your free " + (data.eventLabel || "event") + " wash is complete! We're honored to help start your school year off with a clean car.</p>" +
+          "<p style='margin:0 0 16px;font-size:15px;color:#444;'>Your free wash is complete! We're honored to help start your school year off with a clean car.</p>" +
           "<p style='margin:0;font-size:15px;color:#444;'>Thank you for everything you do for our students.</p>" +
           "</div>" +
           "<div style='padding:0 28px 28px;'>" +
@@ -2426,7 +2501,7 @@ function cancelBooking(data) {
     }
 
     // ── Send cancellation email ──
-    var pkgLabel  = pkgType === "basic" ? "Basic Detail" : pkgType === "premium" ? "Premium Detail" : pkgType === "exterior" ? "Exterior Only - Basic" : pkgType === "exteriorPremium" ? "Exterior Only - Premium" : pkgType === "interior" ? "Interior Only - Basic" : pkgType === "interiorPremium" ? "Interior Only - Premium" : pkgType || "Detail";
+    var pkgLabel  = pkgType === "basic" ? "Basic Detail" : pkgType === "premium" ? "Premium Detail" : pkgType === "exterior" ? "Exterior Only - Basic" : pkgType === "exteriorPremium" ? "Exterior Only - Premium" : pkgType === "interior" ? "Interior Only - Basic" : pkgType === "interiorPremium" ? "Interior Only - Premium" : pkgType === "lvisdFreeWash" ? "Free Wash (Event)" : (pkgType || "Detail");
     var dateLabel = friendlyDate(bookingDate);
 
     if (custEmail && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(custEmail)) {

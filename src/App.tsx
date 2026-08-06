@@ -12,7 +12,7 @@ const GOOGLE_CLIENT_ID =
   "447699234633-ivo2e1c2q843scj32k5323o2rkq6h7dp.apps.googleusercontent.com";
 
 const SCRIPT_URL =
-  "https://script.google.com/macros/s/AKfycbyuP0H9R9DDc-BIuLahBXhxxQh-4e8x_TRG-BjZ6iPLgaIgdIgaI6k0DWpHlRkI3tvfUg/exec";
+  "https://script.google.com/macros/s/AKfycbzTxAeoJd4XROMnj0GWNyw2M3IRxkI0JA64RLb9cYrniYyoDZpqEIQ6u1UbrJwWFcwzCg/exec";
 
 // Sandbox credentials — replace with your Square Sandbox Application ID / Location ID
 // (Dashboard → Sandbox → your app → Locations). These are not secret and are safe here;
@@ -1499,6 +1499,11 @@ export default function App() {
           // Change notification payload
           hasDetailChanges: changeDetails.length > 0,
           changeDetails: JSON.stringify(changeDetails),
+          editedBy: "admin",
+          // Event-specific reschedule copy (address, rain policy) when applicable
+          eventLabel: editingBooking.event === LVISD_EVENT.id ? LVISD_EVENT.label : "",
+          eventAddress: editingBooking.event === LVISD_EVENT.id ? LVISD_EVENT.dropoffAddress : "",
+          eventRainPolicy: editingBooking.event === LVISD_EVENT.id ? LVISD_EVENT.rainPolicy : "",
         }),
       });
       const data = await res.json();
@@ -3620,7 +3625,9 @@ export default function App() {
                                     <div>
                                       <div style={{ fontSize: "0.72rem", color: "rgba(255,255,255,0.35)", marginBottom: 3 }}>New Time</div>
                                       {(() => {
-                                        const slotsForDate = allAvailableSlots.filter(s => s.date === (editFields.date || b.date) && !isSlotInPast(s.date, s.time));
+                                        // Admin needs to see event-reserved slots too (e.g. moving a
+                                        // teacher between LVISD times), unlike the customer-facing picker.
+                                        const slotsForDate = [...allAvailableSlots, ...lvisdRawSlots].filter(s => s.date === (editFields.date || b.date) && !isSlotInPast(s.date, s.time));
                                         return slotsForDate.length > 0 ? (
                                           <select
                                             style={{ ...S.input, padding: "8px 10px", fontSize: "0.85rem", backgroundColor: "transparent" }}
