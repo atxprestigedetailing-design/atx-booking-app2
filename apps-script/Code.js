@@ -64,7 +64,10 @@ function sendSMS(toPhone, message) {
 // AO Event (e.g. "lvisd-aug-2026", blank for normal bookings)
 // AP Eligibility Method (email | photo | attest)
 // AQ Eligibility Proof URL (Drive link, when method === "photo")
+// AR Coupon Code (e.g. "LVISD25", entered by customer at booking — discount is
+//    applied manually by admin when the final invoice amount is set)
 const EVENT_COL = 41; // AO — used to gate self-service edits for promo bookings
+const COUPON_CODE_COL = 44; // AR
 
 function doGet(e) {
   var action = e.parameter.action;
@@ -218,6 +221,7 @@ function getBookingsByEmail(e) {
         event:               String(row[40] || "").trim(),
         eligibilityMethod:   String(row[41] || "").trim(),
         eligibilityProofUrl: String(row[42] || "").trim(),
+        couponCode:          String(row[43] || "").trim(),
         rowIndex:           entry.rowIndex,
       };
     });
@@ -270,6 +274,7 @@ function getAllBookings() {
         event:               String(row[40] || "").trim(),
         eligibilityMethod:   String(row[41] || "").trim(),
         eligibilityProofUrl: String(row[42] || "").trim(),
+        couponCode:          String(row[43] || "").trim(),
       };
     })
     .filter(function(b) { return b.date !== ""; });
@@ -406,6 +411,7 @@ function updateBookingFields(data) {
       serviceType: 16, address: 17, notes: 26,
       clientType: 27, recurringFrequency: 28,
       timerHours: 29,
+      couponCode: COUPON_CODE_COL,
     };
 
     var fields = data.fields || {};
@@ -1529,6 +1535,13 @@ function bookAppointment(data) {
     bookingsSheet.getRange(newRowIndex, 43).setValue(eligibilityProofUrl);
   }
 
+  // Coupon code (e.g. LVISD25) — stored as entered; discount is applied manually
+  // by admin at invoicing time since services are billed hourly.
+  var couponCode = String(data.couponCode || "").trim();
+  if (couponCode) {
+    bookingsSheet.getRange(newRowIndex, COUPON_CODE_COL).setValue(couponCode);
+  }
+
   if (slotRow !== -1) {
     availabilitySheet.getRange(slotRow, 3).setValue(false);
   }
@@ -1637,6 +1650,7 @@ function bookAppointment(data) {
       "Address: " + (data.address || "") + "\n" +
       (data.boatSize ? "Boat Size: " + data.boatSize + "\n" : "") +
       "Avg Time: " + (data.avgTime || "") + "\n" +
+      (couponCode ? "Coupon Code: " + couponCode + " (apply discount when setting final invoice amount)\n" : "") +
       "Notes: " + notesText;
 
     GmailApp.sendEmail(

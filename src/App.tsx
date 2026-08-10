@@ -12,7 +12,7 @@ const GOOGLE_CLIENT_ID =
   "447699234633-ivo2e1c2q843scj32k5323o2rkq6h7dp.apps.googleusercontent.com";
 
 const SCRIPT_URL =
-  "https://script.google.com/macros/s/AKfycbzTxAeoJd4XROMnj0GWNyw2M3IRxkI0JA64RLb9cYrniYyoDZpqEIQ6u1UbrJwWFcwzCg/exec";
+  "https://script.google.com/macros/s/AKfycbxa2_27sZbLm0Dxdn1pjb0ZplrUGEs7mPqSD-z3Pv7og9DkBpVCOvPdVSEd7NOpKHN7Dg/exec";
 
 // Sandbox credentials — replace with your Square Sandbox Application ID / Location ID
 // (Dashboard → Sandbox → your app → Locations). These are not secret and are safe here;
@@ -94,6 +94,7 @@ type Booking = {
   event?: string;
   eligibilityMethod?: string;
   eligibilityProofUrl?: string;
+  couponCode?: string;
 };
 
 type Expense = {
@@ -165,9 +166,15 @@ type EventConfig = {
   emailDomain: string;
   dropoffAddress: string;
   rainPolicy: string;
+  // Controls whether the promo card/flow is reachable from the homepage at all —
+  // flip to true (and update date/slots/etc.) to reuse this for a future promotion.
+  // Existing bookings tagged with this event id stay fully manageable in admin
+  // either way; this only hides the entry point for booking *new* ones.
+  enabled: boolean;
 };
 
 const LVISD_EVENT: EventConfig = {
+  enabled: false,
   id: "lvisd-aug-2026",
   label: "Lago Vista ISD Teacher/Staff Appreciation Wash",
   shortLabel: "LVISD Teacher/Staff Free Wash",
@@ -182,6 +189,19 @@ const LVISD_EVENT: EventConfig = {
   dropoffAddress: "20703 Paseo De Vaca St, Lago Vista, TX 78645",
   rainPolicy: "If weather forces us to reschedule, we'll reach out directly to get you set up for a new time.",
 };
+
+// ─── Coupon codes ──────────────────────────────────────────────────────────────
+// Services are billed hourly, so a coupon can't discount a price shown during
+// booking — it's just recorded on the booking and applied by admin when the
+// final invoice amount is set after the job is done.
+type Coupon = { code: string; discountPercent: number; label: string };
+const COUPON_CODES: Coupon[] = [
+  { code: "LVISD25", discountPercent: 25, label: "LVISD Teacher/Staff Discount" },
+];
+function findCoupon(code: string): Coupon | undefined {
+  const normalized = code.trim().toUpperCase();
+  return COUPON_CODES.find((c) => c.code === normalized);
+}
 
 // Static vehicle make/model data — shared by the main booking flow and the LVISD event flow.
 const CAR_MAKES = [
@@ -795,6 +815,7 @@ export default function App() {
   const [completeNote, setCompleteNote]                 = useState("");
   const [completeLoading, setCompleteLoading]           = useState(false);
   const [billingMode, setBillingMode]                   = useState<"hourly" | "flat">("hourly");
+  const [applyCouponDiscount, setApplyCouponDiscount]   = useState(false);
   const [editingInvoiceRow, setEditingInvoiceRow]       = useState<number | null>(null);
   const [editInvoiceAmount, setEditInvoiceAmount]       = useState("");
   const [editInvoiceNote, setEditInvoiceNote]           = useState("");
@@ -859,6 +880,7 @@ export default function App() {
   const [boatModel, setBoatModel]                       = useState("");
   const [boatSize, setBoatSize]                         = useState("");
   const [bookingNotes, setBookingNotes]                 = useState("");
+  const [couponCode, setCouponCode]                     = useState("");
   const [selectedDate, setSelectedDate]                 = useState("");
   const [availableSlots, setAvailableSlots]             = useState<AvailabilitySlot[]>([]);
   const [allAvailableSlots, setAllAvailableSlots]       = useState<AvailabilitySlot[]>([]);
@@ -1166,7 +1188,11 @@ export default function App() {
     // Auto-fill hours in complete form
     setCompleteHours(hours);
     const rate = parseFloat(booking.hourlyRate || "0");
-    if (rate > 0) setCompleteAmount((parseFloat(hours) * rate).toFixed(2));
+    if (rate > 0) {
+      const coupon = booking.couponCode ? findCoupon(booking.couponCode) : undefined;
+      const raw = parseFloat(hours) * rate;
+      setCompleteAmount((applyCouponDiscount && coupon ? raw * (1 - coupon.discountPercent / 100) : raw).toFixed(2));
+    }
     // Save elapsed time to sheet
     try {
       await fetch(SCRIPT_URL, {
@@ -3465,7 +3491,7 @@ export default function App() {
 
                             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" as const, marginTop: 8, alignItems: "center" }}>
                               {!isComplete && b.status !== "Cancelled" && b.status !== "Skipped" && (
-                                <button onClick={() => { setSelectedAdminBooking(isSelected ? null : b); setEditingBooking(null); if (b.packageType === "custom") { setBillingMode("flat"); setCompleteAmount(""); setCompleteNote(b.addOns || ""); setCompleteHours(""); } else { setBillingMode("hourly"); setCompleteAmount(b.hourlyRate ? String(parseFloat(b.hourlyRate) * 2) : ""); setCompleteHours(b.clientType === "maintenance" ? "2" : ""); setCompleteNote(""); } }}
+                                <button onClick={() => { setSelectedAdminBooking(isSelected ? null : b); setEditingBooking(null); setApplyCouponDiscount(false); if (b.packageType === "custom") { setBillingMode("flat"); setCompleteAmount(""); setCompleteNote(b.addOns || ""); setCompleteHours(""); } else { setBillingMode("hourly"); setCompleteAmount(b.hourlyRate ? String(parseFloat(b.hourlyRate) * 2) : ""); setCompleteHours(b.clientType === "maintenance" ? "2" : ""); setCompleteNote(""); } }}
                                   style={{ background: isSelected ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.1)", color: "#f1f5f9", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 8, padding: "7px 14px", fontSize: "0.82rem", fontWeight: 600, cursor: "pointer" }}>
                                   {isSelected ? "Cancel" : "Mark Complete"}
                                 </button>
@@ -3481,7 +3507,7 @@ export default function App() {
                                     </button>
                                   </div>
                                 ) : (
-                                  <button onClick={() => { startTimer(b.rowIndex); setSelectedAdminBooking(b); setEditingBooking(null); if (b.packageType === "custom") { setBillingMode("flat"); setCompleteAmount(""); setCompleteNote(b.addOns || ""); setCompleteHours(""); } else { setBillingMode("hourly"); setCompleteHours(""); setCompleteAmount(""); setCompleteNote(""); } }}
+                                  <button onClick={() => { startTimer(b.rowIndex); setSelectedAdminBooking(b); setEditingBooking(null); setApplyCouponDiscount(false); if (b.packageType === "custom") { setBillingMode("flat"); setCompleteAmount(""); setCompleteNote(b.addOns || ""); setCompleteHours(""); } else { setBillingMode("hourly"); setCompleteHours(""); setCompleteAmount(""); setCompleteNote(""); } }}
                                     style={{ background: "#059669", color: "#fff", border: "none", borderRadius: 8, padding: "7px 14px", fontSize: "0.82rem", fontWeight: 600, cursor: "pointer" }}>
                                     ▶ Start Timer
                                   </button>
@@ -3902,6 +3928,14 @@ export default function App() {
                                     ⚡ <strong>Custom Job:</strong> {b.addOns || "Custom Service"} — enter the final amount below.
                                   </div>
                                 )}
+                                {(() => {
+                                  const bookingCoupon = b.couponCode ? findCoupon(b.couponCode) : undefined;
+                                  return bookingCoupon ? (
+                                    <div style={{ background: "rgba(16,185,129,0.1)", border: "1.5px solid rgba(16,185,129,0.35)", borderRadius: 10, padding: "10px 14px", marginBottom: 12, fontSize: "0.85rem", color: "#34d399" }}>
+                                      🏷 <strong>Coupon {b.couponCode}:</strong> {bookingCoupon.label} — {bookingCoupon.discountPercent}% off. Use the checkbox below to apply it to the calculated amount.
+                                    </div>
+                                  ) : null;
+                                })()}
 
                                 {b.event ? (
                                   /* Free event booking — no amount to enter, settles at $0 immediately */
@@ -3927,11 +3961,28 @@ export default function App() {
                                       </button>
                                     </div>
 
-                                    {billingMode === "hourly" ? (
+                                    {billingMode === "hourly" ? (() => {
+                                      const hourlyCoupon = b.couponCode ? findCoupon(b.couponCode) : undefined;
+                                      const recalc = (hrsStr: string, discountOn: boolean) => {
+                                        const hrs = parseFloat(hrsStr);
+                                        const rate2 = parseFloat(b.hourlyRate || "0");
+                                        if (!(hrs > 0 && rate2 > 0)) { setCompleteAmount(""); return; }
+                                        const raw = hrs * rate2;
+                                        const final = discountOn && hourlyCoupon ? raw * (1 - hourlyCoupon.discountPercent / 100) : raw;
+                                        setCompleteAmount(final.toFixed(2));
+                                      };
+                                      return (
                                       <>
                                         <div style={{ fontSize: "0.82rem", color: "rgba(255,255,255,0.45)", marginBottom: 10 }}>
                                           Rate: <strong style={{ color: "#f1f5f9" }}>${b.hourlyRate}/hr</strong> — Enter hours to calculate
                                         </div>
+                                        {hourlyCoupon && (
+                                          <label style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10, fontSize: "0.85rem", color: "#34d399", cursor: "pointer" }}>
+                                            <input type="checkbox" checked={applyCouponDiscount}
+                                              onChange={e => { setApplyCouponDiscount(e.target.checked); recalc(completeHours, e.target.checked); }} />
+                                            Apply {hourlyCoupon.discountPercent}% coupon discount ({b.couponCode})
+                                          </label>
+                                        )}
                                         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
                                           <div>
                                             <div style={{ fontSize: "0.78rem", color: "rgba(255,255,255,0.45)", marginBottom: 4 }}>Hours Worked</div>
@@ -3942,13 +3993,7 @@ export default function App() {
                                               step="0.5"
                                               placeholder="e.g. 2.5"
                                               value={completeHours}
-                                              onChange={e => {
-                                                setCompleteHours(e.target.value);
-                                                const hrs = parseFloat(e.target.value);
-                                                const rate2 = parseFloat(b.hourlyRate || "0");
-                                                if (hrs > 0 && rate2 > 0) setCompleteAmount((hrs * rate2).toFixed(2));
-                                                else setCompleteAmount("");
-                                              }}
+                                              onChange={e => { setCompleteHours(e.target.value); recalc(e.target.value, applyCouponDiscount); }}
                                             />
                                           </div>
                                           <div>
@@ -3969,11 +4014,12 @@ export default function App() {
                                         </div>
                                         {completeHours && completeAmount && (
                                           <div style={{ marginTop: 10, padding: "8px 12px", background: "rgba(16,185,129,0.1)", border: "1px solid rgba(16,185,129,0.3)", borderRadius: 10, fontSize: "0.88rem", color: "#34d399", fontWeight: 700 }}>
-                                            {completeHours} hrs × ${b.hourlyRate}/hr = ${completeAmount}
+                                            {completeHours} hrs × ${b.hourlyRate}/hr{applyCouponDiscount && hourlyCoupon ? ` − ${hourlyCoupon.discountPercent}%` : ""} = ${completeAmount}
                                           </div>
                                         )}
                                       </>
-                                    ) : (
+                                      );
+                                    })() : (
                                       <>
                                         <div style={{ fontSize: "0.82rem", color: "#7c3aed", marginBottom: 6, fontWeight: 600 }}>
                                           Flat Rate — enter a custom amount (e.g. add-on consultation, package deal)
@@ -3999,6 +4045,11 @@ export default function App() {
                                         {completeAmount && (
                                           <div style={{ marginTop: 8, fontSize: "0.85rem", color: "#7c3aed", fontWeight: 600 }}>
                                             Flat rate: ${parseFloat(completeAmount).toFixed(2)}
+                                          </div>
+                                        )}
+                                        {completeAmount && b.couponCode && findCoupon(b.couponCode) && (
+                                          <div style={{ marginTop: 4, fontSize: "0.8rem", color: "#34d399" }}>
+                                            With {findCoupon(b.couponCode)!.discountPercent}% coupon ({b.couponCode}): ${(parseFloat(completeAmount) * (1 - findCoupon(b.couponCode)!.discountPercent / 100)).toFixed(2)} — enter this manually above if applying it
                                           </div>
                                         )}
                                       </>
@@ -5604,7 +5655,7 @@ export default function App() {
                 ))}
               </div>
 
-              {!lvisdEventDatePassed && (
+              {LVISD_EVENT.enabled && !lvisdEventDatePassed && (
                 <div style={{ marginTop: 24, borderTop: "1px solid rgba(255,255,255,0.07)", paddingTop: 24, textAlign: "center" as const }}>
                   <div style={{ display: "inline-block", fontSize: "0.68rem", fontWeight: 700, letterSpacing: "0.14em", color: "#fbbf24", textTransform: "uppercase" as const, marginBottom: 10, background: "rgba(251,191,36,0.1)", border: "1px solid rgba(251,191,36,0.3)", borderRadius: 999, padding: "4px 14px" }}>Community Event</div>
                   <h3 style={{ fontSize: "1.3rem", fontWeight: 800, color: "#f1f5f9", margin: "0 0 6px" }}>{LVISD_EVENT.shortLabel}</h3>
@@ -6114,6 +6165,25 @@ export default function App() {
               </div>
 
               <div style={{ marginTop: 24 }}>
+                <div style={S.sectionLabel}>Coupon Code <span style={{ fontWeight: 400, textTransform: "none" as const, color: "rgba(255,255,255,0.35)" }}>(optional)</span></div>
+                <input style={{ ...S.input, marginTop: 10, textTransform: "uppercase" as const }}
+                  placeholder="Enter code"
+                  value={couponCode} onChange={(e) => setCouponCode(e.target.value)} />
+                {couponCode.trim() && (() => {
+                  const c = findCoupon(couponCode);
+                  return c ? (
+                    <div style={{ marginTop: 10, padding: "10px 14px", background: "rgba(16,185,129,0.1)", border: "1px solid rgba(16,185,129,0.3)", borderRadius: 10, fontSize: "0.85rem", color: "#34d399" }}>
+                      ✓ {c.label} applied — {c.discountPercent}% off will be calculated on your final invoice once service is completed.
+                    </div>
+                  ) : (
+                    <div style={{ marginTop: 10, padding: "10px 14px", background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.3)", borderRadius: 10, fontSize: "0.85rem", color: "#f87171" }}>
+                      Code not recognized. Double-check it, or leave blank if you don't have one.
+                    </div>
+                  );
+                })()}
+              </div>
+
+              <div style={{ marginTop: 24 }}>
                 <div style={S.sectionLabel}>Additional Notes</div>
                 <textarea style={{ ...S.input, marginTop: 10, minHeight: 100, resize: "vertical" as const, fontFamily: "inherit", lineHeight: 1.5 }}
                   placeholder="Any access instructions, special requests, or notes about the vehicle condition."
@@ -6149,6 +6219,7 @@ export default function App() {
                           recurringFrequency: frequency,
                           smsConsent: smsConsent,
                           smsMarketingConsent: smsMarketingConsent,
+                          couponCode: findCoupon(couponCode) ? couponCode.trim().toUpperCase() : "",
                         }),
                       });
                       const data = await res.json();
