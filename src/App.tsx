@@ -537,6 +537,7 @@ function BookingCard({ booking, upcoming, onCancel, onBookAgain, isEditing, edit
           <div>{booking.serviceType === "mobile" ? `Mobile Service${booking.address ? ` - ${booking.address}` : ""}` : "Drop-Off Service"}</div>
         )}
         {booking.addOns && booking.packageType !== "custom" && <div>Add-Ons: {booking.addOns}</div>}
+        {booking.couponCode && <div>Coupon: {booking.couponCode}</div>}
         {booking.notes && <div>{booking.notes}</div>}
       </div>
 
@@ -1378,12 +1379,11 @@ export default function App() {
     if (processingRows.has(selectedAdminBooking.rowIndex)) return; // double-click guard
     const savedBooking = selectedAdminBooking;
     const isFreeEvent = !!savedBooking.event;
-    const rate = parseFloat(savedBooking.hourlyRate || "0");
-    const finalAmount = isFreeEvent
-      ? (completeAmount || "0")
-      : savedBooking.clientType !== "maintenance" && completeHours
-      ? String((parseFloat(completeHours) * rate).toFixed(2))
-      : completeAmount;
+    // Trust completeAmount as-is — it's what's actually shown in the Invoice Amount
+    // field, already accounting for hours×rate, any coupon discount applied via the
+    // checkbox, or a manual override. Recomputing hours×rate here would silently
+    // discard a discount the admin just applied.
+    const finalAmount = isFreeEvent ? (completeAmount || "0") : completeAmount;
     if (!isFreeEvent && (!finalAmount || parseFloat(finalAmount) <= 0)) { alert("Please enter the hours or amount."); return; }
     // Free event bookings settle immediately at $0 — no pending invoice to release.
     const finalInvoiceStatus = isFreeEvent ? "paid" : "pending";
