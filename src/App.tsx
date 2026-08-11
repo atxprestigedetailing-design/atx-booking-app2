@@ -3519,7 +3519,7 @@ export default function App() {
                                   {editingBooking?.rowIndex === b.rowIndex ? "Cancel Edit" : "Edit"}
                                 </button>
                               )}
-                              {!isComplete && isUpcoming(b.date) && b.status !== "Cancelled" && b.status !== "Skipped" && (
+                              {!isComplete && b.status !== "Cancelled" && b.status !== "Skipped" && (
                                 <button onClick={async () => {
                                   if (!window.confirm(
                                     b.clientType === "maintenance"
@@ -3561,7 +3561,7 @@ export default function App() {
                                 </button>
                               )}
                               {/* Skip button — maintenance only */}
-                              {!isComplete && isUpcoming(b.date) && b.status !== "Cancelled" && b.status !== "Skipped" && b.clientType === "maintenance" && (
+                              {!isComplete && b.status !== "Cancelled" && b.status !== "Skipped" && b.clientType === "maintenance" && (
                                 <button onClick={async () => {
                                   if (!window.confirm(`Skip ${b.name}'s maintenance on ${formatDateLabel(b.date)}? They will be notified and moved to their next scheduled date.`)) return;
                                   const skipTid = showToast("Skipping appointment and updating calendar...", "loading");
