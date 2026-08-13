@@ -282,6 +282,12 @@ function isUpcoming(dateStr: string) {
   return new Date(y, m - 1, d) >= today;
 }
 
+// A booking whose date has passed but was never resolved (not Completed, Cancelled,
+// or Skipped) — these silently pile up with no indication otherwise.
+function isOverdue(b: Booking) {
+  return !isUpcoming(b.date) && b.status !== "Completed" && b.status !== "Cancelled" && b.status !== "Skipped";
+}
+
 // A slot is bookable only if its date+time hasn't already happened — this catches
 // same-day slots whose time has passed today, which a date-only check would miss.
 function isSlotInPast(dateStr: string, timeStr: string): boolean {
@@ -809,7 +815,7 @@ export default function App() {
   const [addingExpense, setAddingExpense]               = useState(false);
   const [adminBookings, setAdminBookings]               = useState<Booking[]>([]);
   const [adminLoading, setAdminLoading]                 = useState(false);
-  const [adminFilter, setAdminFilter]                   = useState<"all" | "upcoming" | "past" | "maintenance">("all");
+  const [adminFilter, setAdminFilter]                   = useState<"all" | "upcoming" | "past" | "maintenance" | "overdue">("upcoming");
   const [selectedAdminBooking, setSelectedAdminBooking] = useState<Booking | null>(null);
   const [completeAmount, setCompleteAmount]             = useState("");
   const [completeHours, setCompleteHours]               = useState("");
@@ -2346,7 +2352,7 @@ export default function App() {
               <h2 style={{ ...S.title, margin: 0, fontSize: "1.8rem" }}>My Bookings</h2>
               <div style={{ display: "flex", gap: 8, marginLeft: "auto" }}>
                 {googleUser?.email === ADMIN_EMAIL && (
-                  <button onClick={() => { setView("admin"); loadAdminBookings(); }} style={{ ...S.secondary, padding: "10px 16px", fontSize: "0.9rem" }}>Admin</button>
+                  <button onClick={() => { setView("admin"); setAdminFilter("upcoming"); loadAdminBookings(); }} style={{ ...S.secondary, padding: "10px 16px", fontSize: "0.9rem" }}>Admin</button>
                 )}
                 <button onClick={() => { setView("booking"); setStep(1); }} style={{ ...S.primary, padding: "10px 16px", fontSize: "0.9rem" }}>Book New Service</button>
               </div>
@@ -2992,10 +2998,12 @@ export default function App() {
 
   // ADMIN VIEW
   if (view === "admin" && googleUser?.email === ADMIN_EMAIL) {
+    const overdueCount = adminBookings.filter(isOverdue).length;
     const filtered = adminBookings.filter(b => {
       if (adminFilter === "upcoming") return isUpcoming(b.date) && b.status !== "Completed" && b.status !== "Cancelled" && b.status !== "Skipped";
       if (adminFilter === "past") return !isUpcoming(b.date) || b.status === "Completed" || b.status === "Cancelled" || b.status === "Skipped";
       if (adminFilter === "maintenance") return b.clientType === "maintenance";
+      if (adminFilter === "overdue") return isOverdue(b);
       return true;
     }).sort((a, b) => {
       // "All" tab: completed/cancelled first (newest → oldest), then upcoming (soonest first)
@@ -3011,6 +3019,8 @@ export default function App() {
       if (adminFilter === "upcoming") return a.date.localeCompare(b.date);
       // "Past" tab: most recent first
       if (adminFilter === "past") return b.date.localeCompare(a.date);
+      // "Overdue" tab: oldest (most urgent) first
+      if (adminFilter === "overdue") return a.date.localeCompare(b.date);
       // "Maintenance" tab: upcoming first, then by date
       const aUp = isUpcoming(a.date) && a.status !== "Completed" && a.status !== "Cancelled" && a.status !== "Skipped";
       const bUp = isUpcoming(b.date) && b.status !== "Completed" && b.status !== "Cancelled" && b.status !== "Skipped";
@@ -3074,11 +3084,26 @@ export default function App() {
                   <>
                     {/* Filter bar + Quick Book button */}
                     <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" as const, alignItems: "center" }}>
-                      {(["all", "upcoming", "past", "maintenance"] as const).map(f => (
-                        <button key={f} onClick={() => setAdminFilter(f)} style={{ background: adminFilter === f ? "#111827" : "rgba(255,255,255,0.08)", color: adminFilter === f ? "#fff" : "#374151", border: "none", borderRadius: 999, padding: "6px 14px", fontSize: "0.85rem", fontWeight: 600, cursor: "pointer", textTransform: "capitalize" as const }}>
-                          {f === "all" ? "All" : f === "upcoming" ? "Upcoming" : f === "past" ? "Past" : "Maintenance"}
-                        </button>
-                      ))}
+                      {(["all", "upcoming", "past", "maintenance", "overdue"] as const).map(f => {
+                        const isOverdueTab = f === "overdue";
+                        const selected = adminFilter === f;
+                        return (
+                          <button key={f} onClick={() => setAdminFilter(f)} style={{
+                            display: "flex", alignItems: "center", gap: 6,
+                            background: selected ? (isOverdueTab ? "#b45309" : "rgba(255,255,255,0.18)") : "rgba(255,255,255,0.06)",
+                            color: selected ? "#fff" : "rgba(255,255,255,0.65)",
+                            border: selected ? "1px solid transparent" : "1px solid rgba(255,255,255,0.12)",
+                            borderRadius: 999, padding: "6px 14px", fontSize: "0.85rem", fontWeight: 600, cursor: "pointer", textTransform: "capitalize" as const,
+                          }}>
+                            {isOverdueTab ? "Needs Attention" : f === "all" ? "All" : f === "upcoming" ? "Upcoming" : f === "past" ? "Past" : "Maintenance"}
+                            {isOverdueTab && overdueCount > 0 && (
+                              <span style={{ background: selected ? "rgba(255,255,255,0.25)" : "#dc2626", color: "#fff", borderRadius: 999, padding: "1px 7px", fontSize: "0.72rem", fontWeight: 800 }}>
+                                {overdueCount}
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
                       <button
                         onClick={() => { setQuickBookOpen(true); setQuickBookClient(null); setQuickBookSearch(""); }}
                         style={{ ...S.primary, marginLeft: "auto", padding: "7px 16px", fontSize: "0.85rem", background: "linear-gradient(135deg, #7c3aed, #5b21b6)" }}
@@ -3478,8 +3503,8 @@ export default function App() {
                                 {b.notes && <div style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.35)" }}>Notes: {b.notes}</div>}
                               </div>
                               <div style={{ display: "flex", flexDirection: "column" as const, alignItems: "flex-end", gap: 4 }}>
-                                <span style={{ background: b.status === "Cancelled" ? "rgba(239,68,68,0.15)" : b.status === "Skipped" ? "rgba(59,130,246,0.15)" : isComplete ? "rgba(16,185,129,0.15)" : isUpcoming(b.date) ? "rgba(59,130,246,0.15)" : "rgba(255,255,255,0.06)", color: b.status === "Cancelled" ? "#f87171" : b.status === "Skipped" ? "#93c5fd" : isComplete ? "#34d399" : isUpcoming(b.date) ? "#93c5fd" : "rgba(255,255,255,0.35)", fontSize: "0.72rem", fontWeight: 700, borderRadius: 999, padding: "2px 8px" }}>
-                                  {b.status === "Cancelled" ? "CANCELLED" : b.status === "Skipped" ? "SKIPPED" : isComplete ? "COMPLETED" : isUpcoming(b.date) ? "UPCOMING" : "PAST"}
+                                <span style={{ background: b.status === "Cancelled" ? "rgba(239,68,68,0.15)" : b.status === "Skipped" ? "rgba(59,130,246,0.15)" : isComplete ? "rgba(16,185,129,0.15)" : isUpcoming(b.date) ? "rgba(59,130,246,0.15)" : isOverdue(b) ? "rgba(217,119,6,0.2)" : "rgba(255,255,255,0.06)", color: b.status === "Cancelled" ? "#f87171" : b.status === "Skipped" ? "#93c5fd" : isComplete ? "#34d399" : isUpcoming(b.date) ? "#93c5fd" : isOverdue(b) ? "#fbbf24" : "rgba(255,255,255,0.35)", fontSize: "0.72rem", fontWeight: 700, borderRadius: 999, padding: "2px 8px" }}>
+                                  {b.status === "Cancelled" ? "CANCELLED" : b.status === "Skipped" ? "SKIPPED" : isComplete ? "COMPLETED" : isUpcoming(b.date) ? "UPCOMING" : isOverdue(b) ? "⚠ OVERDUE" : "PAST"}
                                 </span>
                                 {b.invoiceStatus && b.invoiceStatus !== "" && (
                                   <span style={{ background: b.invoiceStatus === "paid" ? "rgba(16,185,129,0.2)" : b.invoiceStatus === "released" ? "rgba(251,191,36,0.15)" : "rgba(251,191,36,0.1)", color: b.invoiceStatus === "paid" ? "#34d399" : "#fbbf24", fontSize: "0.72rem", fontWeight: 700, borderRadius: 999, padding: "2px 8px" }}>
@@ -5636,7 +5661,7 @@ export default function App() {
                 <div className="stagger-4" style={{ display: "flex", justifyContent: "center", gap: 12, flexWrap: "wrap" as const, marginBottom: 28 }}>
                   <button style={{ ...S.primary, padding: "16px 32px", fontSize: "1.05rem", letterSpacing: "-0.3px" }} onClick={() => setStep(1)}>Book a Service →</button>
                   {googleUser && googleUser.email === ADMIN_EMAIL && (
-                    <button style={{ ...S.primary, background: "linear-gradient(135deg, #059669, #047857)" }} onClick={() => { setView("admin"); loadAdminBookings(); }}>Admin Panel</button>
+                    <button style={{ ...S.primary, background: "linear-gradient(135deg, #059669, #047857)" }} onClick={() => { setView("admin"); setAdminFilter("upcoming"); loadAdminBookings(); }}>Admin Panel</button>
                   )}
                   {googleUser && googleUser.email === ADMIN_EMAIL && (
                     <button style={{ ...S.primary, background: "linear-gradient(135deg, #7c3aed, #5b21b6)" }} onClick={() => { setView("inventory"); loadInventory(); }}>Inventory</button>
