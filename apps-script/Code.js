@@ -66,8 +66,12 @@ function sendSMS(toPhone, message) {
 // AQ Eligibility Proof URL (Drive link, when method === "photo")
 // AR Coupon Code (e.g. "LVISD25", entered by customer at booking — discount is
 //    applied manually by admin when the final invoice amount is set)
+// AS Consent Source ("self" = client checked the box themselves on their own
+//    booking, "admin" = value was set through the app by staff, blank/"unknown"
+//    = predates this tracking. Only "self" counts as real marketing consent.
 const EVENT_COL = 41; // AO — used to gate self-service edits for promo bookings
 const COUPON_CODE_COL = 44; // AR
+const CONSENT_SOURCE_COL = 45; // AS
 
 function doGet(e) {
   var action = e.parameter.action;
@@ -222,6 +226,7 @@ function getBookingsByEmail(e) {
         eligibilityMethod:   String(row[41] || "").trim(),
         eligibilityProofUrl: String(row[42] || "").trim(),
         couponCode:          String(row[43] || "").trim(),
+        consentSource:       String(row[44] || "").trim(),
         rowIndex:           entry.rowIndex,
       };
     });
@@ -275,6 +280,7 @@ function getAllBookings() {
         eligibilityMethod:   String(row[41] || "").trim(),
         eligibilityProofUrl: String(row[42] || "").trim(),
         couponCode:          String(row[43] || "").trim(),
+        consentSource:       String(row[44] || "").trim(),
       };
     })
     .filter(function(b) { return b.date !== ""; });
@@ -412,9 +418,21 @@ function updateBookingFields(data) {
       clientType: 27, recurringFrequency: 28,
       timerHours: 29,
       couponCode: COUPON_CODE_COL,
+      smsConsent: 38, smsMarketingConsent: 39,
     };
 
     var fields = data.fields || {};
+
+    // SMS/marketing consent can only be changed by an admin edit, never a customer
+    // self-service one — and doing so always marks the source as "admin" (not a
+    // real opt-in signal), since only the client's own booking submission counts
+    // as "self".
+    var changingConsent = fields.smsConsent !== undefined || fields.smsMarketingConsent !== undefined;
+    if (changingConsent && data.editedBy !== "admin") {
+      delete fields.smsConsent;
+      delete fields.smsMarketingConsent;
+      changingConsent = false;
+    }
 
     // Promo event bookings (e.g. LVISD free wash) can't be rescheduled or have
     // their package/service type changed through CUSTOMER self-service edits —
@@ -434,6 +452,18 @@ function updateBookingFields(data) {
         sheet.getRange(row, cols[key]).setValue(fields[key]);
       }
     });
+
+    // Normalize consent to the same "TRUE"/"FALSE" string format bookAppointment
+    // uses (regardless of what type the frontend sent), and record who set it.
+    if (changingConsent) {
+      if (fields.smsConsent !== undefined) {
+        sheet.getRange(row, cols.smsConsent).setValue(fields.smsConsent ? "TRUE" : "FALSE");
+      }
+      if (fields.smsMarketingConsent !== undefined) {
+        sheet.getRange(row, cols.smsMarketingConsent).setValue(fields.smsMarketingConsent ? "TRUE" : "FALSE");
+      }
+      sheet.getRange(row, CONSENT_SOURCE_COL).setValue("admin");
+    }
 
     // ── If date/time changed: update calendar, availability, notify customer ──
     if (data.scheduleChanged) {
@@ -1512,6 +1542,9 @@ function bookAppointment(data) {
   var newRowIndex = bookingsSheet.getLastRow();
   bookingsSheet.getRange(newRowIndex, 38).setValue(data.smsConsent ? "TRUE" : "FALSE");
   bookingsSheet.getRange(newRowIndex, 39).setValue(data.smsMarketingConsent ? "TRUE" : "FALSE");
+  // Consent source — "self" only when the client submitted this booking themselves
+  // (main flow or an event flow); Quick Book (admin) explicitly flags bookedByAdmin.
+  bookingsSheet.getRange(newRowIndex, CONSENT_SOURCE_COL).setValue(data.bookedByAdmin ? "admin" : "self");
 
   // Promo event tagging (e.g. LVISD free wash) — columns AO/AP/AQ
   var eventId = String(data.event || "").trim();
@@ -2288,6 +2321,52 @@ function setupLvisdAug2026() {
   });
 
   Logger.log("LVISD Aug 8 2026 setup complete: headers set, " + times.length + " slots seeded.");
+}
+
+// ─── backfillConsentSource (run once manually from the Apps Script editor) ────
+// Tags every existing booking's SMS-consent source. Only these known bookings
+// were genuinely submitted by the client themselves through the app; everything
+// else with a consent value was entered by staff, and blanks predate the feature
+// entirely. Safe to re-run.
+
+function backfillConsentSource() {
+  var ss    = SpreadsheetApp.openById(SHEET_ID);
+  var sheet = ss.getSheetByName(BOOKINGS_SHEET);
+  sheet.getRange(1, CONSENT_SOURCE_COL).setValue("Consent Source");
+
+  var knownSelf = [
+    { email: "krblake5@gmail.com",       date: "2026-08-01" }, // Ken Blake
+    { email: "hwomack@lagovistaisd.net", date: "2026-08-08" }, // Heather Womack
+    { email: "wnorman@lagovistaisd.net", date: "2026-08-08" }, // Wendy Norman
+    { email: "gcervantes@lagovistaisd.net", date: "2026-08-08" }, // Gabriela Cervantes
+    { email: "cvences@lagovistaisd.net", date: "2026-08-08" }, // Cynthia Joiner
+  ];
+
+  var rows = sheet.getDataRange().getDisplayValues();
+  var selfCount = 0, adminCount = 0, unknownCount = 0;
+
+  for (var i = 1; i < rows.length; i++) {
+    var rDate = String(rows[i][4] || "").trim();
+    if (!rDate) continue; // skip blank rows
+
+    var rEmail = String(rows[i][3] || "").trim().toLowerCase();
+    var rSheetRow = i + 1;
+
+    var isKnownSelf = knownSelf.some(function(k) { return k.email === rEmail && k.date === rDate; });
+
+    var smsVal = String(rows[i][37] || "").trim();
+    var mktVal = String(rows[i][38] || "").trim();
+    var hasConsentValue = smsVal !== "" || mktVal !== "";
+
+    var source = isKnownSelf ? "self" : hasConsentValue ? "admin" : "unknown";
+    sheet.getRange(rSheetRow, CONSENT_SOURCE_COL).setValue(source);
+
+    if (source === "self") selfCount++;
+    else if (source === "admin") adminCount++;
+    else unknownCount++;
+  }
+
+  Logger.log("Consent source backfill complete: " + selfCount + " self, " + adminCount + " admin, " + unknownCount + " unknown.");
 }
 
 // ─── sendBookingReminders (run daily via time trigger) ────────────────────────

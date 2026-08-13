@@ -12,7 +12,7 @@ const GOOGLE_CLIENT_ID =
   "447699234633-ivo2e1c2q843scj32k5323o2rkq6h7dp.apps.googleusercontent.com";
 
 const SCRIPT_URL =
-  "https://script.google.com/macros/s/AKfycbxa2_27sZbLm0Dxdn1pjb0ZplrUGEs7mPqSD-z3Pv7og9DkBpVCOvPdVSEd7NOpKHN7Dg/exec";
+  "https://script.google.com/macros/s/AKfycby4sNDc-sMCic-3k8cVt0yPLyDJ2xtK8bOXLZkMKGWMaHsLYNecTSgnijfy60cru_fgEA/exec";
 
 // Sandbox credentials — replace with your Square Sandbox Application ID / Location ID
 // (Dashboard → Sandbox → your app → Locations). These are not secret and are safe here;
@@ -95,6 +95,7 @@ type Booking = {
   eligibilityMethod?: string;
   eligibilityProofUrl?: string;
   couponCode?: string;
+  consentSource?: string;
 };
 
 type Expense = {
@@ -824,6 +825,10 @@ export default function App() {
   const [billingMode, setBillingMode]                   = useState<"hourly" | "flat">("hourly");
   const [applyCouponDiscount, setApplyCouponDiscount]   = useState(false);
   const [editingInvoiceRow, setEditingInvoiceRow]       = useState<number | null>(null);
+  const [editingClientConsent, setEditingClientConsent] = useState(false);
+  const [editConsentSms, setEditConsentSms]             = useState(false);
+  const [editConsentMarketing, setEditConsentMarketing] = useState(false);
+  const [savingConsent, setSavingConsent]               = useState(false);
   const [editInvoiceAmount, setEditInvoiceAmount]       = useState("");
   const [editInvoiceNote, setEditInvoiceNote]           = useState("");
   const [quickBookClient, setQuickBookClient]           = useState<Booking | null>(null);
@@ -1278,6 +1283,30 @@ export default function App() {
     } catch (e) { console.error("Failed to load admin bookings", e); }
     finally { setAdminLoading(false); }
   }, []);
+
+  // Applies a manual consent override across every booking row for a client —
+  // not just the latest one — so their history stays consistent. Always marks
+  // the source as "admin" (set through the app by staff, not a real self opt-in).
+  async function saveClientConsent(bookings: Booking[], smsConsent: boolean, smsMarketingConsent: boolean) {
+    setSavingConsent(true);
+    try {
+      await Promise.all(bookings.map(b => fetch(SCRIPT_URL, {
+        method: "POST",
+        body: JSON.stringify({
+          action: "updateBookingFields",
+          rowIndex: b.rowIndex,
+          fields: { smsConsent, smsMarketingConsent },
+          editedBy: "admin",
+        }),
+      })));
+      await loadAdminBookings();
+      setEditingClientConsent(false);
+    } catch (e) {
+      alert("Something went wrong saving consent.");
+    } finally {
+      setSavingConsent(false);
+    }
+  }
 
   async function openClientNotes(email: string) {
     setClientNotesOpen(true);
@@ -3392,6 +3421,7 @@ export default function App() {
                                           method: "POST",
                                           body: JSON.stringify({
                                             action: "bookAppointment",
+                                            bookedByAdmin: true,
                                             name: c.name, phone: c.phone, email: c.email,
                                             date: qDate, displayDate: qDate, time: qTime,
                                             year: c.year, make: c.make, model: c.model,
@@ -4825,7 +4855,7 @@ export default function App() {
                     return (
                       <>
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap" as const, gap: 8 }}>
-                          <button onClick={() => setSelectedClientKey(null)} style={{ ...S.secondary, padding: "7px 14px", fontSize: "0.85rem" }}>← All Clients</button>
+                          <button onClick={() => { setSelectedClientKey(null); setEditingClientConsent(false); }} style={{ ...S.secondary, padding: "7px 14px", fontSize: "0.85rem" }}>← All Clients</button>
                           <button onClick={() => openClientNotes(selected.email)} style={{ background: "rgba(167,139,250,0.15)", color: "#a78bfa", border: "1px solid rgba(167,139,250,0.35)", borderRadius: 10, padding: "7px 16px", fontSize: "0.85rem", fontWeight: 700, cursor: "pointer" }}>
                             Notes
                           </button>
@@ -4834,17 +4864,59 @@ export default function App() {
                         <div style={{ background: "rgba(167,139,250,0.08)", border: "1px solid rgba(167,139,250,0.3)", borderRadius: 16, padding: 20, marginBottom: 16 }}>
                           <div style={{ fontWeight: 800, color: "#f1f5f9", fontSize: "1.15rem", marginBottom: 4 }}>{selected.name}</div>
                           <div style={{ fontSize: "0.88rem", color: "rgba(255,255,255,0.5)" }}>{selected.email}{selected.phone ? ` · ${selected.phone}` : ""}</div>
-                          {sortedBookings.length > 0 && (
-                            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" as const, marginTop: 12 }}>
-                              <span style={{ background: isConsentGiven(sortedBookings[0].smsConsent) ? "rgba(16,185,129,0.15)" : "rgba(255,255,255,0.06)", color: isConsentGiven(sortedBookings[0].smsConsent) ? "#34d399" : "rgba(255,255,255,0.4)", fontSize: "0.72rem", fontWeight: 700, borderRadius: 999, padding: "3px 10px" }}>
-                                {isConsentGiven(sortedBookings[0].smsConsent) ? "✓" : "✕"} Transactional SMS
-                              </span>
-                              <span style={{ background: isConsentGiven(sortedBookings[0].smsMarketingConsent) ? "rgba(16,185,129,0.15)" : "rgba(255,255,255,0.06)", color: isConsentGiven(sortedBookings[0].smsMarketingConsent) ? "#34d399" : "rgba(255,255,255,0.4)", fontSize: "0.72rem", fontWeight: 700, borderRadius: 999, padding: "3px 10px" }}>
-                                {isConsentGiven(sortedBookings[0].smsMarketingConsent) ? "✓" : "✕"} Marketing SMS
-                              </span>
-                              <span style={{ fontSize: "0.72rem", color: "rgba(255,255,255,0.3)", alignSelf: "center" }}>as of most recent booking ({formatDateLabel(sortedBookings[0].date)})</span>
-                            </div>
-                          )}
+                          {sortedBookings.length > 0 && (() => {
+                            const latest = sortedBookings[0];
+                            const source = (latest.consentSource || "").trim().toLowerCase();
+                            const sourceLabel = source === "self" ? "Self-chosen" : source === "admin" ? "Set by you" : "Unknown";
+                            const sourceColor = source === "self" ? "#34d399" : source === "admin" ? "#fbbf24" : "rgba(255,255,255,0.4)";
+                            return (
+                              <>
+                                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" as const, marginTop: 12, alignItems: "center" }}>
+                                  <span style={{ background: isConsentGiven(latest.smsConsent) ? "rgba(16,185,129,0.15)" : "rgba(255,255,255,0.06)", color: isConsentGiven(latest.smsConsent) ? "#34d399" : "rgba(255,255,255,0.4)", fontSize: "0.72rem", fontWeight: 700, borderRadius: 999, padding: "3px 10px" }}>
+                                    {isConsentGiven(latest.smsConsent) ? "✓" : "✕"} Transactional SMS
+                                  </span>
+                                  <span style={{ background: isConsentGiven(latest.smsMarketingConsent) ? "rgba(16,185,129,0.15)" : "rgba(255,255,255,0.06)", color: isConsentGiven(latest.smsMarketingConsent) ? "#34d399" : "rgba(255,255,255,0.4)", fontSize: "0.72rem", fontWeight: 700, borderRadius: 999, padding: "3px 10px" }}>
+                                    {isConsentGiven(latest.smsMarketingConsent) ? "✓" : "✕"} Marketing SMS
+                                  </span>
+                                  <span style={{ background: "rgba(255,255,255,0.06)", color: sourceColor, fontSize: "0.72rem", fontWeight: 700, borderRadius: 999, padding: "3px 10px" }}>
+                                    Source: {sourceLabel}
+                                  </span>
+                                  {!editingClientConsent && (
+                                    <button onClick={() => {
+                                      setEditConsentSms(isConsentGiven(latest.smsConsent));
+                                      setEditConsentMarketing(isConsentGiven(latest.smsMarketingConsent));
+                                      setEditingClientConsent(true);
+                                    }} style={{ background: "none", border: "1px solid rgba(255,255,255,0.15)", color: "rgba(255,255,255,0.6)", borderRadius: 8, padding: "3px 10px", fontSize: "0.72rem", fontWeight: 600, cursor: "pointer" }}>
+                                      ✏ Edit
+                                    </button>
+                                  )}
+                                  <span style={{ fontSize: "0.72rem", color: "rgba(255,255,255,0.3)", alignSelf: "center" }}>as of most recent booking ({formatDateLabel(latest.date)})</span>
+                                </div>
+
+                                {editingClientConsent && (
+                                  <div style={{ marginTop: 12, padding: 14, background: "rgba(0,0,0,0.2)", borderRadius: 12, border: "1px solid rgba(255,255,255,0.1)" }}>
+                                    <div style={{ fontSize: "0.78rem", color: "rgba(255,255,255,0.5)", marginBottom: 10 }}>
+                                      Manually setting consent here applies to all of {selected.name}'s bookings and is recorded as "Set by you" — only the client checking the box themselves counts as real opt-in.
+                                    </div>
+                                    <label style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, fontSize: "0.85rem", color: "#f1f5f9", cursor: "pointer" }}>
+                                      <input type="checkbox" checked={editConsentSms} onChange={e => setEditConsentSms(e.target.checked)} />
+                                      Transactional SMS (bookings, reminders, job updates)
+                                    </label>
+                                    <label style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, fontSize: "0.85rem", color: "#f1f5f9", cursor: "pointer" }}>
+                                      <input type="checkbox" checked={editConsentMarketing} onChange={e => setEditConsentMarketing(e.target.checked)} />
+                                      Marketing SMS (promos, seasonal offers)
+                                    </label>
+                                    <div style={{ display: "flex", gap: 8 }}>
+                                      <button onClick={() => setEditingClientConsent(false)} disabled={savingConsent} style={{ background: "rgba(255,255,255,0.08)", color: "#f1f5f9", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 8, padding: "7px 14px", fontSize: "0.82rem", fontWeight: 600, cursor: "pointer" }}>Cancel</button>
+                                      <button onClick={() => saveClientConsent(selected.bookings, editConsentSms, editConsentMarketing)} disabled={savingConsent} style={{ background: "#7c3aed", color: "#fff", border: "none", borderRadius: 8, padding: "7px 14px", fontSize: "0.82rem", fontWeight: 700, cursor: "pointer", opacity: savingConsent ? 0.6 : 1 }}>
+                                        {savingConsent ? "Saving..." : "Save"}
+                                      </button>
+                                    </div>
+                                  </div>
+                                )}
+                              </>
+                            );
+                          })()}
                         </div>
 
                         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12, marginBottom: 20 }}>
@@ -4955,7 +5027,7 @@ export default function App() {
                       ) : (
                         <div style={{ display: "grid", gap: 10 }}>
                           {filtered.map(c => (
-                            <button key={c.key} onClick={() => setSelectedClientKey(c.key)}
+                            <button key={c.key} onClick={() => { setSelectedClientKey(c.key); setEditingClientConsent(false); }}
                               style={{ textAlign: "left" as const, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 14, padding: 16, cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" as const }}>
                               <div>
                                 <div style={{ fontWeight: 700, color: "#f1f5f9", fontSize: "0.95rem" }}>{c.name}</div>
