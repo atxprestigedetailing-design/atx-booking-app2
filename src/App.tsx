@@ -795,7 +795,10 @@ export default function App() {
   const [splashDone, setSplashDone]                     = useState(false);
   const [splashPhase, setSplashPhase]                   = useState(0); // 0=logo, 1=tagline, 2=fadeout
   const [view, setView]                                 = useState<"booking" | "myBookings" | "admin" | "balance" | "inventory" | "lvisdEvent">("booking");
-  const [adminTab, setAdminTab]                         = useState<"bookings" | "invoices" | "revenue" | "availability" | "clients" | "finances">("bookings");
+  const [adminTab, setAdminTab]                         = useState<"bookings" | "invoices" | "revenue" | "availability" | "clients" | "finances" | "reminders">("bookings");
+  const [pendingReminders, setPendingReminders]         = useState<{id:string;createdAt:string;bookingDate:string;reminderType:string;clientName:string;clientPhone:string;message:string;status:string;resolvedAt:string}[]>([]);
+  const [remindersLoading, setRemindersLoading]         = useState(false);
+  const [resolvingReminderId, setResolvingReminderId]   = useState<string | null>(null);
   const [clientSearch, setClientSearch]                 = useState("");
   const [selectedClientKey, setSelectedClientKey]       = useState<string | null>(null);
   const [clientNotesOpen, setClientNotesOpen]           = useState(false);
@@ -1354,6 +1357,33 @@ export default function App() {
       setExpenses(data.expenses || []);
     } catch (e) { console.error("Failed to load expenses", e); }
     finally { setExpensesLoading(false); }
+  }
+
+  async function loadPendingReminders() {
+    setRemindersLoading(true);
+    try {
+      const res = await fetch(`${SCRIPT_URL}?action=getPendingReminders`);
+      const data = await res.json();
+      setPendingReminders(data.reminders || []);
+    } catch (e) { console.error("Failed to load reminders", e); }
+    finally { setRemindersLoading(false); }
+  }
+
+  async function resolveReminder(id: string, approve: boolean) {
+    setResolvingReminderId(id);
+    try {
+      const res = await fetch(SCRIPT_URL, {
+        method: "POST",
+        body: JSON.stringify({ action: approve ? "approveReminder" : "rejectReminder", id }),
+      });
+      const d = await res.json();
+      if (d.success) {
+        setPendingReminders(prev => prev.map(r => r.id === id ? { ...r, status: approve ? "Approved" : "Rejected" } : r));
+      } else {
+        alert("Something went wrong.");
+      }
+    } catch (e) { alert("Network error — please try again"); }
+    finally { setResolvingReminderId(null); }
   }
 
   async function handleAddExpense() {
@@ -3215,6 +3245,9 @@ export default function App() {
               <button onClick={() => { setAdminTab("availability"); if (availSlots.length === 0) { setAvailLoading(true); fetch(`${SCRIPT_URL}?action=getAllAvailability`).then(r => r.json()).then(d => { setAvailSlots(d.slots || []); setAvailLoading(false); }).catch(() => setAvailLoading(false)); } }} style={{ background: "none", border: "none", cursor: "pointer", padding: "10px 18px", fontSize: "0.95rem", fontWeight: 700, color: adminTab === "availability" ? "#2563eb" : "#9ca3af", borderBottom: adminTab === "availability" ? "3px solid #2563eb" : "3px solid transparent", marginBottom: -2 }}>Availability</button>
               <button onClick={() => { setAdminTab("clients"); setSelectedClientKey(null); setClientSearch(""); }} style={{ background: "none", border: "none", cursor: "pointer", padding: "10px 18px", fontSize: "0.95rem", fontWeight: 700, color: adminTab === "clients" ? "#a78bfa" : "#9ca3af", borderBottom: adminTab === "clients" ? "3px solid #a78bfa" : "3px solid transparent", marginBottom: -2 }}>Clients</button>
               <button onClick={() => { setAdminTab("finances"); if (expenses.length === 0) loadExpenses(); }} style={{ background: "none", border: "none", cursor: "pointer", padding: "10px 18px", fontSize: "0.95rem", fontWeight: 700, color: adminTab === "finances" ? "#34d399" : "#9ca3af", borderBottom: adminTab === "finances" ? "3px solid #34d399" : "3px solid transparent", marginBottom: -2 }}>Finances</button>
+              <button onClick={() => { setAdminTab("reminders"); loadPendingReminders(); }} style={{ background: "none", border: "none", cursor: "pointer", padding: "10px 18px", fontSize: "0.95rem", fontWeight: 700, color: adminTab === "reminders" ? "#fbbf24" : "#9ca3af", borderBottom: adminTab === "reminders" ? "3px solid #fbbf24" : "3px solid transparent", marginBottom: -2 }}>
+                Reminders{pendingReminders.filter(r => r.status === "Pending").length > 0 ? ` (${pendingReminders.filter(r => r.status === "Pending").length})` : ""}
+              </button>
             </div>
 
             {adminLoading ? (
@@ -5440,6 +5473,59 @@ export default function App() {
                     </>
                   );
                 })()}
+
+                {/* ── REMINDERS TAB ── */}
+                {adminTab === "reminders" && (
+                  <>
+                    <div style={{ fontSize: "0.85rem", color: "rgba(255,255,255,0.45)", marginBottom: 16 }}>
+                      Daily "tomorrow" and "1-hour" reminder texts wait here for your approval before they go to the client. You'll also get an email with one-tap Approve/Reject links for each one as it's queued.
+                    </div>
+                    {remindersLoading ? (
+                      <div style={{ textAlign: "center", padding: 40, color: "rgba(255,255,255,0.45)" }}>Loading reminders...</div>
+                    ) : pendingReminders.length === 0 ? (
+                      <div style={{ textAlign: "center", padding: 40, color: "rgba(255,255,255,0.45)" }}>No reminders yet.</div>
+                    ) : (
+                      <div style={{ display: "grid", gap: 10 }}>
+                        {pendingReminders.map(r => {
+                          const isPending = r.status === "Pending";
+                          const [ry, rm, rd] = (r.bookingDate || "").split("-").map(Number);
+                          const isExpired = isPending && ry && new Date(ry, rm - 1, rd) < new Date(new Date().setHours(0, 0, 0, 0));
+                          const statusColor = r.status === "Approved" ? "#34d399" : r.status === "Rejected" ? "#f87171" : isExpired ? "#fbbf24" : "#93c5fd";
+                          return (
+                            <div key={r.id} style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 14, padding: 16 }}>
+                              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8, marginBottom: 8, flexWrap: "wrap" as const }}>
+                                <div>
+                                  <div style={{ fontWeight: 700, color: "#f1f5f9", fontSize: "0.92rem" }}>
+                                    {r.clientName} — {r.reminderType === "24hr" ? "Tomorrow reminder" : "1-hour reminder"}
+                                  </div>
+                                  <div style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.45)" }}>{formatDateLabel(r.bookingDate)} · {r.clientPhone}</div>
+                                </div>
+                                <span style={{ background: "rgba(255,255,255,0.06)", color: statusColor, fontSize: "0.72rem", fontWeight: 700, borderRadius: 999, padding: "2px 10px" }}>
+                                  {isExpired ? "EXPIRED — STILL PENDING" : r.status.toUpperCase()}
+                                </span>
+                              </div>
+                              <div style={{ fontSize: "0.85rem", color: "rgba(255,255,255,0.65)", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 10, padding: "10px 12px", marginBottom: isPending ? 12 : 0 }}>
+                                "{r.message}"
+                              </div>
+                              {isPending && (
+                                <div style={{ display: "flex", gap: 8 }}>
+                                  <button disabled={resolvingReminderId === r.id} onClick={() => resolveReminder(r.id, true)}
+                                    style={{ background: "#059669", color: "#fff", border: "none", borderRadius: 8, padding: "7px 14px", fontSize: "0.82rem", fontWeight: 600, cursor: "pointer", opacity: resolvingReminderId === r.id ? 0.6 : 1 }}>
+                                    Approve & Send
+                                  </button>
+                                  <button disabled={resolvingReminderId === r.id} onClick={() => resolveReminder(r.id, false)}
+                                    style={{ background: "rgba(239,68,68,0.1)", color: "#dc2626", border: "1.5px solid #fca5a5", borderRadius: 8, padding: "7px 14px", fontSize: "0.82rem", fontWeight: 600, cursor: "pointer", opacity: resolvingReminderId === r.id ? 0.6 : 1 }}>
+                                    Reject
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </>
+                )}
               </>
             )}
           </div>

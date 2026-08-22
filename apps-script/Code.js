@@ -82,6 +82,9 @@ function doGet(e) {
   if (action === "getInventory")       return getInventory();
   if (action === "getClientNotes")     return getClientNotes(e);
   if (action === "getExpenses")        return getExpenses();
+  if (action === "getPendingReminders") return getPendingReminders();
+  if (action === "approveReminder")    return approveReminderGet(e.parameter.id);
+  if (action === "rejectReminder")     return rejectReminderGet(e.parameter.id);
   return ContentService
     .createTextOutput(JSON.stringify({ error: "Invalid action" }))
     .setMimeType(ContentService.MimeType.JSON);
@@ -118,6 +121,8 @@ function doPost(e) {
     if (action === "chargeSquarePayment")        return chargeSquarePayment(data);
     if (action === "addExpense")                 return addExpense(data);
     if (action === "deleteExpense")              return deleteExpense(data);
+    if (action === "approveReminder")            return approveReminderPost(data);
+    if (action === "rejectReminder")              return rejectReminderPost(data);
     return ContentService
       .createTextOutput(JSON.stringify({ success: false, error: "Invalid action" }))
       .setMimeType(ContentService.MimeType.JSON);
@@ -2557,7 +2562,7 @@ function sendBookingReminders() {
 
       if (bookingDate === tomorrowStr) {
         var msg24 = "Hi " + name + "! Reminder: your ATX Prestige Detailing appointment is tomorrow" + (bookingTime ? " at " + bookingTime : "") + ". We look forward to seeing you!";
-        sendSMS(phone, msg24);
+        queueReminderForApproval(name, phone, msg24, bookingDate, "24hr");
       }
 
       if (bookingDate === oneHourStr && bookingTime) {
@@ -2569,14 +2574,161 @@ function sendBookingReminders() {
         if (timeLower.indexOf("am") !== -1 && bHour === 12) bHour = 0;
         if (bHour === oneHourHour) {
           var msg1 = "Hi " + name + "! Your ATX Prestige Detailing appointment is in about 1 hour. We will see you soon!";
-          sendSMS(phone, msg1);
+          queueReminderForApproval(name, phone, msg1, bookingDate, "1hr");
         }
       }
     });
 
-    Logger.log("Booking reminders sent for " + tomorrowStr);
+    Logger.log("Booking reminders queued for " + tomorrowStr);
   } catch (err) {
     Logger.log("sendBookingReminders error: " + err);
+  }
+}
+
+// ─── PendingReminders queue ───────────────────────────────────────────────────
+// Reminder texts (24hr and 1hr) are held here for the owner to approve/reject
+// instead of sending straight to the client — see queueReminderForApproval,
+// approveReminder, rejectReminder, getPendingReminders.
+
+const PENDING_REMINDERS_SHEET = "PendingReminders";
+const PENDING_REMINDERS_HEADER = ["id", "createdAt", "bookingDate", "reminderType", "clientName", "clientPhone", "message", "status", "resolvedAt"];
+
+function getOrCreatePendingRemindersSheet(ss) {
+  var sheet = ss.getSheetByName(PENDING_REMINDERS_SHEET);
+  if (!sheet) {
+    sheet = ss.insertSheet(PENDING_REMINDERS_SHEET);
+    sheet.appendRow(PENDING_REMINDERS_HEADER);
+  }
+  return sheet;
+}
+
+function queueReminderForApproval(name, phone, message, bookingDate, reminderType) {
+  try {
+    var ss    = SpreadsheetApp.openById(SHEET_ID);
+    var sheet = getOrCreatePendingRemindersSheet(ss);
+    var id    = Utilities.getUuid();
+
+    sheet.appendRow([id, new Date(), bookingDate, reminderType, name, phone, message, "Pending", ""]);
+
+    var baseUrl     = ScriptApp.getService().getUrl();
+    var approveUrl  = baseUrl + "?action=approveReminder&id=" + encodeURIComponent(id);
+    var rejectUrl   = baseUrl + "?action=rejectReminder&id=" + encodeURIComponent(id);
+    var typeLabel   = reminderType === "24hr" ? "Tomorrow reminder" : "1-hour reminder";
+
+    var subject = typeLabel + " pending approval — " + name + " | ATX Prestige Detailing";
+    var plain =
+      typeLabel + " for " + name + " (" + friendlyDate(bookingDate) + ") is waiting on your approval before it goes out:\n\n" +
+      "\"" + message + "\"\n\n" +
+      "Approve (send it now): " + approveUrl + "\n\n" +
+      "Reject (don't send): " + rejectUrl;
+
+    GmailApp.sendEmail("atxprestigedetailing@gmail.com", subject, plain, {
+      from: "atxprestigedetailing@gmail.com",
+      name: "ATX Prestige Detailing",
+    });
+
+    Logger.log("Queued " + reminderType + " reminder for " + name + " (id " + id + ")");
+  } catch (err) {
+    Logger.log("queueReminderForApproval error: " + err);
+  }
+}
+
+// Shared by the GET (email link, one-tap) and POST (admin panel button) paths.
+function resolvePendingReminder(id, approve) {
+  var ss    = SpreadsheetApp.openById(SHEET_ID);
+  var sheet = getOrCreatePendingRemindersSheet(ss);
+  var rows  = sheet.getDataRange().getDisplayValues();
+
+  for (var i = 1; i < rows.length; i++) {
+    if (rows[i][0] !== id) continue;
+
+    var status = rows[i][7];
+    if (status !== "Pending") {
+      return { found: true, alreadyResolved: true, status: status };
+    }
+
+    var phone   = rows[i][5];
+    var message = rows[i][6];
+
+    if (approve) {
+      sendSMS(phone, message);
+    }
+
+    sheet.getRange(i + 1, 8).setValue(approve ? "Approved" : "Rejected");
+    sheet.getRange(i + 1, 9).setValue(new Date());
+
+    return { found: true, alreadyResolved: false, status: approve ? "Approved" : "Rejected" };
+  }
+
+  return { found: false };
+}
+
+function reminderResultPage(title, message) {
+  var html =
+    "<!DOCTYPE html><html><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width, initial-scale=1'></head>" +
+    "<body style='font-family:Arial,sans-serif;background:#f5f4f2;margin:0;padding:48px 20px;text-align:center;'>" +
+    "<div style='max-width:420px;margin:0 auto;background:#fff;border-radius:16px;padding:32px 28px;box-shadow:0 4px 14px rgba(0,0,0,0.08);'>" +
+    "<h2 style='margin:0 0 12px;color:#111;'>" + title + "</h2>" +
+    "<p style='margin:0;color:#555;font-size:15px;line-height:1.6;'>" + message + "</p>" +
+    "</div></body></html>";
+  return HtmlService.createHtmlOutput(html);
+}
+
+function approveReminderGet(id) {
+  var result = resolvePendingReminder(id, true);
+  if (!result.found) return reminderResultPage("Not found", "This reminder link is invalid or the record no longer exists.");
+  if (result.alreadyResolved) return reminderResultPage("Already handled", "This reminder was already marked \"" + result.status + "\" — no action taken.");
+  return reminderResultPage("✓ Approved", "The reminder text has been sent to the client.");
+}
+
+function rejectReminderGet(id) {
+  var result = resolvePendingReminder(id, false);
+  if (!result.found) return reminderResultPage("Not found", "This reminder link is invalid or the record no longer exists.");
+  if (result.alreadyResolved) return reminderResultPage("Already handled", "This reminder was already marked \"" + result.status + "\" — no action taken.");
+  return reminderResultPage("✕ Rejected", "The reminder was not sent.");
+}
+
+function approveReminderPost(data) {
+  try {
+    var result = resolvePendingReminder(String(data.id || ""), true);
+    return ContentService.createTextOutput(JSON.stringify({ success: result.found, alreadyResolved: !!result.alreadyResolved, status: result.status })).setMimeType(ContentService.MimeType.JSON);
+  } catch (err) {
+    return ContentService.createTextOutput(JSON.stringify({ success: false, error: String(err) })).setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+function rejectReminderPost(data) {
+  try {
+    var result = resolvePendingReminder(String(data.id || ""), false);
+    return ContentService.createTextOutput(JSON.stringify({ success: result.found, alreadyResolved: !!result.alreadyResolved, status: result.status })).setMimeType(ContentService.MimeType.JSON);
+  } catch (err) {
+    return ContentService.createTextOutput(JSON.stringify({ success: false, error: String(err) })).setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+function getPendingReminders() {
+  try {
+    var ss    = SpreadsheetApp.openById(SHEET_ID);
+    var sheet = getOrCreatePendingRemindersSheet(ss);
+    var rows  = sheet.getDataRange().getDisplayValues();
+
+    var reminders = rows.slice(1).map(function(row) {
+      return {
+        id:           row[0],
+        createdAt:    row[1],
+        bookingDate:  row[2],
+        reminderType: row[3],
+        clientName:   row[4],
+        clientPhone:  row[5],
+        message:      row[6],
+        status:       row[7],
+        resolvedAt:   row[8],
+      };
+    }).reverse();
+
+    return ContentService.createTextOutput(JSON.stringify({ reminders: reminders })).setMimeType(ContentService.MimeType.JSON);
+  } catch (err) {
+    return ContentService.createTextOutput(JSON.stringify({ reminders: [], error: String(err) })).setMimeType(ContentService.MimeType.JSON);
   }
 }
 
