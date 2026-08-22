@@ -1382,7 +1382,7 @@ export default function App() {
     finally { setUpcomingRemindersLoading(false); }
   }
 
-  async function decideUpcomingReminder(candidate: { name: string; phone: string; bookingDate: string; reminderType: string; message: string }, approve: boolean) {
+  async function decideUpcomingReminder(candidate: { name: string; phone: string; bookingDate: string; reminderType: string; message: string; willFireOn: string }, approve: boolean) {
     const key = candidate.phone + candidate.bookingDate + candidate.reminderType;
     setDecidingReminderKey(key);
     try {
@@ -1395,6 +1395,7 @@ export default function App() {
           bookingDate: candidate.bookingDate,
           reminderType: candidate.reminderType,
           message: candidate.message,
+          willFireOn: candidate.willFireOn,
           decision: approve ? "approve" : "reject",
         }),
       });
@@ -1402,6 +1403,9 @@ export default function App() {
       if (d.success) {
         setUpcomingReminders(prev => prev.filter(c => (c.phone + c.bookingDate + c.reminderType) !== key));
         loadPendingReminders();
+        if (approve) {
+          showToast(d.sentNow ? `Sent to ${candidate.name} now.` : `Will send the morning of ${formatDateLabel(candidate.willFireOn)}.`, "success", 4000);
+        }
       } else {
         alert("Something went wrong.");
       }
@@ -5532,6 +5536,7 @@ export default function App() {
                           {upcomingReminders.map(c => {
                             const key = c.phone + c.bookingDate + c.reminderType;
                             const isDeciding = decidingReminderKey === key;
+                            const windowAlreadyPassed = c.willFireOn <= fmtDate(new Date());
                             return (
                               <div key={key} style={{ background: "rgba(251,191,36,0.05)", border: "1px solid rgba(251,191,36,0.2)", borderRadius: 14, padding: 16 }}>
                                 <div style={{ marginBottom: 8 }}>
@@ -5539,7 +5544,12 @@ export default function App() {
                                     {c.name} — {c.reminderType === "24hr" ? "Tomorrow reminder" : "1-hour reminder"}
                                   </div>
                                   <div style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.45)" }}>
-                                    For {formatDateLabel(c.bookingDate)} · will send {formatDateLabel(c.willFireOn)} · {c.phone}
+                                    For {formatDateLabel(c.bookingDate)} · {c.phone}
+                                  </div>
+                                  <div style={{ fontSize: "0.78rem", color: windowAlreadyPassed ? "#fbbf24" : "rgba(255,255,255,0.4)", marginTop: 2 }}>
+                                    {windowAlreadyPassed
+                                      ? "Its normal send window already passed — Push will text the client immediately."
+                                      : `Will send the morning of ${formatDateLabel(c.willFireOn)}.`}
                                   </div>
                                 </div>
                                 <div style={{ fontSize: "0.85rem", color: "rgba(255,255,255,0.65)", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 10, padding: "10px 12px", marginBottom: 12 }}>

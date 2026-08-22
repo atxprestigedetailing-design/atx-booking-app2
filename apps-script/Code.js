@@ -2653,6 +2653,21 @@ function findExistingReminderRow(phone, bookingDate, reminderType) {
   return null;
 }
 
+// Confirms to the owner that a reminder text actually went out — fired after
+// every real send, regardless of which path triggered it (a fresh cron send,
+// a pre-approved one the cron later honors, an approve-click on a queued
+// item, or an immediate send because the normal window already passed).
+function notifyOwnerReminderSent(name, message) {
+  try {
+    GmailApp.sendEmail(
+      "atxprestigedetailing@gmail.com",
+      "✓ Reminder sent — " + name + " | ATX Prestige Detailing",
+      "A reminder text was just sent to " + name + ":\n\n\"" + message + "\"",
+      { from: "atxprestigedetailing@gmail.com", name: "ATX Prestige Detailing" }
+    );
+  } catch (err) { Logger.log("notifyOwnerReminderSent error: " + err); }
+}
+
 // Called from sendBookingReminders for each 24hr/1hr match. Respects an
 // earlier pre-decision (from the "upcoming" preview) instead of queuing
 // again — a pre-approved reminder is sent right now (this IS its natural
@@ -2665,10 +2680,12 @@ function processReminderCandidate(name, phone, message, bookingDate, reminderTyp
   }
   if (existing.status === "Approved") {
     try {
-      sendSMS(phone, existing.message || message);
+      var sentMessage = existing.message || message;
+      sendSMS(phone, sentMessage);
       var ss    = SpreadsheetApp.openById(SHEET_ID);
       var sheet = getOrCreatePendingRemindersSheet(ss);
       sheet.getRange(existing.rowNumber, 9).setValue(new Date());
+      notifyOwnerReminderSent(name, sentMessage);
       Logger.log("Sent pre-approved " + reminderType + " reminder for " + name);
     } catch (err) { Logger.log("processReminderCandidate send error: " + err); }
   }
@@ -2746,19 +2763,33 @@ function preDecideReminder(data) {
     var id    = Utilities.getUuid();
     var status = data.decision === "approve" ? "Approved" : "Rejected";
     var now = new Date();
+    var clientPhone = String(data.clientPhone || "").trim();
+    var message     = String(data.message || "").trim();
+    var willFireOn  = String(data.willFireOn || "").trim();
+
+    // If this reminder's normal cron window has already elapsed (its "willFireOn"
+    // day is today or earlier), the cron will never revisit it — the once-daily
+    // trigger already passed that date, and by tomorrow's run the date math no
+    // longer lines up. Approving it now IS the send, not an early one.
+    var sentNow = false;
+    if (status === "Approved" && willFireOn && willFireOn <= formatDateStr(new Date())) {
+      sendSMS(clientPhone, message);
+      notifyOwnerReminderSent(String(data.clientName || "").trim(), message);
+      sentNow = true;
+    }
 
     sheet.appendRow([
       id, now,
       String(data.bookingDate || "").trim(),
       String(data.reminderType || "").trim(),
       String(data.clientName || "").trim(),
-      String(data.clientPhone || "").trim(),
-      String(data.message || "").trim(),
+      clientPhone,
+      message,
       status, now,
     ]);
 
-    Logger.log("Pre-decided " + data.reminderType + " reminder for " + data.clientName + " -> " + status);
-    return ContentService.createTextOutput(JSON.stringify({ success: true })).setMimeType(ContentService.MimeType.JSON);
+    Logger.log("Pre-decided " + data.reminderType + " reminder for " + data.clientName + " -> " + status + (sentNow ? " (sent immediately)" : ""));
+    return ContentService.createTextOutput(JSON.stringify({ success: true, sentNow: sentNow })).setMimeType(ContentService.MimeType.JSON);
   } catch (err) {
     return ContentService.createTextOutput(JSON.stringify({ success: false, error: String(err) })).setMimeType(ContentService.MimeType.JSON);
   }
@@ -2778,11 +2809,13 @@ function resolvePendingReminder(id, approve) {
       return { found: true, alreadyResolved: true, status: status };
     }
 
+    var name    = rows[i][4];
     var phone   = rows[i][5];
     var message = rows[i][6];
 
     if (approve) {
       sendSMS(phone, message);
+      notifyOwnerReminderSent(name, message);
     }
 
     sheet.getRange(i + 1, 8).setValue(approve ? "Approved" : "Rejected");
