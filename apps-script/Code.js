@@ -536,7 +536,9 @@ function updateBookingFields(data) {
         }
       } catch (calErr) { Logger.log("Calendar update error: " + calErr); }
 
-      // 3. Send reschedule notification to customer
+      // 3. Send reschedule notification to customer (unless the caller explicitly suppressed it —
+      // calendar/availability above still always sync when the schedule actually changed)
+      if (data.notify !== false) {
       try {
         var oldDateLabel = friendlyDate(oldDate);
         var newDateLabel = friendlyDate(newDate);
@@ -665,6 +667,7 @@ function updateBookingFields(data) {
           }
         }
       } catch (notifyErr) { Logger.log("Reschedule notification error: " + notifyErr); }
+      }
     }
 
     // ── If non-schedule fields changed: send booking change email ──
