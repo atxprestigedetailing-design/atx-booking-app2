@@ -799,7 +799,7 @@ export default function App() {
   const [pendingReminders, setPendingReminders]         = useState<{id:string;createdAt:string;bookingDate:string;reminderType:string;clientName:string;clientPhone:string;message:string;status:string;resolvedAt:string}[]>([]);
   const [remindersLoading, setRemindersLoading]         = useState(false);
   const [resolvingReminderId, setResolvingReminderId]   = useState<string | null>(null);
-  const [upcomingReminders, setUpcomingReminders]       = useState<{name:string;phone:string;bookingDate:string;reminderType:string;message:string;willFireOn:string}[]>([]);
+  const [upcomingReminders, setUpcomingReminders]       = useState<{name:string;phone:string;bookingDate:string;reminderType:string;message:string;willFireOn:string;scheduledSendAt:string}[]>([]);
   const [upcomingRemindersLoading, setUpcomingRemindersLoading] = useState(false);
   const [decidingReminderKey, setDecidingReminderKey]   = useState<string | null>(null);
   const [clientSearch, setClientSearch]                 = useState("");
@@ -1382,7 +1382,7 @@ export default function App() {
     finally { setUpcomingRemindersLoading(false); }
   }
 
-  async function decideUpcomingReminder(candidate: { name: string; phone: string; bookingDate: string; reminderType: string; message: string; willFireOn: string }, approve: boolean) {
+  async function decideUpcomingReminder(candidate: { name: string; phone: string; bookingDate: string; reminderType: string; message: string; willFireOn: string; scheduledSendAt: string }, approve: boolean) {
     const key = candidate.phone + candidate.bookingDate + candidate.reminderType;
     setDecidingReminderKey(key);
     try {
@@ -1396,6 +1396,7 @@ export default function App() {
           reminderType: candidate.reminderType,
           message: candidate.message,
           willFireOn: candidate.willFireOn,
+          scheduledSendAt: candidate.scheduledSendAt,
           decision: approve ? "approve" : "reject",
         }),
       });
@@ -1404,7 +1405,10 @@ export default function App() {
         setUpcomingReminders(prev => prev.filter(c => (c.phone + c.bookingDate + c.reminderType) !== key));
         loadPendingReminders();
         if (approve) {
-          showToast(d.sentNow ? `Sent to ${candidate.name} now.` : `Will send the morning of ${formatDateLabel(candidate.willFireOn)}.`, "success", 4000);
+          const whenLabel = candidate.reminderType === "1hr" && candidate.scheduledSendAt
+            ? new Date(candidate.scheduledSendAt).toLocaleString()
+            : `the morning of ${formatDateLabel(candidate.willFireOn)}`;
+          showToast(d.sentNow ? `Sent to ${candidate.name} now.` : `Will send ${whenLabel}.`, "success", 4000);
         }
       } else {
         alert("Something went wrong.");
@@ -5536,7 +5540,9 @@ export default function App() {
                           {upcomingReminders.map(c => {
                             const key = c.phone + c.bookingDate + c.reminderType;
                             const isDeciding = decidingReminderKey === key;
-                            const windowAlreadyPassed = c.willFireOn <= fmtDate(new Date());
+                            const windowAlreadyPassed = c.reminderType === "1hr"
+                              ? (!!c.scheduledSendAt && new Date(c.scheduledSendAt) <= new Date())
+                              : c.willFireOn <= fmtDate(new Date());
                             return (
                               <div key={key} style={{ background: "rgba(251,191,36,0.05)", border: "1px solid rgba(251,191,36,0.2)", borderRadius: 14, padding: 16 }}>
                                 <div style={{ marginBottom: 8 }}>
@@ -5549,7 +5555,9 @@ export default function App() {
                                   <div style={{ fontSize: "0.78rem", color: windowAlreadyPassed ? "#fbbf24" : "rgba(255,255,255,0.4)", marginTop: 2 }}>
                                     {windowAlreadyPassed
                                       ? "Its normal send window already passed — Push will text the client immediately."
-                                      : `Will send the morning of ${formatDateLabel(c.willFireOn)}.`}
+                                      : c.reminderType === "1hr" && c.scheduledSendAt
+                                        ? `Will send at ${new Date(c.scheduledSendAt).toLocaleString()}.`
+                                        : `Will send the morning of ${formatDateLabel(c.willFireOn)}.`}
                                   </div>
                                 </div>
                                 <div style={{ fontSize: "0.85rem", color: "rgba(255,255,255,0.65)", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 10, padding: "10px 12px", marginBottom: 12 }}>

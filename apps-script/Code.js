@@ -125,6 +125,10 @@ function doPost(e) {
     if (action === "approveReminder")            return approveReminderPost(data);
     if (action === "rejectReminder")              return rejectReminderPost(data);
     if (action === "preDecideReminder")           return preDecideReminder(data);
+    if (action === "installReminderSendCheckTrigger") {
+      setupReminderSendCheckTrigger();
+      return ContentService.createTextOutput(JSON.stringify({ success: true })).setMimeType(ContentService.MimeType.JSON);
+    }
     return ContentService
       .createTextOutput(JSON.stringify({ success: false, error: "Invalid action" }))
       .setMimeType(ContentService.MimeType.JSON);
@@ -2545,43 +2549,12 @@ function sendBookingReminders() {
     var sheet = ss.getSheetByName(BOOKINGS_SHEET);
     var rows  = sheet.getDataRange().getDisplayValues();
 
-    var now       = new Date();
-    var tomorrow  = new Date(now); tomorrow.setDate(tomorrow.getDate() + 1);
-    var tomorrowStr = formatDateStr(tomorrow);
-
-    var oneHourDate = new Date(now); oneHourDate.setHours(oneHourDate.getHours() + 1);
-    var oneHourStr  = formatDateStr(oneHourDate);
-    var oneHourHour = oneHourDate.getHours();
-
-    rows.slice(1).forEach(function(row) {
-      var bookingDate = String(row[4] || "").trim();
-      var bookingTime = String(row[5] || "").trim();
-      var name        = String(row[1] || "").trim();
-      var phone       = String(row[2] || "").trim();
-      var status      = String(row[28] || "").trim();
-
-      if (status === "Completed" || status === "Cancelled" || status === "Skipped" || status === "Paused" || !phone) return;
-
-      if (bookingDate === tomorrowStr) {
-        var msg24 = "Hi " + name + "! Reminder: your ATX Prestige Detailing appointment is tomorrow" + (bookingTime ? " at " + bookingTime : "") + ". We look forward to seeing you!";
-        processReminderCandidate(name, phone, msg24, bookingDate, "24hr");
-      }
-
-      if (bookingDate === oneHourStr && bookingTime) {
-        var timeLower = bookingTime.toLowerCase();
-        var timeNums  = bookingTime.replace(/[^0-9:]/g, "");
-        var parts2    = timeNums.split(":");
-        var bHour     = parseInt(parts2[0]) || 0;
-        if (timeLower.indexOf("pm") !== -1 && bHour !== 12) bHour += 12;
-        if (timeLower.indexOf("am") !== -1 && bHour === 12) bHour = 0;
-        if (bHour === oneHourHour) {
-          var msg1 = "Hi " + name + "! Your ATX Prestige Detailing appointment is in about 1 hour. We will see you soon!";
-          processReminderCandidate(name, phone, msg1, bookingDate, "1hr");
-        }
-      }
+    var candidates = collectReminderCandidates(rows, false);
+    candidates.forEach(function(c) {
+      processReminderCandidate(c.name, c.phone, c.message, c.bookingDate, c.reminderType, c.scheduledSendAt);
     });
 
-    Logger.log("Booking reminders queued for " + tomorrowStr);
+    Logger.log("Booking reminders processed: " + candidates.length + " candidate(s)");
   } catch (err) {
     Logger.log("sendBookingReminders error: " + err);
   }
@@ -2593,7 +2566,7 @@ function sendBookingReminders() {
 // approveReminder, rejectReminder, getPendingReminders.
 
 const PENDING_REMINDERS_SHEET = "PendingReminders";
-const PENDING_REMINDERS_HEADER = ["id", "createdAt", "bookingDate", "reminderType", "clientName", "clientPhone", "message", "status", "resolvedAt"];
+const PENDING_REMINDERS_HEADER = ["id", "createdAt", "bookingDate", "reminderType", "clientName", "clientPhone", "message", "status", "resolvedAt", "scheduledSendAt"];
 
 function getOrCreatePendingRemindersSheet(ss) {
   var sheet = ss.getSheetByName(PENDING_REMINDERS_SHEET);
@@ -2604,24 +2577,85 @@ function getOrCreatePendingRemindersSheet(ss) {
   return sheet;
 }
 
-function queueReminderForApproval(name, phone, message, bookingDate, reminderType) {
+// Both reminder types for a booking dated tomorrow, and the 1hr type for a
+// booking dated today (in case it was booked/edited too late to have been
+// caught the day before) — each 1hr candidate carries a precise
+// scheduledSendAt (that booking's own time minus 1 hour) rather than being
+// tied to when this function happens to run. Shared by sendBookingReminders
+// (the real daily job) and getUpcomingReminderPreview, so they can't drift.
+// extendedLookahead=true additionally surfaces 24hr candidates for bookings
+// dated the day after tomorrow (for the "upcoming, next 2 days" preview only
+// — these aren't due yet, willFireOn is set to when they'll actually become
+// due, one day before their own bookingDate). The real daily cron always
+// passes false, since a 24hr reminder must only ever be generated the day
+// before the appointment, never earlier.
+function collectReminderCandidates(rows, extendedLookahead) {
+  var today = new Date(); today.setHours(0, 0, 0, 0);
+  var tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1);
+  var dayAfterTomorrow = new Date(today); dayAfterTomorrow.setDate(dayAfterTomorrow.getDate() + 2);
+  var todayStr = formatDateStr(today);
+  var tomorrowStr = formatDateStr(tomorrow);
+  var dayAfterTomorrowStr = formatDateStr(dayAfterTomorrow);
+  var candidates = [];
+
+  rows.slice(1).forEach(function(row) {
+    var bookingDate = String(row[4] || "").trim();
+    var bookingTime = String(row[5] || "").trim();
+    var name        = String(row[1] || "").trim();
+    var phone       = String(row[2] || "").trim();
+    var status      = String(row[28] || "").trim();
+
+    if (status === "Completed" || status === "Cancelled" || status === "Skipped" || status === "Paused" || !phone) return;
+
+    var is24hrDue    = bookingDate === tomorrowStr;
+    var is24hrPreview = extendedLookahead && bookingDate === dayAfterTomorrowStr;
+    if (is24hrDue || is24hrPreview) {
+      var msg24 = "Hi " + name + "! Reminder: your ATX Prestige Detailing appointment is tomorrow" + (bookingTime ? " at " + bookingTime : "") + ". We look forward to seeing you!";
+      candidates.push({ name: name, phone: phone, bookingDate: bookingDate, reminderType: "24hr", message: msg24, willFireOn: is24hrDue ? todayStr : tomorrowStr, scheduledSendAt: "" });
+    }
+
+    if ((bookingDate === todayStr || bookingDate === tomorrowStr) && bookingTime) {
+      var timeLower = bookingTime.toLowerCase();
+      var timeNums  = bookingTime.replace(/[^0-9:]/g, "");
+      var parts2    = timeNums.split(":");
+      var bHour     = parseInt(parts2[0]) || 0;
+      var bMin      = parseInt(parts2[1]) || 0;
+      if (timeLower.indexOf("pm") !== -1 && bHour !== 12) bHour += 12;
+      if (timeLower.indexOf("am") !== -1 && bHour === 12) bHour = 0;
+
+      var bParts = bookingDate.split("-");
+      var apptDate = new Date(parseInt(bParts[0]), parseInt(bParts[1]) - 1, parseInt(bParts[2]), bHour, bMin, 0);
+      var sendAt = new Date(apptDate.getTime() - 60 * 60 * 1000);
+
+      var msg1 = "Hi " + name + "! Your ATX Prestige Detailing appointment is in about 1 hour. We will see you soon!";
+      candidates.push({ name: name, phone: phone, bookingDate: bookingDate, reminderType: "1hr", message: msg1, willFireOn: bookingDate, scheduledSendAt: sendAt.toISOString() });
+    }
+  });
+
+  return candidates;
+}
+
+function queueReminderForApproval(name, phone, message, bookingDate, reminderType, scheduledSendAt) {
   try {
     var ss    = SpreadsheetApp.openById(SHEET_ID);
     var sheet = getOrCreatePendingRemindersSheet(ss);
     var id    = Utilities.getUuid();
 
-    sheet.appendRow([id, new Date(), bookingDate, reminderType, name, phone, message, "Pending", ""]);
+    sheet.appendRow([id, new Date(), bookingDate, reminderType, name, phone, message, "Pending", "", scheduledSendAt || ""]);
 
     var baseUrl     = ScriptApp.getService().getUrl();
     var approveUrl  = baseUrl + "?action=approveReminder&id=" + encodeURIComponent(id);
     var rejectUrl   = baseUrl + "?action=rejectReminder&id=" + encodeURIComponent(id);
     var typeLabel   = reminderType === "24hr" ? "Tomorrow reminder" : "1-hour reminder";
+    var timingNote  = reminderType === "1hr" && scheduledSendAt
+      ? "\n\nIf you approve, this will actually text the client at " + new Date(scheduledSendAt).toLocaleString() + " — approving now doesn't send it now."
+      : "";
 
     var subject = typeLabel + " pending approval — " + name + " | ATX Prestige Detailing";
     var plain =
       typeLabel + " for " + name + " (" + friendlyDate(bookingDate) + ") is waiting on your approval before it goes out:\n\n" +
-      "\"" + message + "\"\n\n" +
-      "Approve (send it now): " + approveUrl + "\n\n" +
+      "\"" + message + "\"" + timingNote + "\n\n" +
+      "Approve: " + approveUrl + "\n\n" +
       "Reject (don't send): " + rejectUrl;
 
     GmailApp.sendEmail("atxprestigedetailing@gmail.com", subject, plain, {
@@ -2647,7 +2681,7 @@ function findExistingReminderRow(phone, bookingDate, reminderType) {
     var rDate  = String(rows[i][2] || "").trim();
     var rType  = String(rows[i][3] || "").trim();
     if (rPhone === String(phone || "").trim() && rDate === String(bookingDate || "").trim() && rType === reminderType) {
-      return { rowNumber: i + 1, status: rows[i][7], message: rows[i][6] };
+      return { rowNumber: i + 1, status: rows[i][7], message: rows[i][6], scheduledSendAt: rows[i][9] };
     }
   }
   return null;
@@ -2668,17 +2702,33 @@ function notifyOwnerReminderSent(name, message) {
   } catch (err) { Logger.log("notifyOwnerReminderSent error: " + err); }
 }
 
-// Called from sendBookingReminders for each 24hr/1hr match. Respects an
+// Should approving this reminder right now also send it right now? For 24hr,
+// compare its willFireOn day against today (the daily-cron window may have
+// already elapsed). For 1hr, compare its exact scheduledSendAt against now.
+// If not due yet, the caller should just record the decision and let
+// sendDueApprovedReminders() deliver it at the right moment.
+function isReminderDue(reminderType, willFireOn, scheduledSendAt) {
+  if (reminderType === "24hr") {
+    return !!willFireOn && willFireOn <= formatDateStr(new Date());
+  }
+  if (reminderType === "1hr") {
+    return !!scheduledSendAt && new Date(scheduledSendAt) <= new Date();
+  }
+  return true;
+}
+
+// Called from sendBookingReminders for each 24hr/1hr candidate. Respects an
 // earlier pre-decision (from the "upcoming" preview) instead of queuing
-// again — a pre-approved reminder is sent right now (this IS its natural
-// trigger time), a pre-rejected one is silently skipped.
-function processReminderCandidate(name, phone, message, bookingDate, reminderType) {
+// again. A pre-approved 24hr reminder is sent right now (this IS its natural
+// trigger time). A pre-approved 1hr reminder is left alone here — it's
+// delivered later, at its own scheduledSendAt, by sendDueApprovedReminders().
+function processReminderCandidate(name, phone, message, bookingDate, reminderType, scheduledSendAt) {
   var existing = findExistingReminderRow(phone, bookingDate, reminderType);
   if (!existing) {
-    queueReminderForApproval(name, phone, message, bookingDate, reminderType);
+    queueReminderForApproval(name, phone, message, bookingDate, reminderType, scheduledSendAt);
     return;
   }
-  if (existing.status === "Approved") {
+  if (existing.status === "Approved" && reminderType === "24hr") {
     try {
       var sentMessage = existing.message || message;
       sendSMS(phone, sentMessage);
@@ -2689,49 +2739,60 @@ function processReminderCandidate(name, phone, message, bookingDate, reminderTyp
       Logger.log("Sent pre-approved " + reminderType + " reminder for " + name);
     } catch (err) { Logger.log("processReminderCandidate send error: " + err); }
   }
-  // "Rejected" or still "Pending" (already queued/emailed once) — do nothing further.
+  // 1hr "Approved" rows are left for sendDueApprovedReminders(). "Rejected" or
+  // still "Pending" (already queued/emailed once) — do nothing further.
 }
 
-// ─── Upcoming reminder preview ────────────────────────────────────────────────
-// Simulates what sendBookingReminders would produce if it ran today and
-// tomorrow, without actually sending or queuing anything, so the owner can
-// pre-decide push/don't-push before the cron ever reaches these.
+// Runs every 15 minutes. Delivers 1hr reminders that were approved ahead of
+// time (either pre-decided from the "upcoming" preview, or approved from the
+// queue before they were due) once their scheduledSendAt arrives. Clearing
+// scheduledSendAt after sending doubles as the "already delivered" marker.
+function sendDueApprovedReminders() {
+  try {
+    var ss    = SpreadsheetApp.openById(SHEET_ID);
+    var sheet = getOrCreatePendingRemindersSheet(ss);
+    var rows  = sheet.getDataRange().getDisplayValues();
+    var now   = new Date();
+    var sentCount = 0;
 
-function computeReminderMatchesForRunDate(rows, runDate) {
-  var tomorrow  = new Date(runDate); tomorrow.setDate(tomorrow.getDate() + 1);
-  var tomorrowStr = formatDateStr(tomorrow);
-  var sameDayStr  = formatDateStr(runDate);
-  var matches = [];
+    for (var i = 1; i < rows.length; i++) {
+      var reminderType = rows[i][3];
+      var status       = rows[i][7];
+      var scheduledSendAt = rows[i][9];
+      if (reminderType !== "1hr" || status !== "Approved" || !scheduledSendAt) continue;
+      if (new Date(scheduledSendAt) > now) continue;
 
-  rows.slice(1).forEach(function(row) {
-    var bookingDate = String(row[4] || "").trim();
-    var bookingTime = String(row[5] || "").trim();
-    var name        = String(row[1] || "").trim();
-    var phone       = String(row[2] || "").trim();
-    var status      = String(row[28] || "").trim();
+      var name    = rows[i][4];
+      var phone   = rows[i][5];
+      var message = rows[i][6];
 
-    if (status === "Completed" || status === "Cancelled" || status === "Skipped" || status === "Paused" || !phone) return;
-
-    if (bookingDate === tomorrowStr) {
-      var msg24 = "Hi " + name + "! Reminder: your ATX Prestige Detailing appointment is tomorrow" + (bookingTime ? " at " + bookingTime : "") + ". We look forward to seeing you!";
-      matches.push({ name: name, phone: phone, bookingDate: bookingDate, reminderType: "24hr", message: msg24, willFireOn: sameDayStr });
+      sendSMS(phone, message);
+      notifyOwnerReminderSent(name, message);
+      sheet.getRange(i + 1, 9).setValue(now);
+      sheet.getRange(i + 1, 10).setValue("");
+      sentCount++;
     }
 
-    if (bookingDate === sameDayStr && bookingTime) {
-      var timeLower = bookingTime.toLowerCase();
-      var timeNums  = bookingTime.replace(/[^0-9:]/g, "");
-      var parts2    = timeNums.split(":");
-      var bHour     = parseInt(parts2[0]) || 0;
-      if (timeLower.indexOf("pm") !== -1 && bHour !== 12) bHour += 12;
-      if (timeLower.indexOf("am") !== -1 && bHour === 12) bHour = 0;
-      if (bHour === 9) {
-        var msg1 = "Hi " + name + "! Your ATX Prestige Detailing appointment is in about 1 hour. We will see you soon!";
-        matches.push({ name: name, phone: phone, bookingDate: bookingDate, reminderType: "1hr", message: msg1, willFireOn: sameDayStr });
-      }
+    if (sentCount > 0) Logger.log("sendDueApprovedReminders: sent " + sentCount);
+  } catch (err) {
+    Logger.log("sendDueApprovedReminders error: " + err);
+  }
+}
+
+// Run once (via the installReminderSendCheckTrigger action, or manually from
+// the Apps Script editor) to install the 15-minute check. Safe to re-run —
+// removes any prior trigger for the same handler first.
+function setupReminderSendCheckTrigger() {
+  ScriptApp.getProjectTriggers().forEach(function(t) {
+    if (t.getHandlerFunction() === "sendDueApprovedReminders") {
+      ScriptApp.deleteTrigger(t);
     }
   });
-
-  return matches;
+  ScriptApp.newTrigger("sendDueApprovedReminders")
+    .timeBased()
+    .everyMinutes(15)
+    .create();
+  Logger.log("Reminder send-check trigger installed — runs every 15 minutes");
 }
 
 function getUpcomingReminderPreview() {
@@ -2740,12 +2801,7 @@ function getUpcomingReminderPreview() {
     var sheet = ss.getSheetByName(BOOKINGS_SHEET);
     var rows  = sheet.getDataRange().getDisplayValues();
 
-    var today = new Date(); today.setHours(0, 0, 0, 0);
-    var tomorrowRunDate = new Date(today); tomorrowRunDate.setDate(tomorrowRunDate.getDate() + 1);
-
-    var candidates = computeReminderMatchesForRunDate(rows, today)
-      .concat(computeReminderMatchesForRunDate(rows, tomorrowRunDate));
-
+    var candidates = collectReminderCandidates(rows, true);
     var undecided = candidates.filter(function(c) {
       return !findExistingReminderRow(c.phone, c.bookingDate, c.reminderType);
     });
@@ -2763,32 +2819,32 @@ function preDecideReminder(data) {
     var id    = Utilities.getUuid();
     var status = data.decision === "approve" ? "Approved" : "Rejected";
     var now = new Date();
-    var clientPhone = String(data.clientPhone || "").trim();
-    var message     = String(data.message || "").trim();
-    var willFireOn  = String(data.willFireOn || "").trim();
+    var clientName    = String(data.clientName || "").trim();
+    var clientPhone   = String(data.clientPhone || "").trim();
+    var message       = String(data.message || "").trim();
+    var reminderType  = String(data.reminderType || "").trim();
+    var willFireOn    = String(data.willFireOn || "").trim();
+    var scheduledSendAt = String(data.scheduledSendAt || "").trim();
 
-    // If this reminder's normal cron window has already elapsed (its "willFireOn"
-    // day is today or earlier), the cron will never revisit it — the once-daily
-    // trigger already passed that date, and by tomorrow's run the date math no
-    // longer lines up. Approving it now IS the send, not an early one.
     var sentNow = false;
-    if (status === "Approved" && willFireOn && willFireOn <= formatDateStr(new Date())) {
+    if (status === "Approved" && isReminderDue(reminderType, willFireOn, scheduledSendAt)) {
       sendSMS(clientPhone, message);
-      notifyOwnerReminderSent(String(data.clientName || "").trim(), message);
+      notifyOwnerReminderSent(clientName, message);
       sentNow = true;
     }
 
     sheet.appendRow([
       id, now,
       String(data.bookingDate || "").trim(),
-      String(data.reminderType || "").trim(),
-      String(data.clientName || "").trim(),
+      reminderType,
+      clientName,
       clientPhone,
       message,
       status, now,
+      sentNow ? "" : scheduledSendAt,
     ]);
 
-    Logger.log("Pre-decided " + data.reminderType + " reminder for " + data.clientName + " -> " + status + (sentNow ? " (sent immediately)" : ""));
+    Logger.log("Pre-decided " + reminderType + " reminder for " + clientName + " -> " + status + (sentNow ? " (sent immediately)" : ""));
     return ContentService.createTextOutput(JSON.stringify({ success: true, sentNow: sentNow })).setMimeType(ContentService.MimeType.JSON);
   } catch (err) {
     return ContentService.createTextOutput(JSON.stringify({ success: false, error: String(err) })).setMimeType(ContentService.MimeType.JSON);
@@ -2809,13 +2865,22 @@ function resolvePendingReminder(id, approve) {
       return { found: true, alreadyResolved: true, status: status };
     }
 
-    var name    = rows[i][4];
-    var phone   = rows[i][5];
-    var message = rows[i][6];
+    var reminderType    = rows[i][3];
+    var name            = rows[i][4];
+    var phone           = rows[i][5];
+    var message         = rows[i][6];
+    var scheduledSendAt = rows[i][9];
 
-    if (approve) {
+    // A "Pending" 24hr row only ever exists because the real daily cron just
+    // queued it — its window is always already open, so approving it always
+    // means send now. A "Pending" 1hr row may have been queued a day ahead —
+    // only send now if its exact scheduled moment has actually arrived.
+    var sendNow = approve && (reminderType !== "1hr" || isReminderDue("1hr", "", scheduledSendAt));
+
+    if (sendNow) {
       sendSMS(phone, message);
       notifyOwnerReminderSent(name, message);
+      if (reminderType === "1hr") sheet.getRange(i + 1, 10).setValue("");
     }
 
     sheet.getRange(i + 1, 8).setValue(approve ? "Approved" : "Rejected");
