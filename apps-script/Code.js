@@ -83,6 +83,7 @@ function doGet(e) {
   if (action === "getClientNotes")     return getClientNotes(e);
   if (action === "getExpenses")        return getExpenses();
   if (action === "getPendingReminders") return getPendingReminders();
+  if (action === "getUpcomingReminderPreview") return getUpcomingReminderPreview();
   if (action === "approveReminder")    return approveReminderGet(e.parameter.id);
   if (action === "rejectReminder")     return rejectReminderGet(e.parameter.id);
   return ContentService
@@ -123,6 +124,7 @@ function doPost(e) {
     if (action === "deleteExpense")              return deleteExpense(data);
     if (action === "approveReminder")            return approveReminderPost(data);
     if (action === "rejectReminder")              return rejectReminderPost(data);
+    if (action === "preDecideReminder")           return preDecideReminder(data);
     return ContentService
       .createTextOutput(JSON.stringify({ success: false, error: "Invalid action" }))
       .setMimeType(ContentService.MimeType.JSON);
@@ -2562,7 +2564,7 @@ function sendBookingReminders() {
 
       if (bookingDate === tomorrowStr) {
         var msg24 = "Hi " + name + "! Reminder: your ATX Prestige Detailing appointment is tomorrow" + (bookingTime ? " at " + bookingTime : "") + ". We look forward to seeing you!";
-        queueReminderForApproval(name, phone, msg24, bookingDate, "24hr");
+        processReminderCandidate(name, phone, msg24, bookingDate, "24hr");
       }
 
       if (bookingDate === oneHourStr && bookingTime) {
@@ -2574,7 +2576,7 @@ function sendBookingReminders() {
         if (timeLower.indexOf("am") !== -1 && bHour === 12) bHour = 0;
         if (bHour === oneHourHour) {
           var msg1 = "Hi " + name + "! Your ATX Prestige Detailing appointment is in about 1 hour. We will see you soon!";
-          queueReminderForApproval(name, phone, msg1, bookingDate, "1hr");
+          processReminderCandidate(name, phone, msg1, bookingDate, "1hr");
         }
       }
     });
@@ -2630,6 +2632,135 @@ function queueReminderForApproval(name, phone, message, bookingDate, reminderTyp
     Logger.log("Queued " + reminderType + " reminder for " + name + " (id " + id + ")");
   } catch (err) {
     Logger.log("queueReminderForApproval error: " + err);
+  }
+}
+
+// Finds an existing PendingReminders row (queued OR pre-decided) matching this
+// exact booking + reminder type, regardless of status.
+function findExistingReminderRow(phone, bookingDate, reminderType) {
+  var ss    = SpreadsheetApp.openById(SHEET_ID);
+  var sheet = getOrCreatePendingRemindersSheet(ss);
+  var rows  = sheet.getDataRange().getDisplayValues();
+
+  for (var i = 1; i < rows.length; i++) {
+    var rPhone = String(rows[i][5] || "").trim();
+    var rDate  = String(rows[i][2] || "").trim();
+    var rType  = String(rows[i][3] || "").trim();
+    if (rPhone === String(phone || "").trim() && rDate === String(bookingDate || "").trim() && rType === reminderType) {
+      return { rowNumber: i + 1, status: rows[i][7], message: rows[i][6] };
+    }
+  }
+  return null;
+}
+
+// Called from sendBookingReminders for each 24hr/1hr match. Respects an
+// earlier pre-decision (from the "upcoming" preview) instead of queuing
+// again — a pre-approved reminder is sent right now (this IS its natural
+// trigger time), a pre-rejected one is silently skipped.
+function processReminderCandidate(name, phone, message, bookingDate, reminderType) {
+  var existing = findExistingReminderRow(phone, bookingDate, reminderType);
+  if (!existing) {
+    queueReminderForApproval(name, phone, message, bookingDate, reminderType);
+    return;
+  }
+  if (existing.status === "Approved") {
+    try {
+      sendSMS(phone, existing.message || message);
+      var ss    = SpreadsheetApp.openById(SHEET_ID);
+      var sheet = getOrCreatePendingRemindersSheet(ss);
+      sheet.getRange(existing.rowNumber, 9).setValue(new Date());
+      Logger.log("Sent pre-approved " + reminderType + " reminder for " + name);
+    } catch (err) { Logger.log("processReminderCandidate send error: " + err); }
+  }
+  // "Rejected" or still "Pending" (already queued/emailed once) — do nothing further.
+}
+
+// ─── Upcoming reminder preview ────────────────────────────────────────────────
+// Simulates what sendBookingReminders would produce if it ran today and
+// tomorrow, without actually sending or queuing anything, so the owner can
+// pre-decide push/don't-push before the cron ever reaches these.
+
+function computeReminderMatchesForRunDate(rows, runDate) {
+  var tomorrow  = new Date(runDate); tomorrow.setDate(tomorrow.getDate() + 1);
+  var tomorrowStr = formatDateStr(tomorrow);
+  var sameDayStr  = formatDateStr(runDate);
+  var matches = [];
+
+  rows.slice(1).forEach(function(row) {
+    var bookingDate = String(row[4] || "").trim();
+    var bookingTime = String(row[5] || "").trim();
+    var name        = String(row[1] || "").trim();
+    var phone       = String(row[2] || "").trim();
+    var status      = String(row[28] || "").trim();
+
+    if (status === "Completed" || status === "Cancelled" || status === "Skipped" || status === "Paused" || !phone) return;
+
+    if (bookingDate === tomorrowStr) {
+      var msg24 = "Hi " + name + "! Reminder: your ATX Prestige Detailing appointment is tomorrow" + (bookingTime ? " at " + bookingTime : "") + ". We look forward to seeing you!";
+      matches.push({ name: name, phone: phone, bookingDate: bookingDate, reminderType: "24hr", message: msg24, willFireOn: sameDayStr });
+    }
+
+    if (bookingDate === sameDayStr && bookingTime) {
+      var timeLower = bookingTime.toLowerCase();
+      var timeNums  = bookingTime.replace(/[^0-9:]/g, "");
+      var parts2    = timeNums.split(":");
+      var bHour     = parseInt(parts2[0]) || 0;
+      if (timeLower.indexOf("pm") !== -1 && bHour !== 12) bHour += 12;
+      if (timeLower.indexOf("am") !== -1 && bHour === 12) bHour = 0;
+      if (bHour === 9) {
+        var msg1 = "Hi " + name + "! Your ATX Prestige Detailing appointment is in about 1 hour. We will see you soon!";
+        matches.push({ name: name, phone: phone, bookingDate: bookingDate, reminderType: "1hr", message: msg1, willFireOn: sameDayStr });
+      }
+    }
+  });
+
+  return matches;
+}
+
+function getUpcomingReminderPreview() {
+  try {
+    var ss    = SpreadsheetApp.openById(SHEET_ID);
+    var sheet = ss.getSheetByName(BOOKINGS_SHEET);
+    var rows  = sheet.getDataRange().getDisplayValues();
+
+    var today = new Date(); today.setHours(0, 0, 0, 0);
+    var tomorrowRunDate = new Date(today); tomorrowRunDate.setDate(tomorrowRunDate.getDate() + 1);
+
+    var candidates = computeReminderMatchesForRunDate(rows, today)
+      .concat(computeReminderMatchesForRunDate(rows, tomorrowRunDate));
+
+    var undecided = candidates.filter(function(c) {
+      return !findExistingReminderRow(c.phone, c.bookingDate, c.reminderType);
+    });
+
+    return ContentService.createTextOutput(JSON.stringify({ upcoming: undecided })).setMimeType(ContentService.MimeType.JSON);
+  } catch (err) {
+    return ContentService.createTextOutput(JSON.stringify({ upcoming: [], error: String(err) })).setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+function preDecideReminder(data) {
+  try {
+    var ss    = SpreadsheetApp.openById(SHEET_ID);
+    var sheet = getOrCreatePendingRemindersSheet(ss);
+    var id    = Utilities.getUuid();
+    var status = data.decision === "approve" ? "Approved" : "Rejected";
+    var now = new Date();
+
+    sheet.appendRow([
+      id, now,
+      String(data.bookingDate || "").trim(),
+      String(data.reminderType || "").trim(),
+      String(data.clientName || "").trim(),
+      String(data.clientPhone || "").trim(),
+      String(data.message || "").trim(),
+      status, now,
+    ]);
+
+    Logger.log("Pre-decided " + data.reminderType + " reminder for " + data.clientName + " -> " + status);
+    return ContentService.createTextOutput(JSON.stringify({ success: true })).setMimeType(ContentService.MimeType.JSON);
+  } catch (err) {
+    return ContentService.createTextOutput(JSON.stringify({ success: false, error: String(err) })).setMimeType(ContentService.MimeType.JSON);
   }
 }
 

@@ -799,6 +799,9 @@ export default function App() {
   const [pendingReminders, setPendingReminders]         = useState<{id:string;createdAt:string;bookingDate:string;reminderType:string;clientName:string;clientPhone:string;message:string;status:string;resolvedAt:string}[]>([]);
   const [remindersLoading, setRemindersLoading]         = useState(false);
   const [resolvingReminderId, setResolvingReminderId]   = useState<string | null>(null);
+  const [upcomingReminders, setUpcomingReminders]       = useState<{name:string;phone:string;bookingDate:string;reminderType:string;message:string;willFireOn:string}[]>([]);
+  const [upcomingRemindersLoading, setUpcomingRemindersLoading] = useState(false);
+  const [decidingReminderKey, setDecidingReminderKey]   = useState<string | null>(null);
   const [clientSearch, setClientSearch]                 = useState("");
   const [selectedClientKey, setSelectedClientKey]       = useState<string | null>(null);
   const [clientNotesOpen, setClientNotesOpen]           = useState(false);
@@ -1367,6 +1370,43 @@ export default function App() {
       setPendingReminders(data.reminders || []);
     } catch (e) { console.error("Failed to load reminders", e); }
     finally { setRemindersLoading(false); }
+  }
+
+  async function loadUpcomingReminderPreview() {
+    setUpcomingRemindersLoading(true);
+    try {
+      const res = await fetch(`${SCRIPT_URL}?action=getUpcomingReminderPreview`);
+      const data = await res.json();
+      setUpcomingReminders(data.upcoming || []);
+    } catch (e) { console.error("Failed to load upcoming reminders", e); }
+    finally { setUpcomingRemindersLoading(false); }
+  }
+
+  async function decideUpcomingReminder(candidate: { name: string; phone: string; bookingDate: string; reminderType: string; message: string }, approve: boolean) {
+    const key = candidate.phone + candidate.bookingDate + candidate.reminderType;
+    setDecidingReminderKey(key);
+    try {
+      const res = await fetch(SCRIPT_URL, {
+        method: "POST",
+        body: JSON.stringify({
+          action: "preDecideReminder",
+          clientName: candidate.name,
+          clientPhone: candidate.phone,
+          bookingDate: candidate.bookingDate,
+          reminderType: candidate.reminderType,
+          message: candidate.message,
+          decision: approve ? "approve" : "reject",
+        }),
+      });
+      const d = await res.json();
+      if (d.success) {
+        setUpcomingReminders(prev => prev.filter(c => (c.phone + c.bookingDate + c.reminderType) !== key));
+        loadPendingReminders();
+      } else {
+        alert("Something went wrong.");
+      }
+    } catch (e) { alert("Network error — please try again"); }
+    finally { setDecidingReminderKey(null); }
   }
 
   async function resolveReminder(id: string, approve: boolean) {
@@ -3245,7 +3285,7 @@ export default function App() {
               <button onClick={() => { setAdminTab("availability"); if (availSlots.length === 0) { setAvailLoading(true); fetch(`${SCRIPT_URL}?action=getAllAvailability`).then(r => r.json()).then(d => { setAvailSlots(d.slots || []); setAvailLoading(false); }).catch(() => setAvailLoading(false)); } }} style={{ background: "none", border: "none", cursor: "pointer", padding: "10px 18px", fontSize: "0.95rem", fontWeight: 700, color: adminTab === "availability" ? "#2563eb" : "#9ca3af", borderBottom: adminTab === "availability" ? "3px solid #2563eb" : "3px solid transparent", marginBottom: -2 }}>Availability</button>
               <button onClick={() => { setAdminTab("clients"); setSelectedClientKey(null); setClientSearch(""); }} style={{ background: "none", border: "none", cursor: "pointer", padding: "10px 18px", fontSize: "0.95rem", fontWeight: 700, color: adminTab === "clients" ? "#a78bfa" : "#9ca3af", borderBottom: adminTab === "clients" ? "3px solid #a78bfa" : "3px solid transparent", marginBottom: -2 }}>Clients</button>
               <button onClick={() => { setAdminTab("finances"); if (expenses.length === 0) loadExpenses(); }} style={{ background: "none", border: "none", cursor: "pointer", padding: "10px 18px", fontSize: "0.95rem", fontWeight: 700, color: adminTab === "finances" ? "#34d399" : "#9ca3af", borderBottom: adminTab === "finances" ? "3px solid #34d399" : "3px solid transparent", marginBottom: -2 }}>Finances</button>
-              <button onClick={() => { setAdminTab("reminders"); loadPendingReminders(); }} style={{ background: "none", border: "none", cursor: "pointer", padding: "10px 18px", fontSize: "0.95rem", fontWeight: 700, color: adminTab === "reminders" ? "#fbbf24" : "#9ca3af", borderBottom: adminTab === "reminders" ? "3px solid #fbbf24" : "3px solid transparent", marginBottom: -2 }}>
+              <button onClick={() => { setAdminTab("reminders"); loadPendingReminders(); loadUpcomingReminderPreview(); }} style={{ background: "none", border: "none", cursor: "pointer", padding: "10px 18px", fontSize: "0.95rem", fontWeight: 700, color: adminTab === "reminders" ? "#fbbf24" : "#9ca3af", borderBottom: adminTab === "reminders" ? "3px solid #fbbf24" : "3px solid transparent", marginBottom: -2 }}>
                 Reminders{pendingReminders.filter(r => r.status === "Pending").length > 0 ? ` (${pendingReminders.filter(r => r.status === "Pending").length})` : ""}
               </button>
             </div>
@@ -5477,6 +5517,52 @@ export default function App() {
                 {/* ── REMINDERS TAB ── */}
                 {adminTab === "reminders" && (
                   <>
+                    {/* Upcoming (next 2 days) — decide ahead of the cron */}
+                    <div style={{ marginBottom: 28 }}>
+                      <div style={{ fontWeight: 700, color: "rgba(255,255,255,0.7)", marginBottom: 4, fontSize: "0.95rem" }}>Upcoming (next 2 days)</div>
+                      <div style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.4)", marginBottom: 14 }}>
+                        Decide now, before these are ever queued. A reminder you push here still goes out at its normal time — deciding early doesn't send early.
+                      </div>
+                      {upcomingRemindersLoading ? (
+                        <div style={{ textAlign: "center", padding: 24, color: "rgba(255,255,255,0.45)" }}>Loading upcoming reminders...</div>
+                      ) : upcomingReminders.length === 0 ? (
+                        <div style={{ textAlign: "center", padding: 24, color: "rgba(255,255,255,0.45)" }}>Nothing coming up in the next 2 days.</div>
+                      ) : (
+                        <div style={{ display: "grid", gap: 10 }}>
+                          {upcomingReminders.map(c => {
+                            const key = c.phone + c.bookingDate + c.reminderType;
+                            const isDeciding = decidingReminderKey === key;
+                            return (
+                              <div key={key} style={{ background: "rgba(251,191,36,0.05)", border: "1px solid rgba(251,191,36,0.2)", borderRadius: 14, padding: 16 }}>
+                                <div style={{ marginBottom: 8 }}>
+                                  <div style={{ fontWeight: 700, color: "#f1f5f9", fontSize: "0.92rem" }}>
+                                    {c.name} — {c.reminderType === "24hr" ? "Tomorrow reminder" : "1-hour reminder"}
+                                  </div>
+                                  <div style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.45)" }}>
+                                    For {formatDateLabel(c.bookingDate)} · will send {formatDateLabel(c.willFireOn)} · {c.phone}
+                                  </div>
+                                </div>
+                                <div style={{ fontSize: "0.85rem", color: "rgba(255,255,255,0.65)", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 10, padding: "10px 12px", marginBottom: 12 }}>
+                                  "{c.message}"
+                                </div>
+                                <div style={{ display: "flex", gap: 8 }}>
+                                  <button disabled={isDeciding} onClick={() => decideUpcomingReminder(c, true)}
+                                    style={{ background: "#059669", color: "#fff", border: "none", borderRadius: 8, padding: "7px 14px", fontSize: "0.82rem", fontWeight: 600, cursor: "pointer", opacity: isDeciding ? 0.6 : 1 }}>
+                                    Push
+                                  </button>
+                                  <button disabled={isDeciding} onClick={() => decideUpcomingReminder(c, false)}
+                                    style={{ background: "rgba(239,68,68,0.1)", color: "#dc2626", border: "1.5px solid #fca5a5", borderRadius: 8, padding: "7px 14px", fontSize: "0.82rem", fontWeight: 600, cursor: "pointer", opacity: isDeciding ? 0.6 : 1 }}>
+                                    Don't Push
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+
+                    <div style={{ fontWeight: 700, color: "rgba(255,255,255,0.7)", marginBottom: 4, fontSize: "0.95rem" }}>Queue</div>
                     <div style={{ fontSize: "0.85rem", color: "rgba(255,255,255,0.45)", marginBottom: 16 }}>
                       Daily "tomorrow" and "1-hour" reminder texts wait here for your approval before they go to the client. You'll also get an email with one-tap Approve/Reject links for each one as it's queued.
                     </div>
