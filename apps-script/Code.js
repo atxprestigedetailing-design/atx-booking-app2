@@ -104,6 +104,8 @@ function doPost(e) {
     if (action === "toggleAvailabilitySlot")     return toggleAvailabilitySlot(data);
     if (action === "cancelBooking")              return cancelBooking(data);
     if (action === "skipMaintenanceBooking")      return skipMaintenanceBooking(data);
+    if (action === "pauseMaintenancePlan")        return pauseMaintenancePlan(data);
+    if (action === "resumeMaintenancePlan")       return resumeMaintenancePlan(data);
     if (action === "updateMaintenanceTime")       return updateMaintenanceTime(data);
     if (action === "checkMaintenanceTimeConflicts") return checkMaintenanceTimeConflicts(data);
     if (action === "uploadJobPhoto")             return uploadJobPhoto(data);
@@ -903,11 +905,76 @@ function sendBookingChangeEmail(data) {
 
 // ─── createNextMaintenanceBooking ────────────────────────────────────────────
 
+// Appends a maintenance booking row for dateStr, unless one already exists
+// (matched by email + date + vehicle type + make + model). Shared by
+// createNextMaintenanceBooking and resumeMaintenancePlan so both create the
+// next occurrence the same way.
+function appendMaintenanceRow(data, dateStr) {
+  var ss            = SpreadsheetApp.openById(SHEET_ID);
+  var bookingsSheet = ss.getSheetByName(BOOKINGS_SHEET);
+
+  var rows = bookingsSheet.getDataRange().getDisplayValues();
+  for (var i = 1; i < rows.length; i++) {
+    var rowEmail   = String(rows[i][3]).trim().toLowerCase();
+    var rowDate    = String(rows[i][4]).trim();
+    var rowVehicle = String(rows[i][10]).trim().toLowerCase();
+    var rowMake    = String(rows[i][7]).trim().toLowerCase();
+    var rowModel   = String(rows[i][8]).trim().toLowerCase();
+    var rowStatus  = String(rows[i][28]).trim();
+    var incomingVehicle = String(data.vehicle || "").trim().toLowerCase();
+    var incomingMake    = String(data.make    || "").trim().toLowerCase();
+    var incomingModel   = String(data.model   || "").trim().toLowerCase();
+    // Match on email + date + vehicle type + make + model to allow same client with different cars
+    var sameEmail   = rowEmail === String(data.email || "").trim().toLowerCase();
+    var sameDate    = rowDate  === dateStr;
+    var sameCar     = rowVehicle === incomingVehicle && rowMake === incomingMake && rowModel === incomingModel;
+    var notCancelled = rowStatus !== "Cancelled" && rowStatus !== "Skipped";
+    if (sameEmail && sameDate && sameCar && notCancelled) {
+      return { skipped: true };
+    }
+  }
+
+  bookingsSheet.appendRow([
+    new Date(),
+    data.name              || "",
+    data.phone             || "",
+    data.email             || "",
+    dateStr,
+    data.time              || "",
+    data.year              || "",
+    data.make              || "",
+    data.model             || "",
+    data.boatSize          || "",
+    data.vehicle           || "",
+    data.packageType       || "",
+    data.hourlyRate        || "",
+    data.addOns            || "",
+    data.addOnEstimate     || "",
+    data.serviceType       || "",
+    data.address           || "",
+    data.street            || "",
+    data.city              || "",
+    data.state             || "",
+    data.zip               || "",
+    data.placeId           || "",
+    data.lat               || "",
+    data.lng               || "",
+    data.avgTime           || "",
+    data.notes             || "",
+    data.clientType        || "maintenance",
+    data.recurringFrequency || "",
+    "Booked",
+    "",
+    "",
+    "",
+  ]);
+
+  return { skipped: false };
+}
+
 function createNextMaintenanceBooking(data) {
   try {
-    var ss            = SpreadsheetApp.openById(SHEET_ID);
-    var bookingsSheet = ss.getSheetByName(BOOKINGS_SHEET);
-    var nextDate      = String(data.date || "").trim();
+    var nextDate = String(data.date || "").trim();
 
     if (!nextDate) {
       return ContentService
@@ -915,64 +982,13 @@ function createNextMaintenanceBooking(data) {
         .setMimeType(ContentService.MimeType.JSON);
     }
 
-    var rows = bookingsSheet.getDataRange().getDisplayValues();
-    for (var i = 1; i < rows.length; i++) {
-      var rowEmail   = String(rows[i][3]).trim().toLowerCase();
-      var rowDate    = String(rows[i][4]).trim();
-      var rowVehicle = String(rows[i][10]).trim().toLowerCase();
-      var rowMake    = String(rows[i][7]).trim().toLowerCase();
-      var rowModel   = String(rows[i][8]).trim().toLowerCase();
-      var rowStatus  = String(rows[i][28]).trim();
-      var incomingVehicle = String(data.vehicle || "").trim().toLowerCase();
-      var incomingMake    = String(data.make    || "").trim().toLowerCase();
-      var incomingModel   = String(data.model   || "").trim().toLowerCase();
-      // Match on email + date + vehicle type + make + model to allow same client with different cars
-      var sameEmail   = rowEmail === String(data.email || "").trim().toLowerCase();
-      var sameDate    = rowDate  === nextDate;
-      var sameCar     = rowVehicle === incomingVehicle && rowMake === incomingMake && rowModel === incomingModel;
-      var notCancelled = rowStatus !== "Cancelled" && rowStatus !== "Skipped";
-      if (sameEmail && sameDate && sameCar && notCancelled) {
-        Logger.log("Next booking already exists for " + data.email + " on " + nextDate + " (" + data.make + " " + data.model + ")");
-        return ContentService
-          .createTextOutput(JSON.stringify({ success: true, skipped: true }))
-          .setMimeType(ContentService.MimeType.JSON);
-      }
+    var result = appendMaintenanceRow(data, nextDate);
+    if (result.skipped) {
+      Logger.log("Next booking already exists for " + data.email + " on " + nextDate + " (" + data.make + " " + data.model + ")");
+      return ContentService
+        .createTextOutput(JSON.stringify({ success: true, skipped: true }))
+        .setMimeType(ContentService.MimeType.JSON);
     }
-
-    bookingsSheet.appendRow([
-      new Date(),
-      data.name              || "",
-      data.phone             || "",
-      data.email             || "",
-      nextDate,
-      data.time              || "",
-      data.year              || "",
-      data.make              || "",
-      data.model             || "",
-      data.boatSize          || "",
-      data.vehicle           || "",
-      data.packageType       || "",
-      data.hourlyRate        || "",
-      data.addOns            || "",
-      data.addOnEstimate     || "",
-      data.serviceType       || "",
-      data.address           || "",
-      data.street            || "",
-      data.city              || "",
-      data.state             || "",
-      data.zip               || "",
-      data.placeId           || "",
-      data.lat               || "",
-      data.lng               || "",
-      data.avgTime           || "",
-      data.notes             || "",
-      data.clientType        || "maintenance",
-      data.recurringFrequency || "",
-      "Booked",
-      "",
-      "",
-      "",
-    ]);
 
     Logger.log("Created next maintenance booking for " + data.email + " on " + nextDate);
     return ContentService
@@ -2034,6 +2050,65 @@ function blockRecurringSlots(availabilitySheet, startDateStr, time, frequency) {
   }
 }
 
+// ─── unblockRecurringSlots ───────────────────────────────────────────────────
+// Reverses blockRecurringSlots — frees any recurring slots (from startDateStr
+// through Dec 31 of that year, same window blockRecurringSlots used) that
+// were pre-blocked at booking time but never consumed by an actual row.
+// Used when pausing a maintenance plan.
+
+function unblockRecurringSlots(availabilitySheet, startDateStr, time, frequency) {
+  try {
+    var parts     = startDateStr.split("-");
+    var startDate = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+    var dayOfWeek = startDate.getDay();
+    var weekOfMonth = Math.ceil(startDate.getDate() / 7);
+    var nextOcc = new Date(startDate);
+    nextOcc.setDate(startDate.getDate() + 7);
+    var isLast = nextOcc.getMonth() !== startDate.getMonth();
+    var endDate = new Date(startDate.getFullYear(), 11, 31);
+    var recurringDates = [];
+
+    if (frequency === "biweekly") {
+      var nextDate = new Date(startDate);
+      nextDate.setDate(nextDate.getDate() + 14);
+      while (nextDate <= endDate) {
+        recurringDates.push(formatDateStr(nextDate));
+        nextDate.setDate(nextDate.getDate() + 14);
+      }
+    } else if (frequency === "monthly") {
+      var checkMonth = startDate.getMonth() + 1;
+      var checkYear  = startDate.getFullYear();
+      if (checkMonth > 11) { checkMonth = 0; checkYear++; }
+      while (checkYear <= endDate.getFullYear()) {
+        var candidate = getNthWeekdayOfMonth(checkYear, checkMonth, dayOfWeek, weekOfMonth, isLast);
+        if (candidate && candidate <= endDate) {
+          recurringDates.push(formatDateStr(candidate));
+        }
+        checkMonth++;
+        if (checkMonth > 11) { checkMonth = 0; checkYear++; }
+      }
+    }
+
+    if (recurringDates.length === 0) return;
+
+    var availRows = availabilitySheet.getDataRange().getDisplayValues();
+    for (var d = 0; d < recurringDates.length; d++) {
+      var targetDate = recurringDates[d];
+      for (var i = 1; i < availRows.length; i++) {
+        var rowDate = String(availRows[i][0]).trim();
+        var rowTime = String(availRows[i][1]).trim();
+        if (rowDate === targetDate && rowTime === time) {
+          availabilitySheet.getRange(i + 1, 3).setValue(true);
+          break;
+        }
+      }
+    }
+    Logger.log("Unblocked " + recurringDates.length + " recurring slots for " + frequency + " starting " + startDateStr);
+  } catch (err) {
+    Logger.log("unblockRecurringSlots error: " + err);
+  }
+}
+
 // ─── createCalendarEvent ─────────────────────────────────────────────────────
 
 function createCalendarEvent(data, vehicle, clientTypeLabel, serviceTypeLabel) {
@@ -2179,6 +2254,52 @@ function createRecurringCalendarEvents(data, vehicle, clientTypeLabel, serviceTy
   }
 }
 
+// ─── deleteRecurringCalendarEvents ───────────────────────────────────────────
+// Reverses createRecurringCalendarEvents — deletes any pre-created future
+// recurring events (from startDateStr through ~1yr out, same window
+// createRecurringCalendarEvents used) that were never consumed by a skip/
+// complete cycle. Used when pausing a maintenance plan.
+
+function deleteRecurringCalendarEvents(customerName, startDateStr, frequency) {
+  try {
+    var calendar = CalendarApp.getCalendarById(CALENDAR_ID);
+    if (!calendar) { Logger.log("Calendar not found for deleteRecurringCalendarEvents"); return 0; }
+
+    var oneYearOut = new Date();
+    oneYearOut.setFullYear(oneYearOut.getFullYear() + 1);
+
+    var allDates = calcRecurringDatesGS(startDateStr, frequency, 52);
+    var deleted = 0;
+
+    for (var i = 0; i < allDates.length; i++) {
+      var dateStr = allDates[i];
+      var parts   = dateStr.split("-");
+      var yr = parseInt(parts[0]);
+      var mo = parseInt(parts[1]) - 1;
+      var dy = parseInt(parts[2]);
+      var eventDate = new Date(yr, mo, dy);
+
+      if (eventDate > oneYearOut) break;
+
+      var dayStart = new Date(yr, mo, dy, 0, 0, 0);
+      var dayEnd   = new Date(yr, mo, dy, 23, 59, 0);
+      var events   = calendar.getEvents(dayStart, dayEnd);
+      events.forEach(function(ev) {
+        if (ev.getTitle().indexOf(customerName) !== -1) {
+          ev.deleteEvent();
+          deleted++;
+        }
+      });
+    }
+
+    Logger.log("Deleted " + deleted + " recurring calendar events for " + customerName + " (" + frequency + ")");
+    return deleted;
+  } catch (err) {
+    Logger.log("deleteRecurringCalendarEvents error: " + err);
+    return 0;
+  }
+}
+
 // ─── Date helpers ─────────────────────────────────────────────────────────────
 
 function formatDateStr(d) {
@@ -2232,6 +2353,43 @@ function calcRecurringDatesGS(startDateStr, frequency, count) {
     }
   }
   return dates;
+}
+
+// Steps forward from anchorDateStr using the plan's cadence until landing on
+// (or past) notBeforeDate, preserving the cadence's phase (day-of-week for
+// biweekly; day-of-week + week-position for monthly) rather than restarting
+// it. Used by resumeMaintenancePlan so resuming lands on the next real slot
+// on the existing schedule instead of wherever the old cadence would be by now.
+function nextOccurrenceOnOrAfter(anchorDateStr, frequency, notBeforeDate) {
+  var parts = anchorDateStr.split("-");
+  var d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+
+  var dow, weekPos, isLast;
+  if (frequency === "monthly") {
+    dow = d.getDay();
+    weekPos = Math.ceil(d.getDate() / 7);
+    var testN = new Date(d);
+    testN.setDate(testN.getDate() + 7);
+    isLast = testN.getMonth() !== d.getMonth();
+  }
+
+  var guard = 0;
+  while (d < notBeforeDate && guard < 500) {
+    if (frequency === "biweekly") {
+      d.setDate(d.getDate() + 14);
+    } else if (frequency === "monthly") {
+      var nm = d.getMonth() + 1;
+      var ny = d.getFullYear();
+      if (nm > 11) { nm = 0; ny++; }
+      var candidate = getNthWeekdayOfMonth(ny, nm, dow, weekPos, isLast);
+      d = candidate || (function() { var f = new Date(d); f.setMonth(f.getMonth() + 1); return f; })();
+    } else {
+      break;
+    }
+    guard++;
+  }
+
+  return formatDateStr(d);
 }
 
 function getCadenceLabelGS(startDateStr, frequency) {
@@ -2392,7 +2550,7 @@ function sendBookingReminders() {
       var phone       = String(row[2] || "").trim();
       var status      = String(row[28] || "").trim();
 
-      if (status === "Completed" || !phone) return;
+      if (status === "Completed" || status === "Cancelled" || status === "Skipped" || status === "Paused" || !phone) return;
 
       if (bookingDate === tomorrowStr) {
         var msg24 = "Hi " + name + "! Reminder: your ATX Prestige Detailing appointment is tomorrow" + (bookingTime ? " at " + bookingTime : "") + ". We look forward to seeing you!";
@@ -2536,7 +2694,7 @@ function cancelBooking(data) {
         var rDt = new Date(parseInt(rParts[0]), parseInt(rParts[1]) - 1, parseInt(rParts[2]));
         if (rDt < today) continue;
 
-        var sheetRow = r + 2; // 1-based + header offset
+        var sheetRow = r + 1; // allRows[r] is the (r+1)th sheet row (allRows[0] is the header)
 
         // Mark as Cancelled
         sheet.getRange(sheetRow, 29).setValue("Cancelled");
@@ -2664,6 +2822,117 @@ function cancelBooking(data) {
     return ContentService.createTextOutput(JSON.stringify({ success: true })).setMimeType(ContentService.MimeType.JSON);
   } catch (err) {
     Logger.log("cancelBooking error: " + err);
+    return ContentService.createTextOutput(JSON.stringify({ success: false, error: String(err) })).setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+// ─── pauseMaintenancePlan ─────────────────────────────────────────────────────
+// Pauses a maintenance client's plan indefinitely: marks their upcoming
+// booking row "Paused" (instead of cancelling it), frees its slot/calendar
+// event, and sweeps any further pre-blocked slots/events that were bulk-
+// created at initial booking time (up to ~1yr out) but never consumed.
+// Silent by default — SMS/email only fire if notifySms/notifyEmail are true.
+
+function pauseMaintenancePlan(data) {
+  try {
+    var ss         = SpreadsheetApp.openById(SHEET_ID);
+    var sheet      = ss.getSheetByName(BOOKINGS_SHEET);
+    var availSheet = ss.getSheetByName(AVAILABILITY_SHEET);
+    var calendar   = CalendarApp.getCalendarById(CALENDAR_ID);
+
+    var custEmail = String(data.customerEmail || data.email || "").trim();
+    var custName  = String(data.customerName  || data.name  || "").trim();
+    var custPhone = String(data.customerPhone || data.phone || "").trim();
+    var make      = String(data.make || "").trim().toLowerCase();
+    var model     = String(data.model || "").trim().toLowerCase();
+    var freq      = String(data.recurringFrequency || "").trim();
+
+    if (!custEmail || !make || !model) {
+      return ContentService.createTextOutput(JSON.stringify({ success: false, error: "Missing email, make, or model" })).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    var today      = new Date(); today.setHours(0, 0, 0, 0);
+    var allRows    = sheet.getDataRange().getDisplayValues();
+    var availRows  = availSheet.getDataRange().getDisplayValues();
+    var pausedCount = 0;
+    var lastPausedDate = "";
+    var lastPausedTime = "";
+
+    for (var r = 1; r < allRows.length; r++) {
+      var rEmail  = String(allRows[r][3]).trim().toLowerCase();
+      var rMake   = String(allRows[r][7]).trim().toLowerCase();
+      var rModel  = String(allRows[r][8]).trim().toLowerCase();
+      var rDate   = String(allRows[r][4]).trim();
+      var rTime   = String(allRows[r][5]).trim();
+      var rStatus = String(allRows[r][28]).trim();
+      var rType   = String(allRows[r][26]).trim();
+
+      if (rEmail !== custEmail.toLowerCase()) continue;
+      if (rMake !== make || rModel !== model) continue;
+      if (rType !== "maintenance") continue;
+      if (rStatus === "Cancelled" || rStatus === "Completed" || rStatus === "Skipped" || rStatus === "Paused") continue;
+
+      var rParts = rDate.split("-");
+      if (rParts.length !== 3) continue;
+      var rDt = new Date(parseInt(rParts[0]), parseInt(rParts[1]) - 1, parseInt(rParts[2]));
+      if (rDt < today) continue;
+
+      var sheetRow = r + 1; // allRows[r] is the (r+1)th sheet row (allRows[0] is the header)
+
+      sheet.getRange(sheetRow, 29).setValue("Paused");
+      pausedCount++;
+      if (!lastPausedDate || rDate > lastPausedDate) { lastPausedDate = rDate; lastPausedTime = rTime; }
+
+      // Reopen this row's availability slot
+      for (var a = 1; a < availRows.length; a++) {
+        if (String(availRows[a][0]).trim() === rDate && String(availRows[a][1]).trim() === rTime) {
+          availSheet.getRange(a + 1, 3).setValue(true);
+          break;
+        }
+      }
+
+      // Delete this row's calendar event
+      if (calendar && rDate) {
+        try {
+          var evStart = new Date(parseInt(rParts[0]), parseInt(rParts[1]) - 1, parseInt(rParts[2]), 0, 0, 0);
+          var evEnd   = new Date(parseInt(rParts[0]), parseInt(rParts[1]) - 1, parseInt(rParts[2]), 23, 59, 0);
+          calendar.getEvents(evStart, evEnd).forEach(function(ev) {
+            if (ev.getTitle().indexOf(custName) !== -1) ev.deleteEvent();
+          });
+        } catch (calErr) { Logger.log("Pause calendar delete error for " + rDate + ": " + calErr); }
+      }
+    }
+
+    // Sweep any further pre-blocked slots/events (bulk-created ~1yr out at
+    // initial booking) that don't have a materialized row yet.
+    if (lastPausedDate && freq) {
+      try { unblockRecurringSlots(availSheet, lastPausedDate, lastPausedTime, freq); } catch (e) { Logger.log("Pause sweep unblock error: " + e); }
+      try { deleteRecurringCalendarEvents(custName, lastPausedDate, freq); } catch (e) { Logger.log("Pause sweep calendar error: " + e); }
+    }
+
+    Logger.log("Paused " + pausedCount + " maintenance booking(s) for " + custEmail);
+
+    if (data.notifyEmail && custEmail && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(custEmail)) {
+      try {
+        var subject = "Maintenance Plan Paused | ATX Prestige Detailing";
+        var plain =
+          "Hi " + custName + ",\n\n" +
+          "Your maintenance plan has been paused. Your upcoming appointments have been removed and your time slots released.\n\n" +
+          "Whenever you're ready to pick back up, just let us know and we'll get you on the next available date.\n\n" +
+          "Thank you,\nATX Prestige Detailing";
+        GmailApp.sendEmail(custEmail, subject, plain, { from: "atxprestigedetailing@gmail.com", name: "ATX Prestige Detailing" });
+      } catch (emailErr) { Logger.log("Pause email error: " + emailErr); }
+    }
+
+    if (data.notifySms && custPhone) {
+      try {
+        sendSMS(custPhone, "Hi " + custName + ", your ATX Prestige Detailing maintenance plan has been paused. Just let us know when you're ready to pick back up!");
+      } catch (smsErr) { Logger.log("Pause SMS error: " + smsErr); }
+    }
+
+    return ContentService.createTextOutput(JSON.stringify({ success: true, pausedCount: pausedCount })).setMimeType(ContentService.MimeType.JSON);
+  } catch (err) {
+    Logger.log("pauseMaintenancePlan error: " + err);
     return ContentService.createTextOutput(JSON.stringify({ success: false, error: String(err) })).setMimeType(ContentService.MimeType.JSON);
   }
 }
@@ -3062,6 +3331,106 @@ function skipMaintenanceBooking(data) {
   }
 }
 
+// ─── resumeMaintenancePlan ────────────────────────────────────────────────────
+// Resumes a paused maintenance plan onto the next slot on its existing
+// cadence, computed from today forward (not wherever the old schedule would
+// have landed after months paused). Silent by default — SMS/email only fire
+// if notifySms/notifyEmail are true.
+
+function resumeMaintenancePlan(data) {
+  try {
+    var custEmail   = String(data.customerEmail || data.email || "").trim();
+    var custName    = String(data.customerName  || data.name  || "").trim();
+    var custPhone   = String(data.customerPhone || data.phone || "").trim();
+    var freq        = String(data.recurringFrequency || "").trim();
+    var pausedDate  = String(data.date || "").trim();
+    var pkgType     = String(data.packageType || "").trim();
+    var vehicleLbl  = String(data.vehicleLabel || data.vehicle || "").trim();
+
+    if (!custEmail || !freq || !pausedDate) {
+      return ContentService.createTextOutput(JSON.stringify({ success: false, error: "Missing email, frequency, or date" })).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    var today = new Date(); today.setHours(0, 0, 0, 0);
+    var nextDateStr = nextOccurrenceOnOrAfter(pausedDate, freq, today);
+
+    var appendResult = appendMaintenanceRow(data, nextDateStr);
+
+    if (!appendResult.skipped) {
+      var ss = SpreadsheetApp.openById(SHEET_ID);
+      var availSheet = ss.getSheetByName(AVAILABILITY_SHEET);
+      var timeToUse = String(data.time || "").trim();
+
+      // Block the availability slot for the new date
+      try {
+        var availRows = availSheet.getDataRange().getDisplayValues();
+        for (var i = 1; i < availRows.length; i++) {
+          if (String(availRows[i][0]).trim() === nextDateStr && String(availRows[i][1]).trim() === timeToUse) {
+            availSheet.getRange(i + 1, 3).setValue(false);
+            break;
+          }
+        }
+      } catch (avErr) { Logger.log("Resume availability block error: " + avErr); }
+
+      // Create the calendar event for the new date
+      try {
+        var cal = CalendarApp.getCalendarById(CALENDAR_ID);
+        if (cal && nextDateStr) {
+          var nParts = nextDateStr.split("-");
+          var nHour = 9, nMin = 0;
+          if (timeToUse) {
+            var tl = timeToUse.toLowerCase();
+            var tn = timeToUse.replace(/[^0-9:]/g, "").split(":");
+            nHour = parseInt(tn[0]) || 9;
+            nMin  = parseInt(tn[1]) || 0;
+            if (tl.indexOf("pm") !== -1 && nHour !== 12) nHour += 12;
+            if (tl.indexOf("am") !== -1 && nHour === 12) nHour = 0;
+          }
+          var nStart = new Date(parseInt(nParts[0]), parseInt(nParts[1]) - 1, parseInt(nParts[2]), nHour, nMin, 0);
+          var nEnd   = new Date(parseInt(nParts[0]), parseInt(nParts[1]) - 1, parseInt(nParts[2]), nHour + 2, nMin, 0);
+          var pkgLabel = pkgType === "basic" ? "Basic Detail" : pkgType === "premium" ? "Premium Detail" : pkgType === "exterior" ? "Exterior Only - Basic" : pkgType === "exteriorPremium" ? "Exterior Only - Premium" : pkgType === "interior" ? "Interior Only - Basic" : pkgType === "interiorPremium" ? "Interior Only - Premium" : pkgType || "Maintenance Detail";
+          var nTitle = pkgLabel + " - " + custName + " (Maintenance)";
+          var nDesc  =
+            "Client: " + custName + "\n" +
+            "Phone: " + custPhone + "\n" +
+            "Email: " + custEmail + "\n" +
+            "Vehicle: " + vehicleLbl + "\n" +
+            "Package: " + pkgLabel + "\n" +
+            "Plan: Maintenance Plan (" + (freq === "biweekly" ? "Bi-Weekly" : "Monthly") + ")" +
+            (String(data.address || "").trim() ? "\nAddress: " + String(data.address || "").trim() : "");
+          cal.createEvent(nTitle, nStart, nEnd, { description: nDesc, location: String(data.address || "").trim() });
+        }
+      } catch (calErr) { Logger.log("Resume calendar create error: " + calErr); }
+    }
+
+    var nextDateLabel = friendlyDate(nextDateStr);
+    Logger.log("Resumed maintenance plan for " + custEmail + " — next date " + nextDateStr);
+
+    if (data.notifyEmail && custEmail && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(custEmail)) {
+      try {
+        var subject = "Maintenance Plan Resumed | ATX Prestige Detailing";
+        var plain =
+          "Hi " + custName + ",\n\n" +
+          "Your maintenance plan has been resumed. Your next appointment is scheduled for:\n\n" +
+          nextDateLabel + (data.time ? " at " + data.time : "") + "\n\n" +
+          "If you have any questions, please reach out.\n\nThank you,\nATX Prestige Detailing";
+        GmailApp.sendEmail(custEmail, subject, plain, { from: "atxprestigedetailing@gmail.com", name: "ATX Prestige Detailing" });
+      } catch (emailErr) { Logger.log("Resume email error: " + emailErr); }
+    }
+
+    if (data.notifySms && custPhone) {
+      try {
+        sendSMS(custPhone, "Hi " + custName + "! Your ATX Prestige Detailing maintenance plan has been resumed. Your next detail is " + nextDateLabel + (data.time ? " at " + data.time : "") + ".");
+      } catch (smsErr) { Logger.log("Resume SMS error: " + smsErr); }
+    }
+
+    return ContentService.createTextOutput(JSON.stringify({ success: true, nextDate: nextDateLabel })).setMimeType(ContentService.MimeType.JSON);
+  } catch (err) {
+    Logger.log("resumeMaintenancePlan error: " + err);
+    return ContentService.createTextOutput(JSON.stringify({ success: false, error: String(err) })).setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
 // ─── checkMaintenanceTimeConflicts ───────────────────────────────────────────
 // Checks if a proposed new time for a maintenance schedule conflicts with
 // any existing bookings across all future recurring dates
@@ -3262,8 +3631,8 @@ function updateMaintenanceTime(data) {
 
     Logger.log("updateMaintenanceTime: updated " + updatedRows + " sheet rows and " + updatedCal + " calendar events for " + custEmail);
 
-    // 4. Send notification email to client
-    if (custEmail && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(custEmail)) {
+    // 4. Send notification email to client (unless the caller explicitly suppressed it)
+    if (data.notify !== false && custEmail && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(custEmail)) {
       try {
         var subject = "Your Maintenance Schedule Has Been Updated | ATX Prestige Detailing";
         var freqLabel = "recurring";
@@ -3337,8 +3706,8 @@ function updateMaintenanceTime(data) {
       } catch (emailErr) { Logger.log("Time update email error: " + emailErr); }
     }
 
-    // 5. SMS notification
-    if (custPhone) {
+    // 5. SMS notification (unless the caller explicitly suppressed it)
+    if (data.notify !== false && custPhone) {
       try {
         var vehicleSms = String(data.make || "").trim() + " " + String(data.model || "").trim();
         var smsMsg = "Hi " + custName + "! Your ATX Prestige Detailing maintenance schedule for your " + vehicleSms + " has been updated. All future appointments will now be at " + newTime + ". Questions? Just reach out!";

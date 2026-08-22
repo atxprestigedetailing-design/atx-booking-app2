@@ -12,7 +12,7 @@ const GOOGLE_CLIENT_ID =
   "447699234633-ivo2e1c2q843scj32k5323o2rkq6h7dp.apps.googleusercontent.com";
 
 const SCRIPT_URL =
-  "https://script.google.com/macros/s/AKfycby4sNDc-sMCic-3k8cVt0yPLyDJ2xtK8bOXLZkMKGWMaHsLYNecTSgnijfy60cru_fgEA/exec";
+  "https://script.google.com/macros/s/AKfycbxCp_xnOQlYzgXqBsL0Qq1zRT3d1A-wT-Wq0Ii4JMOA9Wb8LmIRKyTuA68NI_zOKs3cKA/exec";
 
 // Sandbox credentials — replace with your Square Sandbox Application ID / Location ID
 // (Dashboard → Sandbox → your app → Locations). These are not secret and are safe here;
@@ -857,6 +857,11 @@ export default function App() {
   const [editingBooking, setEditingBooking]             = useState<Booking | null>(null);
   const [editFields, setEditFields]                     = useState<Partial<Booking>>({});
   const [editSaving, setEditSaving]                     = useState(false);
+  const [notifyClientOnSave, setNotifyClientOnSave]     = useState(true);
+  const [pauseResumeModal, setPauseResumeModal]         = useState<{ booking: Booking; mode: "pause" | "resume" } | null>(null);
+  const [pauseResumeNotifySms, setPauseResumeNotifySms]     = useState(false);
+  const [pauseResumeNotifyEmail, setPauseResumeNotifyEmail] = useState(false);
+  const [pauseResumeSaving, setPauseResumeSaving]       = useState(false);
   const [bookingsTab, setBookingsTab]                   = useState<"appointments" | "maintenance">("appointments");
   const [availSlots, setAvailSlots]                     = useState<{date: string; time: string; available: string}[]>([]);
   const [availLoading, setAvailLoading]                 = useState(false);
@@ -1141,6 +1146,7 @@ export default function App() {
   const [maintTimeConflicts, setMaintTimeConflicts]     = useState<{date:string;dateLabel:string;time:string;clientName:string;vehicle:string}[]>([]);
   const [maintTimeChecking, setMaintTimeChecking]       = useState(false);
   const [maintTimeCheckedFor, setMaintTimeCheckedFor]   = useState<{rowIndex:number;time:string}|null>(null);
+  const [maintTimeNotify, setMaintTimeNotify]           = useState(true);
 
   // ── Toast / loading system ──
   type Toast = { id: number; message: string; type: "loading" | "success" | "error" };
@@ -1483,7 +1489,7 @@ export default function App() {
     finally { setCompleteLoading(false); setProcessingRows(prev => { const n = new Set(prev); n.delete(savedBooking.rowIndex); return n; }); }
   }
 
-  async function applyMaintenanceTimeUpdate(booking: Booking, newTime: string) {
+  async function applyMaintenanceTimeUpdate(booking: Booking, newTime: string, notify: boolean) {
     const tid = showToast("Updating schedule — this may take a moment...", "loading");
     try {
       const res = await fetch(SCRIPT_URL, {
@@ -1496,6 +1502,7 @@ export default function App() {
           make: booking.make,
           model: booking.model,
           newTime,
+          notify,
         }),
       });
       const d = await res.json();
@@ -1545,7 +1552,7 @@ export default function App() {
           fields: editFields,
           oldDate: editingBooking.date,
           oldTime: editingBooking.time,
-          scheduleChanged,
+          scheduleChanged: notifyClientOnSave && scheduleChanged,
           customerName: editingBooking.name,
           customerEmail: editingBooking.email,
           customerPhone: editingBooking.phone,
@@ -1558,7 +1565,7 @@ export default function App() {
           hourlyRate: editingBooking.hourlyRate,
           serviceDate: editFields.date || editingBooking.date,
           // Change notification payload
-          hasDetailChanges: changeDetails.length > 0,
+          hasDetailChanges: notifyClientOnSave && changeDetails.length > 0,
           changeDetails: JSON.stringify(changeDetails),
           editedBy: "admin",
           // Event-specific reschedule copy (address, rain policy) when applicable
@@ -1572,6 +1579,69 @@ export default function App() {
       else { alert("Something went wrong."); }
     } catch (e) { alert("Something went wrong."); }
     finally { setEditSaving(false); }
+  }
+
+  async function submitPauseResume() {
+    if (!pauseResumeModal) return;
+    const { booking: b, mode } = pauseResumeModal;
+    setPauseResumeSaving(true);
+    const vl = b.vehicle === "boat"
+      ? [b.boatSize, b.make, b.model].filter(Boolean).join(" ")
+      : [b.year, b.make, b.model].filter(Boolean).join(" ");
+    const tid = showToast(mode === "pause" ? "Pausing maintenance plan..." : "Resuming maintenance plan...", "loading");
+    try {
+      const res = await fetch(SCRIPT_URL, {
+        method: "POST",
+        body: JSON.stringify({
+          action: mode === "pause" ? "pauseMaintenancePlan" : "resumeMaintenancePlan",
+          rowIndex: b.rowIndex,
+          customerName: b.name,
+          customerEmail: b.email,
+          customerPhone: b.phone,
+          name: b.name,
+          phone: b.phone,
+          email: b.email,
+          date: b.date,
+          time: b.time,
+          year: b.year,
+          make: b.make,
+          model: b.model,
+          boatSize: b.boatSize,
+          vehicle: b.vehicle,
+          vehicleLabel: vl,
+          hourlyRate: b.hourlyRate,
+          addOns: b.addOns,
+          packageType: b.packageType,
+          serviceType: b.serviceType,
+          address: b.address,
+          avgTime: b.avgTime,
+          notes: b.notes,
+          clientType: b.clientType,
+          recurringFrequency: b.recurringFrequency,
+          notifySms: pauseResumeNotifySms,
+          notifyEmail: pauseResumeNotifyEmail,
+        }),
+      });
+      const d = await res.json();
+      if (d.success) {
+        if (mode === "pause") {
+          setAdminBookings(prev => prev.map(bk => bk.rowIndex === b.rowIndex ? { ...bk, status: "Paused" } : bk));
+          updateToast(tid, "Maintenance plan paused.", "success", 4000);
+        } else {
+          updateToast(tid, `Resumed ✓ — next visit ${d.nextDate || "scheduled"}`, "success", 4000);
+        }
+        setPauseResumeModal(null);
+        setPauseResumeNotifySms(false);
+        setPauseResumeNotifyEmail(false);
+        await loadAdminBookings();
+      } else {
+        updateToast(tid, "Something went wrong: " + (d.error || ""), "error", 4000);
+      }
+    } catch (e) {
+      updateToast(tid, "Network error — please try again", "error", 4000);
+    } finally {
+      setPauseResumeSaving(false);
+    }
   }
 
   async function handleReleaseInvoice(booking: Booking) {
@@ -2113,6 +2183,48 @@ export default function App() {
       </div>
     </div>
   ) : null;
+
+  // PAUSE / RESUME MAINTENANCE PLAN MODAL — lets the admin choose whether to
+  // text/email the client (both default off, since this is usually confirmed
+  // by text separately) before pausing or resuming a maintenance plan.
+  const PauseResumeModal = () => {
+    if (!pauseResumeModal) return null;
+    const { booking: b, mode } = pauseResumeModal;
+    const isPause = mode === "pause";
+    return (
+      <div style={{ position: "fixed" as const, inset: 0, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 2000, padding: 16, backdropFilter: "blur(8px)" }}>
+        <div style={{ background: "rgba(15,20,30,0.95)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 24, padding: 28, maxWidth: 420, width: "100%", boxShadow: "0 40px 100px rgba(0,0,0,0.6)" }}>
+          <h3 style={{ margin: "0 0 8px", fontWeight: 800, color: "#f1f5f9" }}>{isPause ? "Pause Maintenance Plan" : "Resume Maintenance Plan"}</h3>
+          <p style={{ color: "rgba(255,255,255,0.55)", fontSize: "0.9rem", lineHeight: 1.6, margin: "0 0 20px" }}>
+            {isPause
+              ? `This pauses ${b.name}'s maintenance plan indefinitely, freeing up their upcoming time slots and calendar events. You can resume it any time.`
+              : `This resumes ${b.name}'s maintenance plan onto the next available date on their existing schedule.`}
+          </p>
+          <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 12, padding: "14px 16px", marginBottom: 20 }}>
+            <div style={{ fontSize: "0.78rem", fontWeight: 700, color: "rgba(255,255,255,0.5)", marginBottom: 10, textTransform: "uppercase" as const, letterSpacing: "0.04em" }}>Let {b.name} know?</div>
+            <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "0.9rem", color: "#f1f5f9", marginBottom: 10, cursor: "pointer" }}>
+              <input type="checkbox" checked={pauseResumeNotifySms} onChange={e => setPauseResumeNotifySms(e.target.checked)} />
+              Text client
+            </label>
+            <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "0.9rem", color: "#f1f5f9", cursor: "pointer" }}>
+              <input type="checkbox" checked={pauseResumeNotifyEmail} onChange={e => setPauseResumeNotifyEmail(e.target.checked)} />
+              Email client
+            </label>
+          </div>
+          <div style={{ display: "flex", gap: 10 }}>
+            <button onClick={submitPauseResume} disabled={pauseResumeSaving}
+              style={{ flex: 1, background: isPause ? "#7c3aed" : "#059669", color: "#fff", border: "none", borderRadius: 12, padding: "12px 20px", fontWeight: 700, cursor: "pointer", opacity: pauseResumeSaving ? 0.6 : 1 }}>
+              {pauseResumeSaving ? "Working..." : isPause ? "Pause Plan" : "Resume Plan"}
+            </button>
+            <button onClick={() => setPauseResumeModal(null)} disabled={pauseResumeSaving}
+              style={{ background: "transparent", color: "rgba(255,255,255,0.45)", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 12, padding: "12px 20px", fontWeight: 600, cursor: "pointer" }}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   // IN-APP CARD PAYMENT MODAL — mounts Square's hosted card form and charges via chargeSquarePayment
   const CardPaymentModal = () => {
@@ -3511,7 +3623,7 @@ export default function App() {
                         const isSelected = selectedAdminBooking?.rowIndex === b.rowIndex;
 
                         return (
-                          <div key={i} className="booking-card" style={{ background: b.status === "Cancelled" ? "rgba(239,68,68,0.08)" : b.status === "Skipped" ? "rgba(59,130,246,0.08)" : "rgba(255,255,255,0.04)", border: `1px solid ${b.status === "Cancelled" ? "rgba(239,68,68,0.35)" : b.status === "Skipped" ? "rgba(59,130,246,0.35)" : isComplete ? "rgba(255,255,255,0.07)" : isUpcoming(b.date) ? "rgba(59,130,246,0.45)" : "rgba(255,255,255,0.07)"}`, borderRadius: 16, padding: 16, opacity: b.status === "Cancelled" || b.status === "Skipped" ? 0.85 : 1 }}>
+                          <div key={i} className="booking-card" style={{ background: b.status === "Cancelled" ? "rgba(239,68,68,0.08)" : b.status === "Skipped" ? "rgba(59,130,246,0.08)" : b.status === "Paused" ? "rgba(139,92,246,0.08)" : "rgba(255,255,255,0.04)", border: `1px solid ${b.status === "Cancelled" ? "rgba(239,68,68,0.35)" : b.status === "Skipped" ? "rgba(59,130,246,0.35)" : b.status === "Paused" ? "rgba(139,92,246,0.35)" : isComplete ? "rgba(255,255,255,0.07)" : isUpcoming(b.date) ? "rgba(59,130,246,0.45)" : "rgba(255,255,255,0.07)"}`, borderRadius: 16, padding: 16, opacity: b.status === "Cancelled" || b.status === "Skipped" || b.status === "Paused" ? 0.85 : 1 }}>
                             {b.status === "Cancelled" && (
                               <div style={{ background: "rgba(239,68,68,0.25)", border: "1px solid rgba(239,68,68,0.4)", borderRadius: 8, padding: "6px 12px", marginBottom: 10, display: "flex", alignItems: "center", gap: 8 }}>
                                 <span style={{ color: "#fff", fontWeight: 800, fontSize: "0.85rem", letterSpacing: "0.04em" }}>✕ APPOINTMENT CANCELLED</span>
@@ -3522,9 +3634,14 @@ export default function App() {
                                 <span style={{ color: "#fff", fontWeight: 800, fontSize: "0.85rem", letterSpacing: "0.04em" }}>⏭ MAINTENANCE SKIPPED</span>
                               </div>
                             )}
+                            {b.status === "Paused" && (
+                              <div style={{ background: "rgba(139,92,246,0.25)", border: "1px solid rgba(139,92,246,0.4)", borderRadius: 8, padding: "6px 12px", marginBottom: 10, display: "flex", alignItems: "center", gap: 8 }}>
+                                <span style={{ color: "#fff", fontWeight: 800, fontSize: "0.85rem", letterSpacing: "0.04em" }}>⏸ MAINTENANCE PAUSED</span>
+                              </div>
+                            )}
                             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8, marginBottom: 6, flexWrap: "wrap" as const }}>
                               <div>
-                                <div style={{ fontWeight: 700, color: b.status === "Cancelled" ? "#fca5a5" : b.status === "Skipped" ? "rgba(255,255,255,0.45)" : "#f1f5f9", fontSize: "0.95rem" }}>{b.name} — {formatDateLabel(b.date)}{b.time ? ` at ${b.time}` : ""}</div>
+                                <div style={{ fontWeight: 700, color: b.status === "Cancelled" ? "#fca5a5" : b.status === "Skipped" ? "rgba(255,255,255,0.45)" : b.status === "Paused" ? "#c4b5fd" : "#f1f5f9", fontSize: "0.95rem" }}>{b.name} — {formatDateLabel(b.date)}{b.time ? ` at ${b.time}` : ""}</div>
                                 <div style={{ fontSize: "0.85rem", color: "rgba(255,255,255,0.45)" }}>{b.email} · {b.phone}</div>
                                 <div style={{ fontSize: "0.85rem", color: "rgba(255,255,255,0.45)" }}>{vl} · {b.packageType === "basic" ? "Basic Detail" : b.packageType === "premium" ? "Premium Detail" : b.packageType === "exterior" ? "Exterior Only — Basic" : b.packageType === "exteriorPremium" ? "Exterior Only — Premium" : b.packageType === "interior" ? "Interior Only — Basic" : b.packageType === "interiorPremium" ? "Interior Only — Premium" : b.packageType === "custom" ? `⚡ Custom: ${b.addOns || "Custom Job"}` : b.packageType} · {b.packageType === "custom" ? "Flat rate" : `$${b.hourlyRate}/hr`}</div>
                                 {b.clientType === "maintenance" && <div style={{ fontSize: "0.8rem", color: "#059669", fontWeight: 600 }}>{b.recurringFrequency === "biweekly" ? "Bi-Weekly" : "Monthly"} Maintenance</div>}
@@ -3533,8 +3650,8 @@ export default function App() {
                                 {b.notes && <div style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.35)" }}>Notes: {b.notes}</div>}
                               </div>
                               <div style={{ display: "flex", flexDirection: "column" as const, alignItems: "flex-end", gap: 4 }}>
-                                <span style={{ background: b.status === "Cancelled" ? "rgba(239,68,68,0.15)" : b.status === "Skipped" ? "rgba(59,130,246,0.15)" : isComplete ? "rgba(16,185,129,0.15)" : isUpcoming(b.date) ? "rgba(59,130,246,0.15)" : isOverdue(b) ? "rgba(217,119,6,0.2)" : "rgba(255,255,255,0.06)", color: b.status === "Cancelled" ? "#f87171" : b.status === "Skipped" ? "#93c5fd" : isComplete ? "#34d399" : isUpcoming(b.date) ? "#93c5fd" : isOverdue(b) ? "#fbbf24" : "rgba(255,255,255,0.35)", fontSize: "0.72rem", fontWeight: 700, borderRadius: 999, padding: "2px 8px" }}>
-                                  {b.status === "Cancelled" ? "CANCELLED" : b.status === "Skipped" ? "SKIPPED" : isComplete ? "COMPLETED" : isUpcoming(b.date) ? "UPCOMING" : isOverdue(b) ? "⚠ OVERDUE" : "PAST"}
+                                <span style={{ background: b.status === "Cancelled" ? "rgba(239,68,68,0.15)" : b.status === "Skipped" ? "rgba(59,130,246,0.15)" : b.status === "Paused" ? "rgba(139,92,246,0.15)" : isComplete ? "rgba(16,185,129,0.15)" : isUpcoming(b.date) ? "rgba(59,130,246,0.15)" : isOverdue(b) ? "rgba(217,119,6,0.2)" : "rgba(255,255,255,0.06)", color: b.status === "Cancelled" ? "#f87171" : b.status === "Skipped" ? "#93c5fd" : b.status === "Paused" ? "#c4b5fd" : isComplete ? "#34d399" : isUpcoming(b.date) ? "#93c5fd" : isOverdue(b) ? "#fbbf24" : "rgba(255,255,255,0.35)", fontSize: "0.72rem", fontWeight: 700, borderRadius: 999, padding: "2px 8px" }}>
+                                  {b.status === "Cancelled" ? "CANCELLED" : b.status === "Skipped" ? "SKIPPED" : b.status === "Paused" ? "PAUSED" : isComplete ? "COMPLETED" : isUpcoming(b.date) ? "UPCOMING" : isOverdue(b) ? "⚠ OVERDUE" : "PAST"}
                                 </span>
                                 {b.invoiceStatus && b.invoiceStatus !== "" && (
                                   <span style={{ background: b.invoiceStatus === "paid" ? "rgba(16,185,129,0.2)" : b.invoiceStatus === "released" ? "rgba(251,191,36,0.15)" : "rgba(251,191,36,0.1)", color: b.invoiceStatus === "paid" ? "#34d399" : "#fbbf24", fontSize: "0.72rem", fontWeight: 700, borderRadius: 999, padding: "2px 8px" }}>
@@ -3545,14 +3662,14 @@ export default function App() {
                             </div>
 
                             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" as const, marginTop: 8, alignItems: "center" }}>
-                              {!isComplete && b.status !== "Cancelled" && b.status !== "Skipped" && (
+                              {!isComplete && b.status !== "Cancelled" && b.status !== "Skipped" && b.status !== "Paused" && (
                                 <button onClick={() => { setSelectedAdminBooking(isSelected ? null : b); setEditingBooking(null); setApplyCouponDiscount(false); if (b.packageType === "custom") { setBillingMode("flat"); setCompleteAmount(""); setCompleteNote(b.addOns || ""); setCompleteHours(""); } else { setBillingMode("hourly"); setCompleteAmount(b.hourlyRate ? String(parseFloat(b.hourlyRate) * 2) : ""); setCompleteHours(b.clientType === "maintenance" ? "2" : ""); setCompleteNote(""); } }}
                                   style={{ background: isSelected ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.1)", color: "#f1f5f9", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 8, padding: "7px 14px", fontSize: "0.82rem", fontWeight: 600, cursor: "pointer" }}>
                                   {isSelected ? "Cancel" : "Mark Complete"}
                                 </button>
                               )}
                               {/* Job Timer button */}
-                              {!isComplete && b.status !== "Cancelled" && b.status !== "Skipped" && (
+                              {!isComplete && b.status !== "Cancelled" && b.status !== "Skipped" && b.status !== "Paused" && (
                                 timerBookingRow === b.rowIndex ? (
                                   <div style={{ display: "flex", alignItems: "center", gap: 8, background: "rgba(251,191,36,0.08)", border: "1px solid #f59e0b", borderRadius: 8, padding: "5px 12px" }}>
                                     <span style={{ fontSize: "0.9rem", fontWeight: 800, color: "#fbbf24", fontVariantNumeric: "tabular-nums" }}>{timerDisplay(timerElapsed)}</span>
@@ -3568,13 +3685,13 @@ export default function App() {
                                   </button>
                                 )
                               )}
-                              {b.status !== "Cancelled" && b.status !== "Skipped" && (
-                                <button onClick={() => { setEditingBooking(editingBooking?.rowIndex === b.rowIndex ? null : b); setEditFields({ name: b.name, phone: b.phone, email: b.email, date: b.date, time: b.time, year: b.year, make: b.make, model: b.model, boatSize: b.boatSize, packageType: b.packageType, serviceType: b.serviceType, address: b.address, notes: b.notes, clientType: b.clientType, recurringFrequency: b.recurringFrequency, addOns: b.addOns }); setSelectedAdminBooking(null); }}
+                              {b.status !== "Cancelled" && b.status !== "Skipped" && b.status !== "Paused" && (
+                                <button onClick={() => { setEditingBooking(editingBooking?.rowIndex === b.rowIndex ? null : b); setEditFields({ name: b.name, phone: b.phone, email: b.email, date: b.date, time: b.time, year: b.year, make: b.make, model: b.model, boatSize: b.boatSize, packageType: b.packageType, serviceType: b.serviceType, address: b.address, notes: b.notes, clientType: b.clientType, recurringFrequency: b.recurringFrequency, addOns: b.addOns }); setNotifyClientOnSave(true); setSelectedAdminBooking(null); }}
                                   style={{ background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.7)", border: "none", borderRadius: 8, padding: "7px 14px", fontSize: "0.82rem", fontWeight: 600, cursor: "pointer" }}>
                                   {editingBooking?.rowIndex === b.rowIndex ? "Cancel Edit" : "Edit"}
                                 </button>
                               )}
-                              {!isComplete && b.status !== "Cancelled" && b.status !== "Skipped" && (
+                              {!isComplete && b.status !== "Cancelled" && b.status !== "Skipped" && b.status !== "Paused" && (
                                 <button onClick={async () => {
                                   if (!window.confirm(
                                     b.clientType === "maintenance"
@@ -3616,7 +3733,7 @@ export default function App() {
                                 </button>
                               )}
                               {/* Skip button — maintenance only */}
-                              {!isComplete && b.status !== "Cancelled" && b.status !== "Skipped" && b.clientType === "maintenance" && (
+                              {!isComplete && b.status !== "Cancelled" && b.status !== "Skipped" && b.status !== "Paused" && b.clientType === "maintenance" && (
                                 <button onClick={async () => {
                                   if (!window.confirm(`Skip ${b.name}'s maintenance on ${formatDateLabel(b.date)}? They will be notified and moved to their next scheduled date.`)) return;
                                   const skipTid = showToast("Skipping appointment and updating calendar...", "loading");
@@ -3669,6 +3786,20 @@ export default function App() {
                                   ⏭ Skip Appt
                                 </button>
                               )}
+                              {/* Pause Plan button — maintenance only */}
+                              {!isComplete && b.status !== "Cancelled" && b.status !== "Skipped" && b.status !== "Paused" && b.clientType === "maintenance" && (
+                                <button onClick={() => { setPauseResumeModal({ booking: b, mode: "pause" }); setPauseResumeNotifySms(false); setPauseResumeNotifyEmail(false); }}
+                                  style={{ background: "rgba(139,92,246,0.08)", color: "#7c3aed", border: "1.5px solid #c4b5fd", borderRadius: 8, padding: "7px 14px", fontSize: "0.82rem", fontWeight: 600, cursor: "pointer" }}>
+                                  ⏸ Pause Plan
+                                </button>
+                              )}
+                              {/* Resume Plan button */}
+                              {b.status === "Paused" && (
+                                <button onClick={() => { setPauseResumeModal({ booking: b, mode: "resume" }); setPauseResumeNotifySms(false); setPauseResumeNotifyEmail(false); }}
+                                  style={{ background: "rgba(16,185,129,0.08)", color: "#059669", border: "1.5px solid #6ee7b7", borderRadius: 8, padding: "7px 14px", fontSize: "0.82rem", fontWeight: 600, cursor: "pointer" }}>
+                                  ▶ Resume Plan
+                                </button>
+                              )}
                             </div>
 
                             {/* Edit form */}
@@ -3685,7 +3816,7 @@ export default function App() {
                                       <span style={{ margin: "0 8px" }}>→</span>
                                       <strong>{formatDateLabel(editFields.date || b.date)}{(editFields.time || b.time) ? ` at ${editFields.time || b.time}` : ""}</strong>
                                     </div>
-                                    <div style={{ fontSize: "0.75rem", color: "#f59e0b", marginTop: 4 }}>Customer will be notified by email and SMS. Calendar will be updated.</div>
+                                    <div style={{ fontSize: "0.75rem", color: "#f59e0b", marginTop: 4 }}>{notifyClientOnSave ? "Customer will be notified by email and SMS." : "Customer will NOT be notified (unchecked below)."} Calendar will be updated.</div>
                                   </div>
                                 )}
 
@@ -3837,7 +3968,7 @@ export default function App() {
                                   if (editFields.model && editFields.model !== b.model) changes.push({ field: "Model", from: b.model, to: editFields.model });
                                   if (editFields.serviceType && editFields.serviceType !== b.serviceType) changes.push({ field: "Service Type", from: svcLabel(b.serviceType), to: svcLabel(editFields.serviceType) });
                                   if (editFields.address && editFields.address !== b.address) changes.push({ field: "Address", from: b.address, to: editFields.address });
-                                  if (changes.length === 0) return null;
+                                  if (changes.length === 0 || !notifyClientOnSave) return null;
                                   return (
                                     <div style={{ marginBottom: 14, padding: "12px 14px", background: "rgba(251,191,36,0.08)", border: "1.5px solid #fcd34d", borderRadius: 12 }}>
                                       <div style={{ fontSize: "0.78rem", fontWeight: 700, color: "#fbbf24", marginBottom: 8 }}>📧 Booking change email will be sent to {b.email}</div>
@@ -3849,6 +3980,11 @@ export default function App() {
                                     </div>
                                   );
                                 })()}
+
+                                <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "0.85rem", color: "rgba(255,255,255,0.6)", marginBottom: 12, cursor: "pointer" }}>
+                                  <input type="checkbox" checked={notifyClientOnSave} onChange={e => setNotifyClientOnSave(e.target.checked)} />
+                                  Notify client of these changes
+                                </label>
 
                                 <div style={{ display: "flex", gap: 8 }}>
                                   <button onClick={handleSaveEdit} disabled={editSaving}
@@ -3873,6 +4009,11 @@ export default function App() {
                                     <div style={{ marginTop: 16, padding: "14px 16px", background: "rgba(59,130,246,0.08)", border: "1.5px solid #7dd3fc", borderRadius: 12 }}>
                                       <div style={{ fontWeight: 700, color: "#0369a1", fontSize: "0.88rem", marginBottom: 4 }}>Update Time for Entire Schedule</div>
                                       <div style={{ fontSize: "0.78rem", color: "#0284c7", marginBottom: 12 }}>Changes the time on ALL future appointments and calendar events for this vehicle. Checks for conflicts with other bookings first.</div>
+
+                                      <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "0.82rem", color: "#0284c7", marginBottom: 12, cursor: "pointer" }}>
+                                        <input type="checkbox" checked={maintTimeNotify} onChange={e => setMaintTimeNotify(e.target.checked)} />
+                                        Notify client of this change
+                                      </label>
 
                                       <div style={{ display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap" as const, marginBottom: 12 }}>
                                         <div>
@@ -3947,7 +4088,7 @@ export default function App() {
                                           <button
                                             onClick={async () => {
                                               if (!window.confirm(`Apply ${selectedNewTime} to all future ${b.make} ${b.model} appointments anyway? ${maintTimeConflicts.length} conflict${maintTimeConflicts.length !== 1 ? "s" : ""} will need to be resolved manually.`)) return;
-                                              await applyMaintenanceTimeUpdate(b, selectedNewTime);
+                                              await applyMaintenanceTimeUpdate(b, selectedNewTime, maintTimeNotify);
                                             }}
                                             style={{ marginTop: 10, background: "#dc2626", color: "#fff", border: "none", borderRadius: 8, padding: "8px 14px", fontWeight: 700, fontSize: "0.82rem", cursor: "pointer" }}>
                                             Apply Anyway
@@ -3961,7 +4102,7 @@ export default function App() {
                                           <div style={{ fontSize: "0.78rem", color: "#10b981" }}>Safe to apply. This will update all future bookings and calendar events.</div>
                                           <button
                                             onClick={async () => {
-                                              await applyMaintenanceTimeUpdate(b, selectedNewTime);
+                                              await applyMaintenanceTimeUpdate(b, selectedNewTime, maintTimeNotify);
                                             }}
                                             style={{ marginTop: 10, background: "#059669", color: "#fff", border: "none", borderRadius: 8, padding: "8px 14px", fontWeight: 700, fontSize: "0.82rem", cursor: "pointer" }}>
                                             Apply to All Future Appointments
@@ -5302,6 +5443,7 @@ export default function App() {
             )}
           </div>
         </div>
+        <PauseResumeModal />
       </div>
     );
   }
@@ -5714,6 +5856,7 @@ export default function App() {
       </div>
       <div style={S.container}>
         <SignInPromptPopup />
+        <PauseResumeModal />
         <Header />
         {step > 0 && step < TOTAL_STEPS - 1 && <ProgressBar />}
         {step > 0 && step < TOTAL_STEPS - 1 && (
