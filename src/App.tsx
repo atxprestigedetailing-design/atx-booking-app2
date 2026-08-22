@@ -1434,6 +1434,28 @@ export default function App() {
     finally { setResolvingReminderId(null); }
   }
 
+  async function switchReminder(id: string, approve: boolean) {
+    setResolvingReminderId(id);
+    try {
+      const res = await fetch(SCRIPT_URL, {
+        method: "POST",
+        body: JSON.stringify({ action: "switchReminderDecision", id, approve }),
+      });
+      const d = await res.json();
+      if (d.success) {
+        setPendingReminders(prev => prev.map(r => r.id === id ? { ...r, status: approve ? "Approved" : "Rejected" } : r));
+        if (d.alreadyDelivered) {
+          showToast("Already sent — this only updates the record, the client already got it.", "success", 5000);
+        } else {
+          showToast(approve ? (d.sentNow ? "Sent now." : "Switched to Approve.") : "Switched to Reject.", "success", 3500);
+        }
+      } else {
+        alert("Something went wrong.");
+      }
+    } catch (e) { alert("Network error — please try again"); }
+    finally { setResolvingReminderId(null); }
+  }
+
   async function handleAddExpense() {
     if (!newExpenseDate || !newExpenseAmount) return;
     setAddingExpense(true);
@@ -5622,6 +5644,18 @@ export default function App() {
                                     Reject
                                   </button>
                                 </div>
+                              )}
+                              {r.status === "Approved" && (
+                                <button disabled={resolvingReminderId === r.id} onClick={() => switchReminder(r.id, false)}
+                                  style={{ marginTop: 4, background: "none", color: "rgba(255,255,255,0.4)", border: "none", fontSize: "0.78rem", fontWeight: 600, cursor: "pointer", textDecoration: "underline", padding: 0, opacity: resolvingReminderId === r.id ? 0.5 : 1 }}>
+                                  Changed your mind? Switch to Reject
+                                </button>
+                              )}
+                              {r.status === "Rejected" && (
+                                <button disabled={resolvingReminderId === r.id} onClick={() => switchReminder(r.id, true)}
+                                  style={{ marginTop: 4, background: "none", color: "rgba(255,255,255,0.4)", border: "none", fontSize: "0.78rem", fontWeight: 600, cursor: "pointer", textDecoration: "underline", padding: 0, opacity: resolvingReminderId === r.id ? 0.5 : 1 }}>
+                                  Changed your mind? Switch to Approve
+                                </button>
                               )}
                             </div>
                           );

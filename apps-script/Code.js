@@ -125,6 +125,7 @@ function doPost(e) {
     if (action === "approveReminder")            return approveReminderPost(data);
     if (action === "rejectReminder")              return rejectReminderPost(data);
     if (action === "preDecideReminder")           return preDecideReminder(data);
+    if (action === "switchReminderDecision")      return switchReminderDecisionPost(data);
     if (action === "installReminderSendCheckTrigger") {
       setupReminderSendCheckTrigger();
       return ContentService.createTextOutput(JSON.stringify({ success: true })).setMimeType(ContentService.MimeType.JSON);
@@ -2566,7 +2567,7 @@ function sendBookingReminders() {
 // approveReminder, rejectReminder, getPendingReminders.
 
 const PENDING_REMINDERS_SHEET = "PendingReminders";
-const PENDING_REMINDERS_HEADER = ["id", "createdAt", "bookingDate", "reminderType", "clientName", "clientPhone", "message", "status", "resolvedAt", "scheduledSendAt"];
+const PENDING_REMINDERS_HEADER = ["id", "createdAt", "bookingDate", "reminderType", "clientName", "clientPhone", "message", "status", "resolvedAt", "scheduledSendAt", "sentAt"];
 
 function getOrCreatePendingRemindersSheet(ss) {
   var sheet = ss.getSheetByName(PENDING_REMINDERS_SHEET);
@@ -2702,6 +2703,16 @@ function notifyOwnerReminderSent(name, message) {
   } catch (err) { Logger.log("notifyOwnerReminderSent error: " + err); }
 }
 
+// One calendar day before dateStr, as YYYY-MM-DD — used to derive a 24hr
+// reminder's normal window from its stored bookingDate alone.
+function dayBeforeStr(dateStr) {
+  var p = String(dateStr || "").split("-");
+  if (p.length !== 3) return "";
+  var d = new Date(parseInt(p[0]), parseInt(p[1]) - 1, parseInt(p[2]));
+  d.setDate(d.getDate() - 1);
+  return formatDateStr(d);
+}
+
 // Should approving this reminder right now also send it right now? For 24hr,
 // compare its willFireOn day against today (the daily-cron window may have
 // already elapsed). For 1hr, compare its exact scheduledSendAt against now.
@@ -2735,6 +2746,7 @@ function processReminderCandidate(name, phone, message, bookingDate, reminderTyp
       var ss    = SpreadsheetApp.openById(SHEET_ID);
       var sheet = getOrCreatePendingRemindersSheet(ss);
       sheet.getRange(existing.rowNumber, 9).setValue(new Date());
+      sheet.getRange(existing.rowNumber, 11).setValue(new Date());
       notifyOwnerReminderSent(name, sentMessage);
       Logger.log("Sent pre-approved " + reminderType + " reminder for " + name);
     } catch (err) { Logger.log("processReminderCandidate send error: " + err); }
@@ -2770,6 +2782,7 @@ function sendDueApprovedReminders() {
       notifyOwnerReminderSent(name, message);
       sheet.getRange(i + 1, 9).setValue(now);
       sheet.getRange(i + 1, 10).setValue("");
+      sheet.getRange(i + 1, 11).setValue(now);
       sentCount++;
     }
 
@@ -2842,6 +2855,7 @@ function preDecideReminder(data) {
       message,
       status, now,
       sentNow ? "" : scheduledSendAt,
+      sentNow ? now : "",
     ]);
 
     Logger.log("Pre-decided " + reminderType + " reminder for " + clientName + " -> " + status + (sentNow ? " (sent immediately)" : ""));
@@ -2892,6 +2906,52 @@ function resolvePendingReminder(id, approve) {
   return { found: false };
 }
 
+// Lets the owner flip an already-decided reminder (Approved <-> Rejected)
+// from the admin panel, in case they change their mind. If the message was
+// already actually delivered (sentAt set), only the label changes — nothing
+// is resent. Otherwise, switching to Approved sends immediately if the
+// reminder's window is already open, exactly like a fresh approval would.
+function switchReminderDecision(id, approve) {
+  var ss    = SpreadsheetApp.openById(SHEET_ID);
+  var sheet = getOrCreatePendingRemindersSheet(ss);
+  var rows  = sheet.getDataRange().getDisplayValues();
+
+  for (var i = 1; i < rows.length; i++) {
+    if (rows[i][0] !== id) continue;
+
+    var reminderType    = rows[i][3];
+    var bookingDate     = rows[i][2];
+    var name            = rows[i][4];
+    var phone           = rows[i][5];
+    var message         = rows[i][6];
+    var scheduledSendAt = rows[i][9];
+    var sentAt          = rows[i][10];
+
+    if (sentAt) {
+      sheet.getRange(i + 1, 8).setValue(approve ? "Approved" : "Rejected");
+      sheet.getRange(i + 1, 9).setValue(new Date());
+      return { found: true, alreadyDelivered: true, status: approve ? "Approved" : "Rejected" };
+    }
+
+    var willFireOn = dayBeforeStr(bookingDate);
+    var sendNow = approve && isReminderDue(reminderType, willFireOn, scheduledSendAt);
+
+    if (sendNow) {
+      sendSMS(phone, message);
+      notifyOwnerReminderSent(name, message);
+      sheet.getRange(i + 1, 10).setValue("");
+      sheet.getRange(i + 1, 11).setValue(new Date());
+    }
+
+    sheet.getRange(i + 1, 8).setValue(approve ? "Approved" : "Rejected");
+    sheet.getRange(i + 1, 9).setValue(new Date());
+
+    return { found: true, alreadyDelivered: false, status: approve ? "Approved" : "Rejected", sentNow: sendNow };
+  }
+
+  return { found: false };
+}
+
 function reminderResultPage(title, message) {
   var html =
     "<!DOCTYPE html><html><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width, initial-scale=1'></head>" +
@@ -2930,6 +2990,15 @@ function rejectReminderPost(data) {
   try {
     var result = resolvePendingReminder(String(data.id || ""), false);
     return ContentService.createTextOutput(JSON.stringify({ success: result.found, alreadyResolved: !!result.alreadyResolved, status: result.status })).setMimeType(ContentService.MimeType.JSON);
+  } catch (err) {
+    return ContentService.createTextOutput(JSON.stringify({ success: false, error: String(err) })).setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+function switchReminderDecisionPost(data) {
+  try {
+    var result = switchReminderDecision(String(data.id || ""), !!data.approve);
+    return ContentService.createTextOutput(JSON.stringify({ success: result.found, alreadyDelivered: !!result.alreadyDelivered, status: result.status, sentNow: !!result.sentNow })).setMimeType(ContentService.MimeType.JSON);
   } catch (err) {
     return ContentService.createTextOutput(JSON.stringify({ success: false, error: String(err) })).setMimeType(ContentService.MimeType.JSON);
   }
