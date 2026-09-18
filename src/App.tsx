@@ -12,7 +12,7 @@ const GOOGLE_CLIENT_ID =
   "447699234633-ivo2e1c2q843scj32k5323o2rkq6h7dp.apps.googleusercontent.com";
 
 const SCRIPT_URL =
-  "https://script.google.com/macros/s/AKfycbz7XYU2_e-_jR9DxJUJQh60-Rh3qpq8RkGV-27cEMMoJjZKcOXp9MJVFXZOdGackzehVA/exec";
+  "https://script.google.com/macros/s/AKfycbwUAtnhDuDdZTGye7yzm2IQSQvLCAjvmaZHktVMbpCI8IZip9hucvsrsyaw0jK8ls5Jhg/exec";
 
 // Sandbox credentials — replace with your Square Sandbox Application ID / Location ID
 // (Dashboard → Sandbox → your app → Locations). These are not secret and are safe here;
