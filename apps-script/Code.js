@@ -2605,13 +2605,24 @@ function collectReminderCandidates(rows, extendedLookahead) {
     var name        = String(row[1] || "").trim();
     var phone       = String(row[2] || "").trim();
     var status      = String(row[28] || "").trim();
+    var vYear       = String(row[6] || "").trim();
+    var vMake       = String(row[7] || "").trim();
+    var vModel      = String(row[8] || "").trim();
+    var vBoatSize   = String(row[9] || "").trim();
+    var vType       = String(row[10] || "").trim();
+    // So a client with multiple vehicles on file (e.g. recurring maintenance
+    // clients) knows which one this particular reminder is for.
+    var vehicleLabel = vType === "boat"
+      ? [vBoatSize, vMake, vModel].filter(Boolean).join(" ")
+      : [vYear, vMake, vModel].filter(Boolean).join(" ");
+    var vehicleSuffix = vehicleLabel ? " for your " + vehicleLabel : "";
 
     if (status === "Completed" || status === "Cancelled" || status === "Skipped" || status === "Paused" || !phone) return;
 
     var is24hrDue    = bookingDate === tomorrowStr;
     var is24hrPreview = extendedLookahead && bookingDate === dayAfterTomorrowStr;
     if (is24hrDue || is24hrPreview) {
-      var msg24 = "Hi " + name + "! Reminder: your ATX Prestige Detailing appointment is tomorrow" + (bookingTime ? " at " + bookingTime : "") + ". We look forward to seeing you!";
+      var msg24 = "Hi " + name + "! Reminder: your ATX Prestige Detailing appointment" + vehicleSuffix + " is tomorrow" + (bookingTime ? " at " + bookingTime : "") + ". We look forward to seeing you!";
       candidates.push({ name: name, phone: phone, bookingDate: bookingDate, reminderType: "24hr", message: msg24, willFireOn: is24hrDue ? todayStr : tomorrowStr, scheduledSendAt: "" });
     }
 
@@ -2628,7 +2639,7 @@ function collectReminderCandidates(rows, extendedLookahead) {
       var apptDate = new Date(parseInt(bParts[0]), parseInt(bParts[1]) - 1, parseInt(bParts[2]), bHour, bMin, 0);
       var sendAt = new Date(apptDate.getTime() - 60 * 60 * 1000);
 
-      var msg1 = "Hi " + name + "! Your ATX Prestige Detailing appointment is in about 1 hour. We will see you soon!";
+      var msg1 = "Hi " + name + "! Your ATX Prestige Detailing appointment" + vehicleSuffix + " is in about 1 hour. We will see you soon!";
       candidates.push({ name: name, phone: phone, bookingDate: bookingDate, reminderType: "1hr", message: msg1, willFireOn: bookingDate, scheduledSendAt: sendAt.toISOString() });
     }
   });
