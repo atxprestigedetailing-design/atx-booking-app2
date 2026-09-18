@@ -12,7 +12,7 @@ const GOOGLE_CLIENT_ID =
   "447699234633-ivo2e1c2q843scj32k5323o2rkq6h7dp.apps.googleusercontent.com";
 
 const SCRIPT_URL =
-  "https://script.google.com/macros/s/AKfycbxCp_xnOQlYzgXqBsL0Qq1zRT3d1A-wT-Wq0Ii4JMOA9Wb8LmIRKyTuA68NI_zOKs3cKA/exec";
+  "https://script.google.com/macros/s/AKfycbz7XYU2_e-_jR9DxJUJQh60-Rh3qpq8RkGV-27cEMMoJjZKcOXp9MJVFXZOdGackzehVA/exec";
 
 // Sandbox credentials — replace with your Square Sandbox Application ID / Location ID
 // (Dashboard → Sandbox → your app → Locations). These are not secret and are safe here;
@@ -3902,6 +3902,43 @@ export default function App() {
                                 <button onClick={() => { setPauseResumeModal({ booking: b, mode: "resume" }); setPauseResumeNotifySms(false); setPauseResumeNotifyEmail(false); }}
                                   style={{ background: "rgba(16,185,129,0.08)", color: "#059669", border: "1.5px solid #6ee7b7", borderRadius: 8, padding: "7px 14px", fontSize: "0.82rem", fontWeight: 600, cursor: "pointer" }}>
                                   ▶ Resume Plan
+                                </button>
+                              )}
+                              {/* Cancel Plan button — for a paused plan, since the regular Cancel
+                                  button is hidden once status is Paused. Goes through the exact
+                                  same cancelBooking action/confirm/notification as a normal cancel. */}
+                              {b.status === "Paused" && (
+                                <button onClick={async () => {
+                                  if (!window.confirm(`Cancel ${b.name}'s entire maintenance plan? This will cancel ALL upcoming maintenance appointments, reopen the slots, and remove all calendar events.`)) return;
+                                  try {
+                                    const vl = b.vehicle === "boat"
+                                      ? [b.boatSize, b.make, b.model].filter(Boolean).join(" ")
+                                      : [b.year, b.make, b.model].filter(Boolean).join(" ");
+                                    const res = await fetch(SCRIPT_URL, {
+                                      method: "POST",
+                                      body: JSON.stringify({
+                                        action: "cancelBooking",
+                                        rowIndex: b.rowIndex,
+                                        customerName: b.name,
+                                        customerEmail: b.email,
+                                        customerPhone: b.phone,
+                                        date: b.date,
+                                        time: b.time,
+                                        vehicle: vl,
+                                        packageType: b.packageType,
+                                        address: b.address,
+                                        clientType: b.clientType,
+                                      }),
+                                    });
+                                    const d = await res.json();
+                                    if (d.success) {
+                                      setAdminBookings(prev => prev.map(bk => bk.rowIndex === b.rowIndex ? { ...bk, status: "Cancelled" } : bk));
+                                      alert(`Maintenance plan cancelled. All upcoming appointments removed and ${b.name} has been notified.`);
+                                    } else { alert("Something went wrong."); }
+                                  } catch (e) { alert("Something went wrong."); }
+                                }}
+                                style={{ background: "rgba(239,68,68,0.1)", color: "#dc2626", border: "1.5px solid #fca5a5", borderRadius: 8, padding: "7px 14px", fontSize: "0.82rem", fontWeight: 600, cursor: "pointer" }}>
+                                  Cancel Plan
                                 </button>
                               )}
                             </div>

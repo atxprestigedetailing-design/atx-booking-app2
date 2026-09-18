@@ -3141,11 +3141,14 @@ function cancelBooking(data) {
         if (rType  !== "maintenance")           continue;
         if (rStatus === "Cancelled" || rStatus === "Completed") continue;
 
-        // Check if this booking is upcoming (today or future)
+        // Check if this booking is upcoming (today or future) — except a Paused
+        // row, whose date is stale by design (pausing doesn't advance it) and
+        // isn't a real appointment anymore, so it must always be swept here
+        // regardless of how long ago that date was.
         var rParts = rDate.split("-");
         if (rParts.length !== 3) continue;
         var rDt = new Date(parseInt(rParts[0]), parseInt(rParts[1]) - 1, parseInt(rParts[2]));
-        if (rDt < today) continue;
+        if (rStatus !== "Paused" && rDt < today) continue;
 
         var sheetRow = r + 1; // allRows[r] is the (r+1)th sheet row (allRows[0] is the header)
 
@@ -3523,6 +3526,11 @@ function skipMaintenanceBooking(data) {
     var freq        = String(data.recurringFrequency || "").trim();
     var vehicle     = String(data.vehicleLabel    || data.vehicle || "").trim();
     var pkgType     = String(data.packageType     || "").trim();
+    // Computed here (not further down) because the "create next booking" calendar
+    // event below reads pkgLabel too — declaring it later left it "undefined" (var
+    // hoists the declaration but not the value) in every auto-created next-visit
+    // calendar event's title and description.
+    var pkgLabel = pkgType === "basic" ? "Basic Detail" : pkgType === "premium" ? "Premium Detail" : pkgType === "exterior" ? "Exterior Only - Basic" : pkgType === "exteriorPremium" ? "Exterior Only - Premium" : pkgType === "interior" ? "Interior Only - Basic" : pkgType === "interiorPremium" ? "Interior Only - Premium" : pkgType || "Maintenance Detail";
 
     if (!rowIndex || rowIndex < 2) {
       return ContentService.createTextOutput(JSON.stringify({ success: false, error: "Invalid row" })).setMimeType(ContentService.MimeType.JSON);
@@ -3688,11 +3696,10 @@ function skipMaintenanceBooking(data) {
       } catch (calNextErr) { Logger.log("Next date calendar error: " + calNextErr); }
     }
 
-    // 6. Friendly labels (defined here so calendar block can use pkgLabel)
+    // 6. Friendly labels
     var skippedDateLabel = friendlyDate(skippedDate);
     var nextDateLabel    = nextDateStr ? friendlyDate(nextDateStr) : "your next scheduled date";
     var displayTime      = currentTime || skippedTime; // use freshest time from sheet
-    var pkgLabel = pkgType === "basic" ? "Basic Detail" : pkgType === "premium" ? "Premium Detail" : pkgType === "exterior" ? "Exterior Only - Basic" : pkgType === "exteriorPremium" ? "Exterior Only - Premium" : pkgType === "interior" ? "Interior Only - Basic" : pkgType === "interiorPremium" ? "Interior Only - Premium" : pkgType || "Maintenance Detail";
 
     // 6. Update Google Calendar — delete skipped event, create next one
     try {
