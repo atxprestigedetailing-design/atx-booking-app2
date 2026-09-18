@@ -796,7 +796,7 @@ export default function App() {
   const [splashPhase, setSplashPhase]                   = useState(0); // 0=logo, 1=tagline, 2=fadeout
   const [view, setView]                                 = useState<"booking" | "myBookings" | "admin" | "balance" | "inventory" | "lvisdEvent">("booking");
   const [adminTab, setAdminTab]                         = useState<"bookings" | "invoices" | "revenue" | "availability" | "clients" | "finances" | "reminders">("bookings");
-  const [pendingReminders, setPendingReminders]         = useState<{id:string;createdAt:string;bookingDate:string;reminderType:string;clientName:string;clientPhone:string;message:string;status:string;resolvedAt:string}[]>([]);
+  const [pendingReminders, setPendingReminders]         = useState<{id:string;createdAt:string;bookingDate:string;reminderType:string;clientName:string;clientPhone:string;message:string;status:string;resolvedAt:string;scheduledSendAt?:string;sentAt?:string}[]>([]);
   const [remindersLoading, setRemindersLoading]         = useState(false);
   const [resolvingReminderId, setResolvingReminderId]   = useState<string | null>(null);
   const [upcomingReminders, setUpcomingReminders]       = useState<{name:string;phone:string;bookingDate:string;reminderType:string;message:string;willFireOn:string;scheduledSendAt:string}[]>([]);
@@ -5682,17 +5682,25 @@ export default function App() {
                                   </button>
                                 </div>
                               )}
-                              {r.status === "Approved" && (
-                                <button disabled={resolvingReminderId === r.id} onClick={() => switchReminder(r.id, false)}
-                                  style={{ marginTop: 4, background: "none", color: "rgba(255,255,255,0.4)", border: "none", fontSize: "0.78rem", fontWeight: 600, cursor: "pointer", textDecoration: "underline", padding: 0, opacity: resolvingReminderId === r.id ? 0.5 : 1 }}>
-                                  Changed your mind? Switch to Reject
-                                </button>
-                              )}
-                              {r.status === "Rejected" && (
-                                <button disabled={resolvingReminderId === r.id} onClick={() => switchReminder(r.id, true)}
-                                  style={{ marginTop: 4, background: "none", color: "rgba(255,255,255,0.4)", border: "none", fontSize: "0.78rem", fontWeight: 600, cursor: "pointer", textDecoration: "underline", padding: 0, opacity: resolvingReminderId === r.id ? 0.5 : 1 }}>
-                                  Changed your mind? Switch to Approve
-                                </button>
+                              {r.sentAt ? (
+                                <div style={{ marginTop: 4, fontSize: "0.78rem", color: "rgba(255,255,255,0.35)" }}>
+                                  ✓ Already sent to the client — the decision above is just a record, nothing left to switch.
+                                </div>
+                              ) : (
+                                <>
+                                  {r.status === "Approved" && (
+                                    <button disabled={resolvingReminderId === r.id} onClick={() => switchReminder(r.id, false)}
+                                      style={{ marginTop: 4, background: "none", color: "rgba(255,255,255,0.4)", border: "none", fontSize: "0.78rem", fontWeight: 600, cursor: "pointer", textDecoration: "underline", padding: 0, opacity: resolvingReminderId === r.id ? 0.5 : 1 }}>
+                                      Changed your mind? Switch to Reject
+                                    </button>
+                                  )}
+                                  {r.status === "Rejected" && (
+                                    <button disabled={resolvingReminderId === r.id} onClick={() => switchReminder(r.id, true)}
+                                      style={{ marginTop: 4, background: "none", color: "rgba(255,255,255,0.4)", border: "none", fontSize: "0.78rem", fontWeight: 600, cursor: "pointer", textDecoration: "underline", padding: 0, opacity: resolvingReminderId === r.id ? 0.5 : 1 }}>
+                                      Changed your mind? Switch to Approve
+                                    </button>
+                                  )}
+                                </>
                               )}
                             </div>
                           );

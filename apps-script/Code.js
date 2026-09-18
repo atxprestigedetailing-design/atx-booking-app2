@@ -3032,6 +3032,8 @@ function getPendingReminders() {
         message:      row[6],
         status:       row[7],
         resolvedAt:   row[8],
+        scheduledSendAt: row[9],
+        sentAt:       row[10],
       };
     }).reverse();
 
