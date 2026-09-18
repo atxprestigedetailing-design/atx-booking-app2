@@ -2906,6 +2906,7 @@ function resolvePendingReminder(id, approve) {
       sendSMS(phone, message);
       notifyOwnerReminderSent(name, message);
       if (reminderType === "1hr") sheet.getRange(i + 1, 10).setValue("");
+      sheet.getRange(i + 1, 11).setValue(new Date());
     }
 
     sheet.getRange(i + 1, 8).setValue(approve ? "Approved" : "Rejected");
