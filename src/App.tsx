@@ -195,13 +195,12 @@ const LVISD_EVENT: EventConfig = {
 // Services are billed hourly, so a coupon can't discount a price shown during
 // booking — it's just recorded on the booking and applied by admin when the
 // final invoice amount is set after the job is done.
-type Coupon = { code: string; discountPercent: number; label: string };
-const COUPON_CODES: Coupon[] = [
-  { code: "LVISD25", discountPercent: 25, label: "LVISD Teacher/Staff Discount" },
-];
-function findCoupon(code: string): Coupon | undefined {
+// Codes themselves are admin-managed (Admin → Coupons tab), backed by a
+// sheet — not a hardcoded list — so new ones can be added without a deploy.
+type Coupon = { rowIndex: number; code: string; discountPercent: number; label: string };
+function findCoupon(coupons: Coupon[], code: string): Coupon | undefined {
   const normalized = code.trim().toUpperCase();
-  return COUPON_CODES.find((c) => c.code === normalized);
+  return coupons.find((c) => c.code === normalized);
 }
 
 // Static vehicle make/model data — shared by the main booking flow and the LVISD event flow.
@@ -795,7 +794,7 @@ export default function App() {
   const [splashDone, setSplashDone]                     = useState(false);
   const [splashPhase, setSplashPhase]                   = useState(0); // 0=logo, 1=tagline, 2=fadeout
   const [view, setView]                                 = useState<"booking" | "myBookings" | "admin" | "balance" | "inventory" | "lvisdEvent">("booking");
-  const [adminTab, setAdminTab]                         = useState<"bookings" | "invoices" | "revenue" | "availability" | "clients" | "finances" | "reminders">("bookings");
+  const [adminTab, setAdminTab]                         = useState<"bookings" | "invoices" | "revenue" | "availability" | "clients" | "finances" | "reminders" | "coupons">("bookings");
   const [pendingReminders, setPendingReminders]         = useState<{id:string;createdAt:string;bookingDate:string;reminderType:string;clientName:string;clientPhone:string;message:string;status:string;resolvedAt:string;scheduledSendAt?:string;sentAt?:string}[]>([]);
   const [remindersLoading, setRemindersLoading]         = useState(false);
   const [resolvingReminderId, setResolvingReminderId]   = useState<string | null>(null);
@@ -820,6 +819,13 @@ export default function App() {
   const [newExpenseRecurring, setNewExpenseRecurring]   = useState(false);
   const [newExpenseFrequency, setNewExpenseFrequency]   = useState("monthly");
   const [addingExpense, setAddingExpense]               = useState(false);
+  const [coupons, setCoupons]                           = useState<Coupon[]>([]);
+  const [couponsLoading, setCouponsLoading]             = useState(false);
+  const [newCouponCode, setNewCouponCode]               = useState("");
+  const [newCouponDiscount, setNewCouponDiscount]       = useState("");
+  const [newCouponLabel, setNewCouponLabel]             = useState("");
+  const [addingCoupon, setAddingCoupon]                 = useState(false);
+  const [couponError, setCouponError]                   = useState("");
   const [adminBookings, setAdminBookings]               = useState<Booking[]>([]);
   const [adminLoading, setAdminLoading]                 = useState(false);
   const [adminFilter, setAdminFilter]                   = useState<"all" | "upcoming" | "past" | "maintenance" | "overdue">("upcoming");
@@ -956,6 +962,10 @@ export default function App() {
       setShowSignInPrompt(true);
     }
   }, [step, googleUser]);
+
+  // ── Coupon codes are needed by the public booking form (not just admin), so
+  // load them once on mount rather than lazily on an admin tab click ──
+  useEffect(() => { loadCoupons(); }, []);
 
   // ── Global styles injected once into <head> so they apply on ALL views ──
   useEffect(() => {
@@ -1213,7 +1223,7 @@ export default function App() {
     setCompleteHours(hours);
     const rate = parseFloat(booking.hourlyRate || "0");
     if (rate > 0) {
-      const coupon = booking.couponCode ? findCoupon(booking.couponCode) : undefined;
+      const coupon = booking.couponCode ? findCoupon(coupons, booking.couponCode) : undefined;
       const raw = parseFloat(hours) * rate;
       setCompleteAmount((applyCouponDiscount && coupon ? raw * (1 - coupon.discountPercent / 100) : raw).toFixed(2));
     }
@@ -1360,6 +1370,55 @@ export default function App() {
       setExpenses(data.expenses || []);
     } catch (e) { console.error("Failed to load expenses", e); }
     finally { setExpensesLoading(false); }
+  }
+
+  async function loadCoupons() {
+    setCouponsLoading(true);
+    try {
+      const res = await fetch(`${SCRIPT_URL}?action=getCoupons`);
+      const data = await res.json();
+      setCoupons(data.coupons || []);
+    } catch (e) { console.error("Failed to load coupons", e); }
+    finally { setCouponsLoading(false); }
+  }
+
+  async function handleAddCoupon() {
+    if (!newCouponCode.trim() || !newCouponDiscount) return;
+    setAddingCoupon(true);
+    setCouponError("");
+    try {
+      const res = await fetch(SCRIPT_URL, {
+        method: "POST",
+        body: JSON.stringify({
+          action: "addCouponCode",
+          code: newCouponCode.trim(),
+          discountPercent: newCouponDiscount,
+          label: newCouponLabel.trim(),
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setNewCouponCode(""); setNewCouponDiscount(""); setNewCouponLabel("");
+        await loadCoupons();
+      } else {
+        setCouponError(data.error || "Something went wrong saving that code.");
+      }
+    } catch { setCouponError("Network error — please try again."); }
+    finally { setAddingCoupon(false); }
+  }
+
+  async function handleDeleteCoupon(rowIndex: number) {
+    if (!window.confirm("Delete this coupon code? It will stop working immediately for new bookings.")) return;
+    const prev = coupons;
+    setCoupons(p => p.filter(c => c.rowIndex !== rowIndex));
+    try {
+      const res = await fetch(SCRIPT_URL, {
+        method: "POST",
+        body: JSON.stringify({ action: "deleteCouponCode", rowIndex }),
+      });
+      const data = await res.json();
+      if (!data.success) { setCoupons(prev); alert("Something went wrong deleting that code."); }
+    } catch { setCoupons(prev); alert("Network error — please try again"); }
   }
 
   async function loadPendingReminders() {
@@ -3318,6 +3377,9 @@ export default function App() {
               <button onClick={() => { setAdminTab("reminders"); loadPendingReminders(); loadUpcomingReminderPreview(); }} style={{ background: "none", border: "none", cursor: "pointer", padding: "10px 18px", fontSize: "0.95rem", fontWeight: 700, color: adminTab === "reminders" ? "#fbbf24" : "#9ca3af", borderBottom: adminTab === "reminders" ? "3px solid #fbbf24" : "3px solid transparent", marginBottom: -2 }}>
                 Reminders{pendingReminders.filter(r => r.status === "Pending").length > 0 ? ` (${pendingReminders.filter(r => r.status === "Pending").length})` : ""}
               </button>
+              <button onClick={() => { setAdminTab("coupons"); if (coupons.length === 0) loadCoupons(); }} style={{ background: "none", border: "none", cursor: "pointer", padding: "10px 18px", fontSize: "0.95rem", fontWeight: 700, color: adminTab === "coupons" ? "#f472b6" : "#9ca3af", borderBottom: adminTab === "coupons" ? "3px solid #f472b6" : "3px solid transparent", marginBottom: -2 }}>
+                Coupons
+              </button>
             </div>
 
             {adminLoading ? (
@@ -4266,7 +4328,7 @@ export default function App() {
                                   </div>
                                 )}
                                 {(() => {
-                                  const bookingCoupon = b.couponCode ? findCoupon(b.couponCode) : undefined;
+                                  const bookingCoupon = b.couponCode ? findCoupon(coupons, b.couponCode) : undefined;
                                   return bookingCoupon ? (
                                     <div style={{ background: "rgba(16,185,129,0.1)", border: "1.5px solid rgba(16,185,129,0.35)", borderRadius: 10, padding: "10px 14px", marginBottom: 12, fontSize: "0.85rem", color: "#34d399" }}>
                                       🏷 <strong>Coupon {b.couponCode}:</strong> {bookingCoupon.label} — {bookingCoupon.discountPercent}% off. Use the checkbox below to apply it to the calculated amount.
@@ -4299,7 +4361,7 @@ export default function App() {
                                     </div>
 
                                     {billingMode === "hourly" ? (() => {
-                                      const hourlyCoupon = b.couponCode ? findCoupon(b.couponCode) : undefined;
+                                      const hourlyCoupon = b.couponCode ? findCoupon(coupons, b.couponCode) : undefined;
                                       const recalc = (hrsStr: string, discountOn: boolean) => {
                                         const hrs = parseFloat(hrsStr);
                                         const rate2 = parseFloat(b.hourlyRate || "0");
@@ -4384,9 +4446,9 @@ export default function App() {
                                             Flat rate: ${parseFloat(completeAmount).toFixed(2)}
                                           </div>
                                         )}
-                                        {completeAmount && b.couponCode && findCoupon(b.couponCode) && (
+                                        {completeAmount && b.couponCode && findCoupon(coupons, b.couponCode) && (
                                           <div style={{ marginTop: 4, fontSize: "0.8rem", color: "#34d399" }}>
-                                            With {findCoupon(b.couponCode)!.discountPercent}% coupon ({b.couponCode}): ${(parseFloat(completeAmount) * (1 - findCoupon(b.couponCode)!.discountPercent / 100)).toFixed(2)} — enter this manually above if applying it
+                                            With {findCoupon(coupons, b.couponCode)!.discountPercent}% coupon ({b.couponCode}): ${(parseFloat(completeAmount) * (1 - findCoupon(coupons, b.couponCode)!.discountPercent / 100)).toFixed(2)} — enter this manually above if applying it
                                           </div>
                                         )}
                                       </>
@@ -5709,6 +5771,71 @@ export default function App() {
                     )}
                   </>
                 )}
+
+                {/* ── COUPONS TAB ── */}
+                {adminTab === "coupons" && (
+                  <>
+                    <div style={{ fontSize: "0.85rem", color: "rgba(255,255,255,0.45)", marginBottom: 20 }}>
+                      Codes clients can enter at booking. The discount is applied manually — automatically for hourly jobs, as a suggested amount for flat/custom jobs — when you complete the service.
+                    </div>
+
+                    {/* Add coupon form */}
+                    <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 14, padding: 16, marginBottom: 24 }}>
+                      <div style={{ fontWeight: 700, color: "rgba(255,255,255,0.7)", marginBottom: 12, fontSize: "0.9rem" }}>Add a Coupon Code</div>
+                      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" as const, alignItems: "flex-end" }}>
+                        <div>
+                          <div style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.45)", marginBottom: 4 }}>Code</div>
+                          <input placeholder="e.g. FALL25" value={newCouponCode}
+                            onChange={e => setNewCouponCode(e.target.value)}
+                            style={{ ...S.input, padding: "8px 12px", width: 140, textTransform: "uppercase" as const }} />
+                        </div>
+                        <div>
+                          <div style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.45)", marginBottom: 4 }}>Discount %</div>
+                          <input type="number" min="1" max="100" placeholder="15" value={newCouponDiscount}
+                            onChange={e => setNewCouponDiscount(e.target.value)}
+                            style={{ ...S.input, padding: "8px 12px", width: 90 }} />
+                        </div>
+                        <div style={{ flex: 1, minWidth: 180 }}>
+                          <div style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.45)", marginBottom: 4 }}>Label <span style={{ opacity: 0.6 }}>(optional)</span></div>
+                          <input placeholder="e.g. Fall Promo 2026" value={newCouponLabel}
+                            onChange={e => setNewCouponLabel(e.target.value)}
+                            style={{ ...S.input, padding: "8px 12px", width: "100%" }} />
+                        </div>
+                        <button disabled={!newCouponCode.trim() || !newCouponDiscount || addingCoupon}
+                          onClick={handleAddCoupon}
+                          style={{ background: "linear-gradient(135deg, #ec4899, #be185d)", color: "#fff", border: "none", borderRadius: 10, padding: "9px 18px", fontWeight: 700, fontSize: "0.88rem", cursor: "pointer", opacity: !newCouponCode.trim() || !newCouponDiscount ? 0.4 : 1 }}>
+                          {addingCoupon ? "Adding..." : "+ Add Code"}
+                        </button>
+                      </div>
+                      {couponError && (
+                        <div style={{ marginTop: 10, fontSize: "0.82rem", color: "#f87171" }}>{couponError}</div>
+                      )}
+                    </div>
+
+                    {/* Coupon list */}
+                    <div style={{ fontWeight: 700, color: "rgba(255,255,255,0.7)", marginBottom: 12, fontSize: "0.9rem" }}>Active Codes</div>
+                    {couponsLoading ? (
+                      <div style={{ textAlign: "center", padding: 40, color: "rgba(255,255,255,0.45)" }}>Loading coupons...</div>
+                    ) : coupons.length === 0 ? (
+                      <div style={{ textAlign: "center", padding: 40, color: "rgba(255,255,255,0.45)" }}>No coupon codes yet.</div>
+                    ) : (
+                      <div style={{ display: "grid", gap: 8 }}>
+                        {coupons.map(c => (
+                          <div key={c.rowIndex} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, padding: "10px 14px", gap: 10, flexWrap: "wrap" as const }}>
+                            <div style={{ display: "flex", flexDirection: "column" as const }}>
+                              <span style={{ fontWeight: 700, color: "#f1f5f9", fontSize: "0.88rem" }}>{c.code}</span>
+                              <span style={{ fontSize: "0.72rem", color: "rgba(255,255,255,0.4)" }}>{c.label}</span>
+                            </div>
+                            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                              <span style={{ fontWeight: 800, color: "#f472b6" }}>{c.discountPercent}% off</span>
+                              <button onClick={() => handleDeleteCoupon(c.rowIndex)} style={{ background: "rgba(239,68,68,0.12)", color: "#f87171", border: "1px solid rgba(239,68,68,0.3)", borderRadius: 8, padding: "5px 10px", fontSize: "0.75rem", fontWeight: 700, cursor: "pointer" }}>Delete</button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )}
               </>
             )}
           </div>
@@ -6680,7 +6807,7 @@ export default function App() {
                   placeholder="Enter code"
                   value={couponCode} onChange={(e) => setCouponCode(e.target.value)} />
                 {couponCode.trim() && (() => {
-                  const c = findCoupon(couponCode);
+                  const c = findCoupon(coupons, couponCode);
                   return c ? (
                     <div style={{ marginTop: 10, padding: "10px 14px", background: "rgba(16,185,129,0.1)", border: "1px solid rgba(16,185,129,0.3)", borderRadius: 10, fontSize: "0.85rem", color: "#34d399" }}>
                       ✓ {c.label} applied — {c.discountPercent}% off will be calculated on your final invoice once service is completed.
@@ -6729,7 +6856,7 @@ export default function App() {
                           recurringFrequency: frequency,
                           smsConsent: smsConsent,
                           smsMarketingConsent: smsMarketingConsent,
-                          couponCode: findCoupon(couponCode) ? couponCode.trim().toUpperCase() : "",
+                          couponCode: findCoupon(coupons, couponCode) ? couponCode.trim().toUpperCase() : "",
                         }),
                       });
                       const data = await res.json();

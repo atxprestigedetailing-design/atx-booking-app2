@@ -82,6 +82,7 @@ function doGet(e) {
   if (action === "getInventory")       return getInventory();
   if (action === "getClientNotes")     return getClientNotes(e);
   if (action === "getExpenses")        return getExpenses();
+  if (action === "getCoupons")         return getCoupons();
   if (action === "getPendingReminders") return getPendingReminders();
   if (action === "getUpcomingReminderPreview") return getUpcomingReminderPreview();
   if (action === "approveReminder")    return approveReminderGet(e.parameter.id);
@@ -122,6 +123,8 @@ function doPost(e) {
     if (action === "chargeSquarePayment")        return chargeSquarePayment(data);
     if (action === "addExpense")                 return addExpense(data);
     if (action === "deleteExpense")              return deleteExpense(data);
+    if (action === "addCouponCode")              return addCouponCode(data);
+    if (action === "deleteCouponCode")           return deleteCouponCode(data);
     if (action === "approveReminder")            return approveReminderPost(data);
     if (action === "rejectReminder")              return rejectReminderPost(data);
     if (action === "preDecideReminder")           return preDecideReminder(data);
@@ -410,6 +413,91 @@ function deleteExpense(data) {
     return ContentService.createTextOutput(JSON.stringify({ success: false, error: String(err) })).setMimeType(ContentService.MimeType.JSON);
   }
 }
+
+// ─── Coupons ────────────────────────────────────────────────────────────────
+// Admin-managed replacement for the old hardcoded COUPON_CODES list in the
+// frontend. Codes are validated against this sheet both when a customer
+// enters one at booking and when admin applies the discount at service
+// completion — same two touch points as before, just backed by a sheet
+// instead of a source-code array.
+const COUPONS_SHEET = "Coupons";
+const COUPONS_HEADER = ["Code", "DiscountPercent", "Label", "CreatedAt"];
+
+function getOrCreateCouponsSheet(ss) {
+  var sheet = ss.getSheetByName(COUPONS_SHEET);
+  if (!sheet) {
+    sheet = ss.insertSheet(COUPONS_SHEET);
+    sheet.appendRow(COUPONS_HEADER);
+    // Preserves the one code that was previously hardcoded in the frontend,
+    // so existing behavior doesn't change the moment this sheet is created.
+    sheet.appendRow(["LVISD25", 25, "LVISD Teacher/Staff Discount", new Date()]);
+  }
+  return sheet;
+}
+
+function getCoupons() {
+  var ss    = SpreadsheetApp.openById(SHEET_ID);
+  var sheet = getOrCreateCouponsSheet(ss);
+  var rows  = sheet.getDataRange().getDisplayValues();
+  var coupons = rows.slice(1)
+    .map(function(row, index) {
+      return {
+        rowIndex:        index + 2,
+        code:            String(row[0] || "").trim().toUpperCase(),
+        discountPercent: parseFloat(row[1]) || 0,
+        label:           String(row[2] || "").trim(),
+      };
+    })
+    .filter(function(c) { return c.code !== ""; });
+  return ContentService.createTextOutput(JSON.stringify({ coupons: coupons })).setMimeType(ContentService.MimeType.JSON);
+}
+
+function addCouponCode(data) {
+  try {
+    var code            = String(data.code || "").trim().toUpperCase();
+    var discountPercent = parseFloat(data.discountPercent);
+    var label            = String(data.label || "").trim();
+
+    if (!code) {
+      return ContentService.createTextOutput(JSON.stringify({ success: false, error: "Code is required" })).setMimeType(ContentService.MimeType.JSON);
+    }
+    if (!(discountPercent > 0 && discountPercent <= 100)) {
+      return ContentService.createTextOutput(JSON.stringify({ success: false, error: "Discount must be a number between 1 and 100" })).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    var ss    = SpreadsheetApp.openById(SHEET_ID);
+    var sheet = getOrCreateCouponsSheet(ss);
+    var rows  = sheet.getDataRange().getDisplayValues();
+    for (var i = 1; i < rows.length; i++) {
+      if (String(rows[i][0] || "").trim().toUpperCase() === code) {
+        return ContentService.createTextOutput(JSON.stringify({ success: false, error: "That code already exists" })).setMimeType(ContentService.MimeType.JSON);
+      }
+    }
+
+    sheet.appendRow([code, discountPercent, label || code, new Date()]);
+    return ContentService.createTextOutput(JSON.stringify({ success: true })).setMimeType(ContentService.MimeType.JSON);
+  } catch (err) {
+    Logger.log("addCouponCode error: " + err);
+    return ContentService.createTextOutput(JSON.stringify({ success: false, error: String(err) })).setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+function deleteCouponCode(data) {
+  try {
+    var row = parseInt(data.rowIndex);
+    if (!row || row < 2) {
+      return ContentService.createTextOutput(JSON.stringify({ success: false, error: "Invalid row" })).setMimeType(ContentService.MimeType.JSON);
+    }
+    var ss    = SpreadsheetApp.openById(SHEET_ID);
+    var sheet = getOrCreateCouponsSheet(ss);
+    sheet.deleteRow(row);
+    return ContentService.createTextOutput(JSON.stringify({ success: true })).setMimeType(ContentService.MimeType.JSON);
+  } catch (err) {
+    Logger.log("deleteCouponCode error: " + err);
+    return ContentService.createTextOutput(JSON.stringify({ success: false, error: String(err) })).setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
 // ─── updateBookingFields ─────────────────────────────────────────────────────
 
 function updateBookingFields(data) {
