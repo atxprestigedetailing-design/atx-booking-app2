@@ -804,6 +804,8 @@ if (data.editedBy === "client" && changeDetails.length > 0) {
       } catch (changeErr) { Logger.log("Booking change email error: " + changeErr); }
     }
 
+    if (data.scheduleChanged) sweepStaleReminders();
+
     return ContentService
       .createTextOutput(JSON.stringify({ success: true }))
       .setMimeType(ContentService.MimeType.JSON);
@@ -1121,6 +1123,7 @@ function updateBooking(data) {
     if (data.invoiceAmount !== undefined) sheet.getRange(row, 30).setValue(data.invoiceAmount);
     if (data.invoiceStatus !== undefined) sheet.getRange(row, 31).setValue(data.invoiceStatus);
     if (data.invoiceNote   !== undefined) sheet.getRange(row, 32).setValue(data.invoiceNote);
+    if (data.status        !== undefined) sweepStaleReminders();
     return ContentService
       .createTextOutput(JSON.stringify({ success: true }))
       .setMimeType(ContentService.MimeType.JSON);
@@ -2638,6 +2641,10 @@ function sendBookingReminders() {
     var sheet = ss.getSheetByName(BOOKINGS_SHEET);
     var rows  = sheet.getDataRange().getDisplayValues();
 
+    // First, retire reminders for bookings that moved/cancelled since they were
+    // queued or approved, so the candidates below queue fresh ones when needed.
+    sweepStaleReminders();
+
     var candidates = collectReminderCandidates(rows, false);
     candidates.forEach(function(c) {
       processReminderCandidate(c.name, c.phone, c.message, c.bookingDate, c.reminderType, c.scheduledSendAt);
@@ -2777,6 +2784,9 @@ function findExistingReminderRow(phone, bookingDate, reminderType) {
   var rows  = sheet.getDataRange().getDisplayValues();
 
   for (var i = 1; i < rows.length; i++) {
+    // A superseded row belongs to a booking that was since moved/cancelled — it
+    // must not block (or be reused for) a reminder for the booking's new state.
+    if (String(rows[i][7] || "").trim() === "Superseded") continue;
     var rPhone = String(rows[i][5] || "").trim();
     var rDate  = String(rows[i][2] || "").trim();
     var rType  = String(rows[i][3] || "").trim();
@@ -2812,6 +2822,111 @@ function dayBeforeStr(dateStr) {
   return formatDateStr(d);
 }
 
+// ─── Stale-reminder protection ───────────────────────────────────────────────
+// A PendingReminders row is only meaningful while the booking it was made for
+// still exists at the same date/time. Reschedule, cancel, skip, pause and
+// time-change flows never touched this sheet, so rows could outlive their
+// booking and still send (or be approved) with the old date/time. Instead of
+// hooking every flow's details, rows are validated against the live Bookings
+// sheet: anything unsent whose booking is gone or moved is marked "Superseded"
+// (never sent; a fresh reminder is queued by the normal cron if still needed).
+var INACTIVE_BOOKING_STATUSES = ["Completed", "Cancelled", "Skipped", "Paused"];
+
+function reminderPhoneKey(p) {
+  var d = String(p || "").replace(/\D/g, "");
+  return d.length > 10 ? d.slice(-10) : d;
+}
+
+function parseBookingStart(bookingDate, bookingTime) {
+  var bParts = String(bookingDate || "").split("-");
+  if (bParts.length !== 3) return null;
+  var timeLower = String(bookingTime || "").toLowerCase();
+  var parts2 = String(bookingTime || "").replace(/[^0-9:]/g, "").split(":");
+  var bHour = parseInt(parts2[0]) || 0;
+  var bMin  = parseInt(parts2[1]) || 0;
+  if (timeLower.indexOf("pm") !== -1 && bHour !== 12) bHour += 12;
+  if (timeLower.indexOf("am") !== -1 && bHour === 12) bHour = 0;
+  return new Date(parseInt(bParts[0]), parseInt(bParts[1]) - 1, parseInt(bParts[2]), bHour, bMin, 0);
+}
+
+// rem: { phone, bookingDate, reminderType, scheduledSendAt, message }
+// bookingRows: Bookings sheet getDisplayValues() (header row first).
+function reminderStillValid(rem, bookingRows) {
+  var key = reminderPhoneKey(rem.phone);
+  for (var i = 1; i < bookingRows.length; i++) {
+    var b = bookingRows[i];
+    if (reminderPhoneKey(b[2]) !== key) continue;
+    if (String(b[4] || "").trim() !== String(rem.bookingDate || "").trim()) continue;
+    if (INACTIVE_BOOKING_STATUSES.indexOf(String(b[28] || "").trim()) !== -1) continue;
+    var time = String(b[5] || "").trim();
+
+    if (rem.reminderType === "24hr") {
+      var needle = "tomorrow" + (time ? " at " + time : "") + ".";
+      if (String(rem.message || "").indexOf(needle) !== -1) return true;
+    } else if (rem.reminderType === "1hr") {
+      var start = parseBookingStart(rem.bookingDate, time);
+      var sched = new Date(rem.scheduledSendAt);
+      if (start && !isNaN(sched.getTime()) && Math.abs(start.getTime() - 3600000 - sched.getTime()) < 60000) return true;
+    } else {
+      return true;
+    }
+  }
+  return false;
+}
+
+function isReminderRowStillValid(rowValues) {
+  var ss = SpreadsheetApp.openById(SHEET_ID);
+  var bookingRows = ss.getSheetByName(BOOKINGS_SHEET).getDataRange().getDisplayValues();
+  return reminderStillValid({
+    phone: rowValues[5], bookingDate: rowValues[2], reminderType: rowValues[3],
+    scheduledSendAt: rowValues[9], message: rowValues[6],
+  }, bookingRows);
+}
+
+function supersedeReminderRow(sheet, rowNumber) {
+  sheet.getRange(rowNumber, 8).setValue("Superseded");
+  sheet.getRange(rowNumber, 9).setValue(new Date());
+  sheet.getRange(rowNumber, 10).setValue("");
+}
+
+// Never throws — it runs after the real operation (reschedule, cancel, ...)
+// has already succeeded and must not turn that into a reported failure.
+function sweepStaleReminders() {
+  try {
+    var ss       = SpreadsheetApp.openById(SHEET_ID);
+    var remSheet = getOrCreatePendingRemindersSheet(ss);
+    var remRows  = remSheet.getDataRange().getDisplayValues();
+    if (remRows.length < 2) return 0;
+    var bookingRows = ss.getSheetByName(BOOKINGS_SHEET).getDataRange().getDisplayValues();
+    var today   = formatDateStr(new Date());
+    var changed = 0;
+
+    for (var i = 1; i < remRows.length; i++) {
+      var status      = String(remRows[i][7] || "").trim();
+      var bookingDate = String(remRows[i][2] || "").trim();
+      var type        = remRows[i][3];
+      var sentAt      = remRows[i][10];
+      if (status === "Superseded" || sentAt || !bookingDate || bookingDate < today) continue;
+      // Unsent 1hr rows always carry scheduledSendAt; a blank one is a row from
+      // before sentAt was recorded and can't be validated, so leave it alone.
+      if (type === "1hr" && !remRows[i][9]) continue;
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(bookingDate)) continue;
+      if (reminderStillValid({
+        phone: remRows[i][5], bookingDate: bookingDate, reminderType: type,
+        scheduledSendAt: remRows[i][9], message: remRows[i][6],
+      }, bookingRows)) continue;
+
+      supersedeReminderRow(remSheet, i + 1);
+      changed++;
+    }
+    if (changed > 0) Logger.log("sweepStaleReminders: superseded " + changed + " reminder(s)");
+    return changed;
+  } catch (err) {
+    Logger.log("sweepStaleReminders error: " + err);
+    return 0;
+  }
+}
+
 // Should approving this reminder right now also send it right now? For 24hr,
 // compare its willFireOn day against today (the daily-cron window may have
 // already elapsed). For 1hr, compare its exact scheduledSendAt against now.
@@ -2840,7 +2955,9 @@ function processReminderCandidate(name, phone, message, bookingDate, reminderTyp
   }
   if (existing.status === "Approved" && reminderType === "24hr") {
     try {
-      var sentMessage = existing.message || message;
+      // The freshly built message, not existing.message: the stored one can
+      // carry a time/vehicle from before the booking was edited.
+      var sentMessage = message;
       sendSMS(phone, sentMessage);
       var ss    = SpreadsheetApp.openById(SHEET_ID);
       var sheet = getOrCreatePendingRemindersSheet(ss);
@@ -2860,6 +2977,8 @@ function processReminderCandidate(name, phone, message, bookingDate, reminderTyp
 // scheduledSendAt after sending doubles as the "already delivered" marker.
 function sendDueApprovedReminders() {
   try {
+    // Retire rows whose booking was moved/cancelled before anything is sent.
+    sweepStaleReminders();
     var ss    = SpreadsheetApp.openById(SHEET_ID);
     var sheet = getOrCreatePendingRemindersSheet(ss);
     var rows  = sheet.getDataRange().getDisplayValues();
@@ -2984,6 +3103,13 @@ function resolvePendingReminder(id, approve) {
     var message         = rows[i][6];
     var scheduledSendAt = rows[i][9];
 
+    // The booking may have been rescheduled/cancelled since this was queued —
+    // never send (or approve) a reminder for a date/time that no longer exists.
+    if (approve && !isReminderRowStillValid(rows[i])) {
+      supersedeReminderRow(sheet, i + 1);
+      return { found: true, alreadyResolved: true, status: "Superseded" };
+    }
+
     // A "Pending" 24hr row only ever exists because the real daily cron just
     // queued it — its window is always already open, so approving it always
     // means send now. A "Pending" 1hr row may have been queued a day ahead —
@@ -3027,10 +3153,19 @@ function switchReminderDecision(id, approve) {
     var scheduledSendAt = rows[i][9];
     var sentAt          = rows[i][10];
 
+    if (rows[i][7] === "Superseded") {
+      return { found: true, alreadyDelivered: false, status: "Superseded" };
+    }
+
     if (sentAt) {
       sheet.getRange(i + 1, 8).setValue(approve ? "Approved" : "Rejected");
       sheet.getRange(i + 1, 9).setValue(new Date());
       return { found: true, alreadyDelivered: true, status: approve ? "Approved" : "Rejected" };
+    }
+
+    if (approve && !isReminderRowStillValid(rows[i])) {
+      supersedeReminderRow(sheet, i + 1);
+      return { found: true, alreadyDelivered: false, status: "Superseded" };
     }
 
     var willFireOn = dayBeforeStr(bookingDate);
@@ -3066,6 +3201,7 @@ function reminderResultPage(title, message) {
 function approveReminderGet(id) {
   var result = resolvePendingReminder(id, true);
   if (!result.found) return reminderResultPage("Not found", "This reminder link is invalid or the record no longer exists.");
+  if (result.status === "Superseded") return reminderResultPage("No longer needed", "This booking was rescheduled or cancelled, so nothing was sent. A fresh reminder will be queued for you if one is still needed.");
   if (result.alreadyResolved) return reminderResultPage("Already handled", "This reminder was already marked \"" + result.status + "\" — no action taken.");
   return reminderResultPage("✓ Approved", "The reminder text has been sent to the client.");
 }
@@ -3073,6 +3209,7 @@ function approveReminderGet(id) {
 function rejectReminderGet(id) {
   var result = resolvePendingReminder(id, false);
   if (!result.found) return reminderResultPage("Not found", "This reminder link is invalid or the record no longer exists.");
+  if (result.status === "Superseded") return reminderResultPage("No longer needed", "This booking was rescheduled or cancelled, so this reminder was already retired. Nothing was sent.");
   if (result.alreadyResolved) return reminderResultPage("Already handled", "This reminder was already marked \"" + result.status + "\" — no action taken.");
   return reminderResultPage("✕ Rejected", "The reminder was not sent.");
 }
@@ -3377,6 +3514,7 @@ function cancelBooking(data) {
       sendSMS(custPhone, smsMsg);
     }
 
+    sweepStaleReminders();
     return ContentService.createTextOutput(JSON.stringify({ success: true })).setMimeType(ContentService.MimeType.JSON);
   } catch (err) {
     Logger.log("cancelBooking error: " + err);
@@ -3488,6 +3626,7 @@ function pauseMaintenancePlan(data) {
       } catch (smsErr) { Logger.log("Pause SMS error: " + smsErr); }
     }
 
+    sweepStaleReminders();
     return ContentService.createTextOutput(JSON.stringify({ success: true, pausedCount: pausedCount })).setMimeType(ContentService.MimeType.JSON);
   } catch (err) {
     Logger.log("pauseMaintenancePlan error: " + err);
@@ -3882,6 +4021,7 @@ function skipMaintenanceBooking(data) {
       sendSMS(custPhone, smsMsg);
     }
 
+    sweepStaleReminders();
     return ContentService
       .createTextOutput(JSON.stringify({ success: true, nextDate: nextDateLabel }))
       .setMimeType(ContentService.MimeType.JSON);
@@ -4277,6 +4417,7 @@ function updateMaintenanceTime(data) {
       } catch (smsErr) { Logger.log("Time update SMS error: " + smsErr); }
     }
 
+    sweepStaleReminders();
     return ContentService.createTextOutput(JSON.stringify({ success: true, updatedRows: updatedRows, updatedCal: updatedCal })).setMimeType(ContentService.MimeType.JSON);
   } catch (err) {
     Logger.log("updateMaintenanceTime error: " + err);

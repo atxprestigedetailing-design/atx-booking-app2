@@ -1485,7 +1485,8 @@ export default function App() {
       });
       const d = await res.json();
       if (d.success) {
-        setPendingReminders(prev => prev.map(r => r.id === id ? { ...r, status: approve ? "Approved" : "Rejected" } : r));
+        setPendingReminders(prev => prev.map(r => r.id === id ? { ...r, status: d.status || (approve ? "Approved" : "Rejected") } : r));
+        if (d.status === "Superseded") showToast("That booking was rescheduled or cancelled, so nothing was sent.", "success", 5000);
       } else {
         alert("Something went wrong.");
       }
@@ -1502,8 +1503,10 @@ export default function App() {
       });
       const d = await res.json();
       if (d.success) {
-        setPendingReminders(prev => prev.map(r => r.id === id ? { ...r, status: approve ? "Approved" : "Rejected" } : r));
-        if (d.alreadyDelivered) {
+        setPendingReminders(prev => prev.map(r => r.id === id ? { ...r, status: d.status || (approve ? "Approved" : "Rejected") } : r));
+        if (d.status === "Superseded") {
+          showToast("That booking was rescheduled or cancelled, so nothing was sent.", "success", 5000);
+        } else if (d.alreadyDelivered) {
           showToast("Already sent — this only updates the record, the client already got it.", "success", 5000);
         } else {
           showToast(approve ? (d.sentNow ? "Sent now." : "Switched to Approve.") : "Switched to Reject.", "success", 3500);
@@ -5715,7 +5718,7 @@ export default function App() {
                           const isPending = r.status === "Pending";
                           const [ry, rm, rd] = (r.bookingDate || "").split("-").map(Number);
                           const isExpired = isPending && ry && new Date(ry, rm - 1, rd) < new Date(new Date().setHours(0, 0, 0, 0));
-                          const statusColor = r.status === "Approved" ? "#34d399" : r.status === "Rejected" ? "#f87171" : isExpired ? "#fbbf24" : "#93c5fd";
+                          const statusColor = r.status === "Approved" ? "#34d399" : r.status === "Rejected" ? "#f87171" : r.status === "Superseded" ? "rgba(255,255,255,0.4)" : isExpired ? "#fbbf24" : "#93c5fd";
                           return (
                             <div key={r.id} style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 14, padding: 16 }}>
                               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8, marginBottom: 8, flexWrap: "wrap" as const }}>
@@ -5726,12 +5729,17 @@ export default function App() {
                                   <div style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.45)" }}>{formatDateLabel(r.bookingDate)} · {r.clientPhone}</div>
                                 </div>
                                 <span style={{ background: "rgba(255,255,255,0.06)", color: statusColor, fontSize: "0.72rem", fontWeight: 700, borderRadius: 999, padding: "2px 10px" }}>
-                                  {isExpired ? "EXPIRED — STILL PENDING" : r.status.toUpperCase()}
+                                  {isExpired ? "EXPIRED — STILL PENDING" : r.status === "Superseded" ? "SUPERSEDED — BOOKING CHANGED" : r.status.toUpperCase()}
                                 </span>
                               </div>
                               <div style={{ fontSize: "0.85rem", color: "rgba(255,255,255,0.65)", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 10, padding: "10px 12px", marginBottom: isPending ? 12 : 0 }}>
                                 "{r.message}"
                               </div>
+                              {r.status === "Superseded" && (
+                                <div style={{ marginTop: 8, fontSize: "0.78rem", color: "rgba(255,255,255,0.4)" }}>
+                                  This booking was rescheduled or cancelled after this was queued, so it will never be sent. A fresh reminder is queued automatically if one is still needed.
+                                </div>
+                              )}
                               {isPending && (
                                 <div style={{ display: "flex", gap: 8 }}>
                                   <button disabled={resolvingReminderId === r.id} onClick={() => resolveReminder(r.id, true)}
