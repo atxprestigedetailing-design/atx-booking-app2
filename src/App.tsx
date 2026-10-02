@@ -5717,7 +5717,8 @@ export default function App() {
                         {pendingReminders.map(r => {
                           const isPending = r.status === "Pending";
                           const [ry, rm, rd] = (r.bookingDate || "").split("-").map(Number);
-                          const isExpired = isPending && ry && new Date(ry, rm - 1, rd) < new Date(new Date().setHours(0, 0, 0, 0));
+                          const isPast = !!ry && new Date(ry, rm - 1, rd) < new Date(new Date().setHours(0, 0, 0, 0));
+                          const isExpired = isPending && isPast;
                           const statusColor = r.status === "Approved" ? "#34d399" : r.status === "Rejected" ? "#f87171" : r.status === "Superseded" ? "rgba(255,255,255,0.4)" : isExpired ? "#fbbf24" : "#93c5fd";
                           return (
                             <div key={r.id} style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 14, padding: 16 }}>
@@ -5740,7 +5741,7 @@ export default function App() {
                                   This booking was rescheduled or cancelled after this was queued, so it will never be sent. A fresh reminder is queued automatically if one is still needed.
                                 </div>
                               )}
-                              {isPending && (
+                              {isPending && !isPast && (
                                 <div style={{ display: "flex", gap: 8 }}>
                                   <button disabled={resolvingReminderId === r.id} onClick={() => resolveReminder(r.id, true)}
                                     style={{ background: "#059669", color: "#fff", border: "none", borderRadius: 8, padding: "7px 14px", fontSize: "0.82rem", fontWeight: 600, cursor: "pointer", opacity: resolvingReminderId === r.id ? 0.6 : 1 }}>
@@ -5755,6 +5756,10 @@ export default function App() {
                               {r.sentAt ? (
                                 <div style={{ marginTop: 4, fontSize: "0.78rem", color: "rgba(255,255,255,0.35)" }}>
                                   ✓ Already sent to the client — the decision above is just a record, nothing left to switch.
+                                </div>
+                              ) : isPast && r.status !== "Superseded" ? (
+                                <div style={{ marginTop: 8, fontSize: "0.78rem", color: "rgba(255,255,255,0.35)" }}>
+                                  This appointment date has passed — this is just a record, nothing left to approve or switch.
                                 </div>
                               ) : (
                                 <>
