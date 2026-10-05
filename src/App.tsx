@@ -5719,6 +5719,10 @@ export default function App() {
                           const [ry, rm, rd] = (r.bookingDate || "").split("-").map(Number);
                           const isPast = !!ry && new Date(ry, rm - 1, rd) < new Date(new Date().setHours(0, 0, 0, 0));
                           const isExpired = isPending && isPast;
+                          // A 1hr reminder whose send time hasn't arrived is scheduled by approving, not sent.
+                          const sendAtDate = r.reminderType === "1hr" && r.scheduledSendAt ? new Date(r.scheduledSendAt) : null;
+                          const sendsLater = !!sendAtDate && !isNaN(sendAtDate.getTime()) && sendAtDate > new Date();
+                          const sendAtLabel = sendsLater ? sendAtDate!.toLocaleString([], { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "";
                           const statusColor = r.status === "Approved" ? "#34d399" : r.status === "Rejected" ? "#f87171" : r.status === "Superseded" ? "rgba(255,255,255,0.4)" : isExpired ? "#fbbf24" : "#93c5fd";
                           return (
                             <div key={r.id} style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 14, padding: 16 }}>
@@ -5741,11 +5745,21 @@ export default function App() {
                                   This booking was rescheduled or cancelled after this was queued, so it will never be sent. A fresh reminder is queued automatically if one is still needed.
                                 </div>
                               )}
+                              {isPending && !isPast && sendsLater && (
+                                <div style={{ marginBottom: 10, fontSize: "0.78rem", color: "#93c5fd" }}>
+                                  Approving schedules this — it won't text the client now. It sends automatically at {sendAtLabel} (1 hour before the appointment).
+                                </div>
+                              )}
+                              {r.status === "Approved" && !r.sentAt && sendsLater && (
+                                <div style={{ marginTop: 8, fontSize: "0.78rem", color: "#34d399" }}>
+                                  Scheduled — sends automatically at {sendAtLabel}.
+                                </div>
+                              )}
                               {isPending && !isPast && (
                                 <div style={{ display: "flex", gap: 8 }}>
                                   <button disabled={resolvingReminderId === r.id} onClick={() => resolveReminder(r.id, true)}
                                     style={{ background: "#059669", color: "#fff", border: "none", borderRadius: 8, padding: "7px 14px", fontSize: "0.82rem", fontWeight: 600, cursor: "pointer", opacity: resolvingReminderId === r.id ? 0.6 : 1 }}>
-                                    Approve & Send
+                                    {sendsLater ? "Approve" : "Approve & Send"}
                                   </button>
                                   <button disabled={resolvingReminderId === r.id} onClick={() => resolveReminder(r.id, false)}
                                     style={{ background: "rgba(239,68,68,0.1)", color: "#dc2626", border: "1.5px solid #fca5a5", borderRadius: 8, padding: "7px 14px", fontSize: "0.82rem", fontWeight: 600, cursor: "pointer", opacity: resolvingReminderId === r.id ? 0.6 : 1 }}>
