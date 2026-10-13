@@ -1101,6 +1101,7 @@ function createNextMaintenanceBooking(data) {
     }
 
     Logger.log("Created next maintenance booking for " + data.email + " on " + nextDate);
+    reconcileAvailabilitySafe(); // close this booking's slot so the public can't book on top of it
     return ContentService
       .createTextOutput(JSON.stringify({ success: true }))
       .setMimeType(ContentService.MimeType.JSON);
@@ -2640,6 +2641,12 @@ function backfillConsentSource() {
 
 // ─── sendBookingReminders (run daily via time trigger) ────────────────────────
 
+// Closing a booking's availability slot is best-effort bookkeeping: it must never
+// be able to break the booking, skip or reminder flow that calls it.
+function reconcileAvailabilitySafe() {
+  try { avReconcile(); } catch (err) { Logger.log("reconcileAvailabilitySafe: " + err); }
+}
+
 function sendBookingReminders() {
   try {
     var ss    = SpreadsheetApp.openById(SHEET_ID);
@@ -2984,6 +2991,8 @@ function sendDueApprovedReminders() {
   try {
     // Retire rows whose booking was moved/cancelled before anything is sent.
     sweepStaleReminders();
+    // Safety net: any active booking whose slot is still open to the public gets closed.
+    reconcileAvailabilitySafe();
     var ss    = SpreadsheetApp.openById(SHEET_ID);
     var sheet = getOrCreatePendingRemindersSheet(ss);
     var rows  = sheet.getDataRange().getDisplayValues();
@@ -4027,6 +4036,7 @@ function skipMaintenanceBooking(data) {
     }
 
     sweepStaleReminders();
+    reconcileAvailabilitySafe();
     return ContentService
       .createTextOutput(JSON.stringify({ success: true, nextDate: nextDateLabel }))
       .setMimeType(ContentService.MimeType.JSON);
@@ -4131,6 +4141,7 @@ function resumeMaintenancePlan(data) {
       } catch (smsErr) { Logger.log("Resume SMS error: " + smsErr); }
     }
 
+    reconcileAvailabilitySafe();
     return ContentService.createTextOutput(JSON.stringify({ success: true, nextDate: nextDateLabel })).setMimeType(ContentService.MimeType.JSON);
   } catch (err) {
     Logger.log("resumeMaintenancePlan error: " + err);
