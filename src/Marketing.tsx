@@ -200,11 +200,12 @@ function fmtDay(ts: string): string {
 
 const SEGMENTS: { id: string; label: string; match: (c: MkClient) => boolean }[] = [
   { id: "all", label: "All clients", match: (c) => !c.eventOnly },
+  { id: "everyone", label: "Everyone incl. event signups", match: () => true },
   { id: "returning", label: "Returning (2+ visits)", match: (c) => !c.eventOnly && c.completedCount >= 2 },
   { id: "oneTime", label: "One-time (1 visit)", match: (c) => !c.eventOnly && c.completedCount === 1 },
-  { id: "maintenance", label: "Maintenance plan", match: (c) => c.isMaintenance },
+  { id: "maintenance", label: "Active maintenance plan", match: (c) => c.isMaintenance },
   { id: "lapsed", label: "Lapsed (60+ days)", match: (c) => !c.eventOnly && c.completedCount > 0 && c.upcomingCount === 0 && daysSince(c.lastServiceDate) >= 60 },
-  { id: "new", label: "Booked, not serviced yet", match: (c) => !c.eventOnly && c.completedCount === 0 },
+  { id: "new", label: "Booked, not serviced yet", match: (c) => !c.eventOnly && c.completedCount === 0 && c.upcomingCount > 0 },
   { id: "textOk", label: "Opted in to texts", match: (c) => c.smsOk },
   { id: "event", label: "LVISD event signups", match: (c) => c.eventOnly },
 ];
@@ -529,6 +530,11 @@ export default function MarketingDashboard({ scriptUrl, googleClientId, coupons,
                   <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
                     {SEGMENTS.map((s) => <Chip key={s.id} active={segment === s.id} onClick={() => setSegment(s.id)}>{s.label} ({segCounts[s.id]})</Chip>)}
                   </div>
+                  {segCounts.event > 0 && (
+                    <div style={{ ...mutedText, marginBottom: 10, lineHeight: 1.5 }}>
+                      "All clients" leaves out the {segCounts.event} LVISD event signups (free-wash teachers) so they aren't promoted to by accident. Pick "Everyone" to include them.
+                    </div>
+                  )}
                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
                     <input style={{ ...inputStyle, flex: 1, minWidth: 160 }} placeholder="Search name, email or phone" value={search} onChange={(e) => setSearch(e.target.value)} />
                     <button type="button" style={ghostBtn} onClick={toggleShown}>{allShownSelected ? "Deselect shown" : `Select shown (${shown.length})`}</button>

@@ -188,7 +188,9 @@ function mkBuildAudience() {
     }
     if (status === "Booked" && date >= today) c.upcomingCount++;
     if (status !== "Cancelled") c.totalCount++;
-    if (clientType === "maintenance" && status !== "Cancelled") c.isMaintenance = true;
+    // An active plan = a maintenance booking still ahead (or paused). Merely having
+    // past/skipped/cancelled maintenance bookings means the plan ended.
+    if (clientType === "maintenance" && (status === "Paused" || (status === "Booked" && date >= today))) c.isMaintenance = true;
 
     if (mktConsent === "TRUE" && source === "self") c.smsConsentState = true;
     else if (mktConsent === "FALSE") c.smsConsentState = false;
