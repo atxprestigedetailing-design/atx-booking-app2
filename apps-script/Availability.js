@@ -29,12 +29,54 @@ function avAddDays(dateStr, n) {
 
 function avIsDate(s) { return /^\d{4}-\d{2}-\d{2}$/.test(String(s || "")); }
 
+// Current weekly hours (JS weekday: 0 = Sunday). Used to decide whether a released
+// "plan hold" slot should reopen. Change this when the weekly hours change.
+var AV_TEMPLATE = { 0: ["8:00 AM", "11:00 AM", "2:00 PM"], 1: ["5:00 PM"], 2: [], 3: [], 4: ["5:00 PM"], 5: ["4:30 PM"], 6: ["8:00 AM", "11:00 AM", "2:00 PM"] };
+
+// Plan holds: future visits of active maintenance plans are hidden from the public
+// ahead of time (their booking row doesn't exist until the previous visit is
+// completed). Each hidden slot is tagged in the Notes column so it can be
+// released automatically when the plan changes; slots blocked any other way are
+// never touched. Switched on after the first run was reviewed.
+var AV_HOLD_PREFIX = "plan-hold:";
+var AV_HOLDS_ENABLED = true;
+var AV_HOLD_HORIZON_DAYS = 190;
+
+function avOnTemplate(tmpl, date, time) {
+  return (tmpl[avDow(date)] || []).some(function(t) { return avNormTime(t) === time; });
+}
+
+// Active plans -> projected future visit dates, using the app's own recurrence rule
+// (calcRecurringDatesGS), so holds land exactly where the app will create the visits.
+function avProjectPlans(bookingRows, today, horizon) {
+  var groups = {};
+  for (var i = 1; i < bookingRows.length; i++) {
+    var r = bookingRows[i];
+    if (String(r[28] || "").trim() !== "Booked") continue;
+    if (String(r[26] || "").trim() !== "maintenance") continue;
+    var freq = String(r[27] || "").trim();
+    if (freq !== "biweekly" && freq !== "monthly") continue;
+    var date = String(r[4] || "").trim();
+    if (!avIsDate(date) || date < today) continue;
+    var key = String(r[3] || "").trim().toLowerCase() + "|" + String(r[7] || "").trim().toLowerCase() + "|" + String(r[8] || "").trim().toLowerCase();
+    var g = groups[key];
+    if (!g || date > g.anchor) groups[key] = { name: String(r[1] || "").trim(), freq: freq, anchor: date, time: avNormTime(r[5]) };
+  }
+  var out = [];
+  Object.keys(groups).forEach(function(k) {
+    var g = groups[k];
+    var dates = calcRecurringDatesGS(g.anchor, g.freq, g.freq === "biweekly" ? 40 : 14).filter(function(d) { return d > g.anchor && d <= horizon; });
+    out.push({ name: g.name, freq: g.freq, anchor: g.anchor, time: g.time, dates: dates });
+  });
+  return out;
+}
+
 // availRows / bookingRows: getDisplayValues() output, header row first.
 // opts: { today, end?, template? ({0..6: ["5:00 PM", ...]}), timeChanges? }
 //   timeChanges: [{ name, date, from, to }] — applied to bookings before planning
 // With no template this only blocks the slots of active bookings (reconcile mode).
 function avPlan(availRows, bookingRows, opts) {
-  var plan = { errors: [], timeChanges: [], block: [], deletes: [], adds: [], info: { blockedWithoutBooking: [], duplicates: [], skippedWithNotes: [] } };
+  var plan = { errors: [], timeChanges: [], block: [], hold: [], release: [], reopen: [], deletes: [], adds: [], info: { blockedWithoutBooking: [], duplicates: [], skippedWithNotes: [] } };
   var today = opts.today;
 
   // 1. Booking time changes (matched exactly; already-applied is fine, ambiguity is not)
@@ -73,6 +115,17 @@ function avPlan(availRows, bookingRows, opts) {
     if (!booked[key]) { booked[key] = true; bookedList.push({ date: bd, time: bookingTime[b], name: String(br[1] || "").trim() }); }
   }
 
+  var desiredHolds = {};
+  if (opts.holds) {
+    var horizon = opts.horizon || avAddDays(today, AV_HOLD_HORIZON_DAYS);
+    avProjectPlans(bookingRows, today, horizon).forEach(function(pl) {
+      pl.dates.forEach(function(d) { var hk = d + "|" + pl.time; if (!booked[hk]) desiredHolds[hk] = pl.name; });
+    });
+  }
+  var reopenSet = {};
+  (opts.reopen || []).forEach(function(x) { reopenSet[x.date + "|" + avNormTime(x.time)] = true; });
+  plan.info.reopenSkipped = [];
+
   var tmpl = opts.template || null;
   var onTemplate = function(date, time) {
     if (!tmpl) return true; // reconcile mode: never delete anything
@@ -92,10 +145,27 @@ function avPlan(availRows, bookingRows, opts) {
     if (existing[k]) plan.info.duplicates.push({ date: date, time: time, rowNumber: a + 1 });
     existing[k] = existing[k] || true;
     if (date < today) continue;
+
+    if (notes.indexOf(AV_HOLD_PREFIX) === 0) {
+      if (!opts.holds) continue; // holds not managed in this run
+      if (!desiredHolds[k]) plan.release.push({ rowNumber: a + 1, date: date, time: time, booked: !!booked[k], keep: avOnTemplate(AV_TEMPLATE, date, time) });
+      else delete desiredHolds[k]; // already held and still wanted
+      continue;
+    }
     if (notes) { plan.info.skippedWithNotes.push({ date: date, time: time, rowNumber: a + 1 }); continue; }
+
+    if (reopenSet[k] && !open) {
+      var why = booked[k] ? "a booking occupies it" : !avOnTemplate(tmpl || AV_TEMPLATE, date, time) ? "not on the weekly hours" : "";
+      if (why) plan.info.reopenSkipped.push({ date: date, time: time, why: why });
+      else plan.reopen.push({ rowNumber: a + 1, date: date, time: time });
+      continue;
+    }
 
     if (booked[k]) {
       if (open) plan.block.push({ rowNumber: a + 1, date: date, time: time });
+    } else if (open && desiredHolds[k]) {
+      plan.hold.push({ rowNumber: a + 1, date: date, time: time, name: desiredHolds[k] });
+      delete desiredHolds[k];
     } else if (open && !onTemplate(date, time)) {
       plan.deletes.push({ rowNumber: a + 1, date: date, time: time });
     } else if (!open) {
@@ -131,7 +201,7 @@ function avTimeMinutes(t) {
 }
 
 function avPlanIsEmpty(plan) {
-  return !plan.timeChanges.length && !plan.block.length && !plan.deletes.length && !plan.adds.length;
+  return !plan.timeChanges.length && !plan.block.length && !plan.hold.length && !plan.release.length && !plan.reopen.length && !plan.deletes.length && !plan.adds.length;
 }
 
 function avToday() {
@@ -148,6 +218,10 @@ function avSummary(plan) {
     errors: plan.errors,
     timeChanges: plan.timeChanges,
     blockExistingOpenSlots: plan.block.map(function(x) { return x.date + " " + x.time; }),
+    reopen: plan.reopen.map(function(x) { return x.date + " " + x.time; }),
+    reopenSkipped: plan.info.reopenSkipped,
+    holdSlots: plan.hold.map(function(x) { return x.date + " " + x.time + " (" + x.name + ")"; }),
+    releaseHolds: plan.release.map(function(x) { return x.date + " " + x.time + (x.booked ? " [stays blocked: booked]" : x.keep ? " [reopens]" : " [removed: off hours]"); }),
     deleteOpenRows: { total: plan.deletes.length, byDayAndTime: byKind(plan.deletes) },
     addRows: { total: plan.adds.length, openRows: plan.adds.filter(function(x) { return x.available; }).length, blockedRows: plan.adds.filter(function(x) { return !x.available; }).map(function(x) { return x.date + " " + x.time; }), byDayAndTime: byKind(plan.adds), firstDate: plan.adds.length ? plan.adds[0].date : null, lastDate: plan.adds.length ? plan.adds[plan.adds.length - 1].date : null },
     info: { blockedWithoutBookingCount: plan.info.blockedWithoutBooking.length, blockedWithoutBooking: plan.info.blockedWithoutBooking.slice(0, 40).map(function(x) { return x.date + " " + x.time; }), duplicates: plan.info.duplicates, skippedWithNotes: plan.info.skippedWithNotes }
@@ -213,7 +287,7 @@ function avAppendRows(sheet, rows) {
 function avApply(plan, opts) {
   var ss = SpreadsheetApp.openById(SHEET_ID);
   var sheet = ss.getSheetByName(AVAILABILITY_SHEET);
-  var done = { backup: null, timeChanges: 0, blocked: 0, added: 0, deleted: 0 };
+  var done = { backup: null, timeChanges: 0, blocked: 0, held: 0, released: 0, reopened: 0, added: 0, deleted: 0 };
 
   if (opts && opts.backup) {
     var stamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd_HHmm");
@@ -231,11 +305,24 @@ function avApply(plan, opts) {
   }
 
   plan.block.forEach(function(x) { sheet.getRange(x.rowNumber, 3).setValue(false); done.blocked++; });
+  (plan.reopen || []).forEach(function(x) { sheet.getRange(x.rowNumber, 3).setValue(true); done.reopened++; });
+  (plan.hold || []).forEach(function(x) {
+    sheet.getRange(x.rowNumber, 3).setValue(false);
+    sheet.getRange(x.rowNumber, 4).setValue(AV_HOLD_PREFIX + " " + x.name);
+    done.held++;
+  });
+  var removeRows = [];
+  (plan.release || []).forEach(function(x) {
+    if (x.booked) { sheet.getRange(x.rowNumber, 3).setValue(false); sheet.getRange(x.rowNumber, 4).setValue(""); }
+    else if (x.keep) { sheet.getRange(x.rowNumber, 3).setValue(true); sheet.getRange(x.rowNumber, 4).setValue(""); }
+    else removeRows.push(x.rowNumber);
+    done.released++;
+  });
 
   if (plan.adds.length) done.added = avAppendRows(sheet, plan.adds);
 
-  plan.deletes.slice().sort(function(x, y) { return y.rowNumber - x.rowNumber; }).forEach(function(x) {
-    sheet.deleteRow(x.rowNumber);
+  plan.deletes.map(function(x) { return x.rowNumber; }).concat(removeRows).sort(function(x, y) { return y - x; }).forEach(function(rowNumber) {
+    sheet.deleteRow(rowNumber);
     done.deleted++;
   });
 
@@ -253,11 +340,11 @@ function avReconcile() {
       var ss = SpreadsheetApp.openById(SHEET_ID);
       var availRows = ss.getSheetByName(AVAILABILITY_SHEET).getDataRange().getDisplayValues();
       var bookingRows = ss.getSheetByName(BOOKINGS_SHEET).getDataRange().getDisplayValues();
-      var plan = avPlan(availRows, bookingRows, { today: avToday() });
-      if (!plan.block.length) return 0;
-      var done = avApply({ timeChanges: [], block: plan.block, adds: [], deletes: [] }, { backup: false });
-      Logger.log("avReconcile: blocked " + done.blocked + " slot(s)");
-      return done.blocked;
+      var plan = avPlan(availRows, bookingRows, { today: avToday(), holds: AV_HOLDS_ENABLED });
+      if (!plan.block.length && !plan.hold.length && !plan.release.length) return 0;
+      var done = avApply({ timeChanges: [], block: plan.block, hold: plan.hold, release: plan.release, reopen: [], adds: [], deletes: [] }, { backup: false });
+      Logger.log("avReconcile: blocked " + done.blocked + ", held " + done.held + ", released " + done.released);
+      return done.blocked + done.held + done.released;
     } finally { lock.releaseLock(); }
   } catch (err) {
     Logger.log("avReconcile error: " + err);
