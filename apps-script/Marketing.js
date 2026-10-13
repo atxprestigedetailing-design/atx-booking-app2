@@ -51,6 +51,13 @@ function mkVerifyAdminToken(idToken) {
 
 // ── Small helpers ───────────────────────────────────────────────────────────
 
+// MailApp.getRemainingDailyQuota needs the script.send_mail permission, which
+// this project was never granted (it sends through GmailApp). Treat the count
+// as unknown (null) instead of failing the whole dashboard.
+function mkEmailQuota() {
+  try { return MailApp.getRemainingDailyQuota(); } catch (err) { return null; }
+}
+
 function mkPhoneKey(p) {
   var d = String(p || "").replace(/\D/g, "");
   return d.length > 10 ? d.slice(-10) : d;
@@ -222,7 +229,7 @@ function getMarketingAudiencePost(data) {
     return mkJson({
       success: true,
       clients: mkBuildAudience(),
-      emailQuotaRemaining: MailApp.getRemainingDailyQuota(),
+      emailQuotaRemaining: mkEmailQuota(),
       marketingNumberConfigured: !!PropertiesService.getScriptProperties().getProperty("TWILIO_MARKETING_FROM_NUMBER"),
       optOutCount: optOutCount
     });
@@ -404,7 +411,9 @@ function sendMarketingBatchPost(data) {
       if (logRows[i][1] === campaignId && logRows[i][4] === "sent") already[logRows[i][5] + "|" + logRows[i][3]] = true;
     }
 
-    var quota = wantEmail ? MailApp.getRemainingDailyQuota() : 0;
+    var knownQuota = wantEmail ? mkEmailQuota() : 0;
+    var quotaKnown = knownQuota !== null;
+    var quota = quotaKnown ? knownQuota : Infinity;
     var emailPreview = wantEmail ? String(data.email.subject).slice(0, 120) : "";
     var smsFinal = wantSms ? mkEnsureStopLanguage(data.sms) : "";
     var results = [];
@@ -424,6 +433,8 @@ function sendMarketingBatchPost(data) {
         } else {
           var e = mkSendEmail(c.email, c.name, data.email.subject, data.email.html, data.email.plain || "", data.baseUrl);
           quota--;
+          // Without a readable quota, Gmail's own "too many" error is the signal to stop.
+          if (!e.ok && /too many|quota|limit/i.test(e.detail)) quota = 0;
           var eStatus = e.ok ? "sent" : "failed";
           mkLogEntry(logSheet, Object.assign({}, base, { channel: "email", status: eStatus, detail: e.detail, preview: emailPreview }));
           results.push({ key: key, name: c.name, channel: "email", status: eStatus, detail: e.detail });
@@ -446,7 +457,7 @@ function sendMarketingBatchPost(data) {
       }
     });
 
-    return mkJson({ success: true, results: results, emailQuotaRemaining: wantEmail ? quota : null });
+    return mkJson({ success: true, results: results, emailQuotaRemaining: wantEmail && quotaKnown ? quota : null });
   } catch (err) {
     Logger.log("sendMarketingBatch error: " + err);
     return mkJson({ success: false, error: String(err) });

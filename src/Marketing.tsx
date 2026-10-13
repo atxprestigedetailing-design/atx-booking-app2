@@ -271,9 +271,11 @@ function GoogleVerify({ clientId, onCredential }: { clientId: string; onCredenti
 export default function MarketingDashboard({ scriptUrl, googleClientId, coupons, credential, onCredential }: Props) {
   const [view, setView] = useState<"compose" | "history">("compose");
   const [clients, setClients] = useState<MkClient[] | null>(null);
-  const [meta, setMeta] = useState({ emailQuota: 0, marketingNumber: false, optOuts: 0 });
+  const [meta, setMeta] = useState<{ emailQuota: number | null; marketingNumber: boolean; optOuts: number }>({ emailQuota: null, marketingNumber: false, optOuts: 0 });
   const [loadError, setLoadError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [audienceTried, setAudienceTried] = useState(false);
+  const [logTried, setLogTried] = useState(false);
   const [authIssue, setAuthIssue] = useState("");
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -319,20 +321,20 @@ export default function MarketingDashboard({ scriptUrl, googleClientId, coupons,
   }, [scriptUrl, credential]);
 
   const loadAudience = useCallback(async () => {
-    setLoading(true); setLoadError("");
+    setAudienceTried(true); setLoading(true); setLoadError("");
     try {
       const d = await api("getMarketingAudience");
       if (d.success) {
         setClients(d.clients as MkClient[]);
-        setMeta({ emailQuota: d.emailQuotaRemaining, marketingNumber: !!d.marketingNumberConfigured, optOuts: d.optOutCount || 0 });
+        setMeta({ emailQuota: typeof d.emailQuotaRemaining === "number" ? d.emailQuotaRemaining : null, marketingNumber: !!d.marketingNumberConfigured, optOuts: d.optOutCount || 0 });
         setAuthIssue("");
       } else if (!d.authError) setLoadError(d.error || "Couldn't load clients.");
-    } catch { setLoadError("Network error — couldn't load clients."); }
+    } catch { setLoadError("Couldn't reach the server (the response wasn't what the app expected). Try again in a moment."); }
     finally { setLoading(false); }
   }, [api]);
 
   const loadLog = useCallback(async () => {
-    setLogLoading(true);
+    setLogTried(true); setLogLoading(true);
     try {
       const d = await api("getMarketingLog");
       if (d.success) setLog(d.entries as MkLogEntry[]);
@@ -340,8 +342,12 @@ export default function MarketingDashboard({ scriptUrl, googleClientId, coupons,
     finally { setLogLoading(false); }
   }, [api]);
 
-  useEffect(() => { if (authed && clients === null && !loading) void loadAudience(); }, [authed, clients, loading, loadAudience]);
-  useEffect(() => { if (authed && view === "history" && log === null && !logLoading) void loadLog(); }, [authed, view, log, logLoading, loadLog]);
+  // A new sign-in token means earlier failures may now succeed — allow a fresh attempt.
+  useEffect(() => { setAudienceTried(false); setLogTried(false); }, [credential]);
+  // Auto-load once per attempt; a failure must not retrigger this (Refresh / Try again do).
+  useEffect(() => { if (authed && !audienceTried && !loading) void loadAudience(); }, [authed, audienceTried, loading, loadAudience]);
+  useEffect(() => { if (authed && view === "history" && !logTried && !logLoading) void loadLog(); }, [authed, view, logTried, logLoading, loadLog]);
+  const reloadAll = () => { setClients(null); setLog(null); setAudienceTried(false); setLogTried(false); };
 
   const coupon = useMemo(() => coupons.find((c) => c.code === draft.couponCode), [coupons, draft.couponCode]);
   const emailHtml = useMemo(() => buildEmailHtml(draft, coupon), [draft, coupon]);
@@ -404,7 +410,7 @@ export default function MarketingDashboard({ scriptUrl, googleClientId, coupons,
   }
 
   const needsAck = useSms && !meta.marketingNumber && smsTargets.length > 0;
-  const quotaShort = useEmail && emailTargets.length > meta.emailQuota;
+  const quotaShort = useEmail && meta.emailQuota !== null && emailTargets.length > meta.emailQuota;
   const problems: string[] = [];
   if (!useEmail && !useSms) problems.push("Turn on Email, Text, or both.");
   if (useEmail && !draft.subject.trim()) problems.push("Add an email subject.");
@@ -431,7 +437,7 @@ export default function MarketingDashboard({ scriptUrl, googleClientId, coupons,
       }
     } catch { setSendError("Network error — stopped. Check History to see what already went out."); }
     setResults(all); setSending(false); setConfirmOpen(false); setConfirmText(""); setAckShared(false);
-    setClients(null); setLog(null);
+    reloadAll();
   }
 
   // ── History grouping ──
@@ -477,8 +483,8 @@ export default function MarketingDashboard({ scriptUrl, googleClientId, coupons,
         </div>
         {authed && (
           <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-            {clients && <span style={mutedText}>{clients.length} clients · Gmail sends left today: {meta.emailQuota} · {meta.optOuts} unsubscribed</span>}
-            <button type="button" style={ghostBtn} onClick={() => { setClients(null); setLog(null); }}>Refresh</button>
+            {clients && <span style={mutedText}>{clients.length} clients · Gmail sends left today: {meta.emailQuota ?? "not tracked"} · {meta.optOuts} unsubscribed</span>}
+            <button type="button" style={ghostBtn} onClick={reloadAll}>Refresh</button>
           </div>
         )}
       </div>
@@ -497,6 +503,11 @@ export default function MarketingDashboard({ scriptUrl, googleClientId, coupons,
                 <Chip active={useEmail} onClick={() => setUseEmail((v) => !v)}>{useEmail ? "✓ " : ""}Email</Chip>
                 <Chip active={useSms} onClick={() => setUseSms((v) => !v)}>{useSms ? "✓ " : ""}Text message</Chip>
               </div>
+              {useEmail && (
+                <div style={{ ...mutedText, marginTop: 10, lineHeight: 1.55 }}>
+                  Emails send from your Gmail, which caps daily sends (about 100 on a free Gmail account). If it runs out mid-send, the rest are skipped and shown in the results.
+                </div>
+              )}
               {useSms && (
                 <div style={{ ...mutedText, marginTop: 10, lineHeight: 1.55 }}>
                   Texts only go to clients who checked the marketing-text box themselves when booking — everyone else is skipped automatically.
@@ -507,6 +518,12 @@ export default function MarketingDashboard({ scriptUrl, googleClientId, coupons,
             <div style={card}>
               <div style={{ fontWeight: 800, color: "#f1f5f9", marginBottom: 10 }}>2 · Audience</div>
               {loading && !clients && <div style={mutedText}>Loading clients…</div>}
+              {!loading && !clients && loadError && (
+                <div>
+                  <div style={{ fontSize: "0.85rem", color: "#f87171", lineHeight: 1.5, marginBottom: 10 }}>{loadError}</div>
+                  <button type="button" style={ghostBtn} onClick={reloadAll}>Try again</button>
+                </div>
+              )}
               {clients && (
                 <>
                   <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
@@ -669,7 +686,7 @@ export default function MarketingDashboard({ scriptUrl, googleClientId, coupons,
                 {problems.length > 0 && (
                   <ul style={{ margin: 0, paddingLeft: 18, fontSize: "0.8rem", color: "#fbbf24", lineHeight: 1.6 }}>{problems.map((p) => <li key={p}>{p}</li>)}</ul>
                 )}
-                {quotaShort && <div style={{ fontSize: "0.8rem", color: "#fbbf24" }}>Gmail will only allow {meta.emailQuota} more emails today — the rest of the list would be skipped. Send in two days, or fewer recipients.</div>}
+                {quotaShort && <div style={{ fontSize: "0.8rem", color: "#fbbf24" }}>Gmail will only allow {meta.emailQuota ?? 0} more emails today — the rest of the list would be skipped. Send in two days, or fewer recipients.</div>}
 
                 <button type="button" style={{ ...primaryBtn, opacity: canReview ? 1 : 0.4, cursor: canReview ? "pointer" : "not-allowed" }} disabled={!canReview} onClick={() => setConfirmOpen(true)}>
                   Review &amp; send to {targetKeys.length} client{targetKeys.length === 1 ? "" : "s"}
