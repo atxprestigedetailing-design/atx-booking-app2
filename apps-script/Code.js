@@ -603,7 +603,7 @@ function updateBookingFields(data) {
 
       // 2. Update Google Calendar — delete old event, create new one
       try {
-        var calendar = CalendarApp.getCalendarById(CALENDAR_ID);
+        var calendar = legacyCalendar();
         if (calendar && oldDate) {
           var oldParts = oldDate.split("-");
           var oldStart = new Date(parseInt(oldParts[0]), parseInt(oldParts[1]) - 1, parseInt(oldParts[2]), 0, 0, 0);
@@ -2224,7 +2224,7 @@ function unblockRecurringSlots(availabilitySheet, startDateStr, time, frequency)
 // ─── createCalendarEvent ─────────────────────────────────────────────────────
 
 function createCalendarEvent(data, vehicle, clientTypeLabel, serviceTypeLabel) {
-  var calendar = CalendarApp.getCalendarById(CALENDAR_ID);
+  var calendar = legacyCalendar();
   if (!calendar) {
     Logger.log("Calendar not found: " + CALENDAR_ID);
     return;
@@ -2294,7 +2294,7 @@ function createCalendarEvent(data, vehicle, clientTypeLabel, serviceTypeLabel) {
 
 function createRecurringCalendarEvents(data, vehicle, clientTypeLabel, serviceTypeLabel, frequency, startDateStr) {
   try {
-    var calendar = CalendarApp.getCalendarById(CALENDAR_ID);
+    var calendar = legacyCalendar();
     if (!calendar) { Logger.log("Calendar not found for recurring events"); return; }
 
     var bookingTime  = String(data.time || "").trim();
@@ -2374,7 +2374,7 @@ function createRecurringCalendarEvents(data, vehicle, clientTypeLabel, serviceTy
 
 function deleteRecurringCalendarEvents(customerName, startDateStr, frequency) {
   try {
-    var calendar = CalendarApp.getCalendarById(CALENDAR_ID);
+    var calendar = legacyCalendar();
     if (!calendar) { Logger.log("Calendar not found for deleteRecurringCalendarEvents"); return 0; }
 
     var oneYearOut = new Date();
@@ -3022,6 +3022,8 @@ function sendDueApprovedReminders() {
   } catch (err) {
     Logger.log("sendDueApprovedReminders error: " + err);
   }
+  // After reminders are out: keep the calendar in step with bookings (only does work when something changed).
+  if (typeof calendarSyncSafe === "function") calendarSyncSafe();
 }
 
 // Run once (via the installReminderSendCheckTrigger action, or manually from
@@ -3379,7 +3381,7 @@ function cancelBooking(data) {
     if (isMaintenance) {
       var allRows   = sheet.getDataRange().getDisplayValues();
       var availRows = availSheet.getDataRange().getDisplayValues();
-      var calendar  = CalendarApp.getCalendarById(CALENDAR_ID);
+      var calendar  = legacyCalendar();
       var today     = new Date(); today.setHours(0, 0, 0, 0);
       var cancelledCount = 0;
 
@@ -3448,7 +3450,7 @@ function cancelBooking(data) {
 
       // Delete calendar event
       try {
-        var cal2 = CalendarApp.getCalendarById(CALENDAR_ID);
+        var cal2 = legacyCalendar();
         if (cal2 && bookingDate) {
           var p2 = bookingDate.split("-");
           var ds = new Date(parseInt(p2[0]), parseInt(p2[1]) - 1, parseInt(p2[2]), 0, 0, 0);
@@ -3548,7 +3550,7 @@ function pauseMaintenancePlan(data) {
     var ss         = SpreadsheetApp.openById(SHEET_ID);
     var sheet      = ss.getSheetByName(BOOKINGS_SHEET);
     var availSheet = ss.getSheetByName(AVAILABILITY_SHEET);
-    var calendar   = CalendarApp.getCalendarById(CALENDAR_ID);
+    var calendar   = legacyCalendar();
 
     var custEmail = String(data.customerEmail || data.email || "").trim();
     var custName  = String(data.customerName  || data.name  || "").trim();
@@ -3807,7 +3809,7 @@ function skipMaintenanceBooking(data) {
 
     // 2b. Delete calendar event for the skipped date
     try {
-      var cal = CalendarApp.getCalendarById(CALENDAR_ID);
+      var cal = legacyCalendar();
       if (cal && skippedDate) {
         var sdParts  = skippedDate.split("-");
         var sdStart  = new Date(parseInt(sdParts[0]), parseInt(sdParts[1]) - 1, parseInt(sdParts[2]), 0, 0, 0);
@@ -3909,7 +3911,7 @@ function skipMaintenanceBooking(data) {
 
       // Also create a calendar event for the next date — only if one doesn't already exist
       try {
-        var calNext = CalendarApp.getCalendarById(CALENDAR_ID);
+        var calNext = legacyCalendar();
         if (calNext && nextDate) {
           var nParts = nextDateStr.split("-");
           var nHour = 9; var nMin = 0;
@@ -3958,7 +3960,7 @@ function skipMaintenanceBooking(data) {
 
     // 6. Update Google Calendar — delete skipped event, create next one
     try {
-      var calendar = CalendarApp.getCalendarById(CALENDAR_ID);
+      var calendar = legacyCalendar();
       if (calendar && skippedDate) {
         // Delete the skipped event
         var skipParts = skippedDate.split("-");
@@ -4091,7 +4093,7 @@ function resumeMaintenancePlan(data) {
 
       // Create the calendar event for the new date
       try {
-        var cal = CalendarApp.getCalendarById(CALENDAR_ID);
+        var cal = legacyCalendar();
         if (cal && nextDateStr) {
           var nParts = nextDateStr.split("-");
           var nHour = 9, nMin = 0;
@@ -4235,7 +4237,7 @@ function updateMaintenanceTime(data) {
   try {
     var ss         = SpreadsheetApp.openById(SHEET_ID);
     var sheet      = ss.getSheetByName(BOOKINGS_SHEET);
-    var cal        = CalendarApp.getCalendarById(CALENDAR_ID);
+    var cal        = legacyCalendar();
     var custEmail  = String(data.customerEmail || "").trim().toLowerCase();
     var custName   = String(data.customerName  || "").trim();
     var custPhone  = String(data.customerPhone || "").trim();
@@ -4448,7 +4450,7 @@ function updateMaintenanceTime(data) {
 function backfillMaintenanceCalendarEvents() {
   var ss      = SpreadsheetApp.openById(SHEET_ID);
   var sheet   = ss.getSheetByName(BOOKINGS_SHEET);
-  var cal     = CalendarApp.getCalendarById(CALENDAR_ID);
+  var cal     = legacyCalendar();
   var rows    = sheet.getDataRange().getDisplayValues();
   var today   = new Date(); today.setHours(0, 0, 0, 0);
 
