@@ -83,6 +83,7 @@ function doGet(e) {
   if (action === "getClientNotes")     return getClientNotes(e);
   if (action === "getExpenses")        return getExpenses();
   if (action === "getCoupons")         return getCoupons();
+  if (action === "unsubscribeMarketing") return mkUnsubscribeGet(e);
   if (action === "getPendingReminders") return getPendingReminders();
   if (action === "getUpcomingReminderPreview") return getUpcomingReminderPreview();
   if (action === "approveReminder")    return approveReminderGet(e.parameter.id);
@@ -124,6 +125,10 @@ function doPost(e) {
     if (action === "addExpense")                 return addExpense(data);
     if (action === "deleteExpense")              return deleteExpense(data);
     if (action === "addCouponCode")              return addCouponCode(data);
+    if (action === "getMarketingAudience")       return getMarketingAudiencePost(data);
+    if (action === "getMarketingLog")            return getMarketingLogPost(data);
+    if (action === "sendMarketingTest")          return sendMarketingTestPost(data);
+    if (action === "sendMarketingBatch")         return sendMarketingBatchPost(data);
     if (action === "deleteCouponCode")           return deleteCouponCode(data);
     if (action === "approveReminder")            return approveReminderPost(data);
     if (action === "rejectReminder")              return rejectReminderPost(data);

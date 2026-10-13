@@ -1,5 +1,6 @@
 import logo from "./assets/logo.png";
 import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import MarketingDashboard from "./Marketing";
 
 declare global {
   interface Window {
@@ -794,7 +795,8 @@ export default function App() {
   const [splashDone, setSplashDone]                     = useState(false);
   const [splashPhase, setSplashPhase]                   = useState(0); // 0=logo, 1=tagline, 2=fadeout
   const [view, setView]                                 = useState<"booking" | "myBookings" | "admin" | "balance" | "inventory" | "lvisdEvent">("booking");
-  const [adminTab, setAdminTab]                         = useState<"bookings" | "invoices" | "revenue" | "availability" | "clients" | "finances" | "reminders" | "coupons">("bookings");
+  const [googleCredential, setGoogleCredential]   = useState<string>(() => { try { return sessionStorage.getItem("atx_gcred") || ""; } catch { return ""; } });
+  const [adminTab, setAdminTab]                         = useState<"bookings" | "invoices" | "revenue" | "availability" | "clients" | "finances" | "reminders" | "coupons" | "marketing">("bookings");
   const [pendingReminders, setPendingReminders]         = useState<{id:string;createdAt:string;bookingDate:string;reminderType:string;clientName:string;clientPhone:string;message:string;status:string;resolvedAt:string;scheduledSendAt?:string;sentAt?:string}[]>([]);
   const [remindersLoading, setRemindersLoading]         = useState(false);
   const [resolvingReminderId, setResolvingReminderId]   = useState<string | null>(null);
@@ -1268,6 +1270,7 @@ export default function App() {
   function handleGoogleCredential(response: any) {
     try {
       const payload = JSON.parse(atob(response.credential.split(".")[1]));
+      storeGoogleCredential(response.credential);
       const user = { name: payload.name || "", email: payload.email || "", picture: payload.picture || "" };
       setGoogleUser(user);
       setEmail(payload.email || "");
@@ -1277,7 +1280,13 @@ export default function App() {
     } catch (e) { console.error("Google sign-in error", e); }
   }
 
+  function storeGoogleCredential(cred: string) {
+    setGoogleCredential(cred);
+    try { if (cred) sessionStorage.setItem("atx_gcred", cred); else sessionStorage.removeItem("atx_gcred"); } catch { /* storage unavailable */ }
+  }
+
   function handleSignOut() {
+    storeGoogleCredential("");
     if (window.google?.accounts?.id) window.google.accounts.id.disableAutoSelect();
     localStorage.removeItem("atx_google_user");
     setGoogleUser(null); setEmail(""); setView("booking"); setUserBookings([]);
@@ -3382,6 +3391,9 @@ export default function App() {
               </button>
               <button onClick={() => { setAdminTab("coupons"); if (coupons.length === 0) loadCoupons(); }} style={{ background: "none", border: "none", cursor: "pointer", padding: "10px 18px", fontSize: "0.95rem", fontWeight: 700, color: adminTab === "coupons" ? "#f472b6" : "#9ca3af", borderBottom: adminTab === "coupons" ? "3px solid #f472b6" : "3px solid transparent", marginBottom: -2 }}>
                 Coupons
+              </button>
+              <button onClick={() => setAdminTab("marketing")} style={{ background: "none", border: "none", cursor: "pointer", padding: "10px 18px", fontSize: "0.95rem", fontWeight: 700, color: adminTab === "marketing" ? "#38bdf8" : "#9ca3af", borderBottom: adminTab === "marketing" ? "3px solid #38bdf8" : "3px solid transparent", marginBottom: -2 }}>
+                Marketing
               </button>
             </div>
 
@@ -5797,6 +5809,17 @@ export default function App() {
                       </div>
                     )}
                   </>
+                )}
+
+                {/* ── MARKETING TAB ── */}
+                {adminTab === "marketing" && (
+                  <MarketingDashboard
+                    scriptUrl={SCRIPT_URL}
+                    googleClientId={GOOGLE_CLIENT_ID}
+                    coupons={coupons}
+                    credential={googleCredential}
+                    onCredential={storeGoogleCredential}
+                  />
                 )}
 
                 {/* ── COUPONS TAB ── */}
