@@ -199,8 +199,8 @@ function fmtDay(ts: string): string {
 // ─── Segments ────────────────────────────────────────────────────────────────
 
 const SEGMENTS: { id: string; label: string; match: (c: MkClient) => boolean }[] = [
-  { id: "all", label: "All clients", match: (c) => !c.eventOnly },
-  { id: "everyone", label: "Everyone incl. event signups", match: () => true },
+  { id: "all", label: "All clients", match: () => true },
+  { id: "noEvent", label: "Excluding event signups", match: (c) => !c.eventOnly },
   { id: "returning", label: "Returning (2+ visits)", match: (c) => !c.eventOnly && c.completedCount >= 2 },
   { id: "oneTime", label: "One-time (1 visit)", match: (c) => !c.eventOnly && c.completedCount === 1 },
   { id: "maintenance", label: "Active maintenance plan", match: (c) => c.isMaintenance },
@@ -532,7 +532,7 @@ export default function MarketingDashboard({ scriptUrl, googleClientId, coupons,
                   </div>
                   {segCounts.event > 0 && (
                     <div style={{ ...mutedText, marginBottom: 10, lineHeight: 1.5 }}>
-                      "All clients" leaves out the {segCounts.event} LVISD event signups (free-wash teachers) so they aren't promoted to by accident. Pick "Everyone" to include them.
+                      {segCounts.event} of these are LVISD event signups (free-wash teachers), tagged "Event" below. Pick "Excluding event signups" to leave them out of a send.
                     </div>
                   )}
                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
