@@ -2584,16 +2584,17 @@ export default function App() {
         `}</style>
 
         {/* Spline 3D — scaled down on mobile */}
-        <div style={{ position:"absolute", inset:0, overflow:"hidden" }}>
+        <div style={{ position:"absolute", inset:0, overflow:"hidden", background:"#000" }}>
           <style>{`
             @media (max-width: 640px) {
               .spline-frame {
-                transform: scale(0.65);
-                transform-origin: center center;
-                width: 154% !important;
-                height: 154% !important;
-                top: -27% !important;
-                left: -27% !important;
+                inset: auto !important;
+                left: 0 !important;
+                top: 23% !important;
+                width: 100% !important;
+                height: 54% !important;
+                -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 12%, #000 88%, transparent 100%);
+                mask-image: linear-gradient(to bottom, transparent 0, #000 12%, #000 88%, transparent 100%);
               }
             }
           `}</style>
@@ -2601,7 +2602,7 @@ export default function App() {
   className="spline-frame"
   src="https://my.spline.design/halloweenpumpkin-SQ2g5DIaylgzoHyqRE9hCqLQ/"
   frameBorder={0}
-  style={{ position:"absolute", inset:0, width:"100%", height:"100%", border:"none", background:"#080c12" }}
+  style={{ position:"absolute", inset:0, width:"100%", height:"100%", border:"none", background:"#000" }}
 />
         </div>
 
