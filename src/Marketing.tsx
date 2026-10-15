@@ -9,7 +9,7 @@ type MkClient = {
   key: string; name: string; email: string; phone: string;
   completedCount: number; upcomingCount: number; totalCount: number;
   lastServiceDate: string; isMaintenance: boolean; eventOnly: boolean;
-  emailOk: boolean; emailReason: string; smsOk: boolean; smsReason: string;
+  emailOk: boolean; emailReason: string; smsOk: boolean; smsReason: string; smsConsent: boolean;
   lastContactedAt: string;
 };
 
@@ -235,7 +235,7 @@ const SEGMENTS: { id: string; label: string; match: (c: MkClient) => boolean }[]
   { id: "maintenance", label: "Active maintenance plan", match: (c) => c.isMaintenance },
   { id: "lapsed", label: "Lapsed (60+ days)", match: (c) => !c.eventOnly && c.completedCount > 0 && c.upcomingCount === 0 && daysSince(c.lastServiceDate) >= 60 },
   { id: "new", label: "Booked, not serviced yet", match: (c) => !c.eventOnly && c.completedCount === 0 && c.upcomingCount > 0 },
-  { id: "textOk", label: "Opted in to texts", match: (c) => c.smsOk },
+  { id: "textOk", label: "Ticked the text opt-in", match: (c) => c.smsConsent },
   { id: "event", label: "LVISD event signups", match: (c) => c.eventOnly },
 ];
 
@@ -594,7 +594,7 @@ export default function MarketingDashboard({ scriptUrl, googleClientId, coupons,
                             <td style={td}>
                               <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
                                 {c.emailOk ? <Badge tone="good">Email</Badge> : <Badge tone="muted">{c.emailReason}</Badge>}
-                                {c.smsOk ? <Badge tone="good">Text</Badge> : <Badge tone="muted">{c.smsReason}</Badge>}
+                                {c.smsOk ? (c.smsConsent ? <Badge tone="good">Text</Badge> : <Badge tone="warn">Text (no opt-in)</Badge>) : <Badge tone="muted">{c.smsReason}</Badge>}
                                 {c.eventOnly && <Badge tone="warn">Event</Badge>}
                               </div>
                             </td>

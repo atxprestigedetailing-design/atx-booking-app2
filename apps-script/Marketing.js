@@ -214,8 +214,11 @@ function mkBuildAudience() {
       eventOnly: c.eventRows > 0 && c.nonEventRows === 0,
       emailOk: hasEmail && !optedOut,
       emailReason: !hasEmail ? "No email on file" : (optedOut ? "Unsubscribed" : ""),
-      smsOk: hasPhone && c.smsConsentState,
-      smsReason: !hasPhone ? "No phone on file" : (!c.smsConsentState ? "No marketing text opt-in" : ""),
+      // Owner decision: anyone with a valid phone can be texted when the owner selects them.
+      // smsConsent is still reported so the dashboard can show who ticked the box.
+      smsOk: hasPhone,
+      smsReason: !hasPhone ? "No phone on file" : "",
+      smsConsent: hasPhone && c.smsConsentState,
       lastContactedAt: lastContacted[c.key] || ""
     };
   });
