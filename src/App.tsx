@@ -2599,7 +2599,7 @@ export default function App() {
           `}</style>
           <iframe
   className="spline-frame"
-  src="https://my.spline.design/genkubgreetingrobot-NgmkAjIFK5UZXMhKVt6jVhFW/"
+  src="https://my.spline.design/halloweenpumpkin-SQ2g5DIaylgzoHyqRE9hCqLQ/"
   frameBorder={0}
   style={{ position:"absolute", inset:0, width:"100%", height:"100%", border:"none", background:"#080c12" }}
 />
