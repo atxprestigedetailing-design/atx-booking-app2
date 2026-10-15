@@ -3,7 +3,7 @@ import type { CSSProperties, ReactNode } from "react";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-type CouponLite = { code: string; discountPercent: number; label: string };
+type CouponLite = { code: string; discountPercent: number; label: string; expiresOn?: string; expired?: boolean };
 
 type MkClient = {
   key: string; name: string; email: string; phone: string;
@@ -41,6 +41,30 @@ const DRAFT_KEY = "atx_marketing_draft_v1";
 // ─── Presets ─────────────────────────────────────────────────────────────────
 
 const PRESETS: { id: string; label: string; draft: Draft }[] = [
+  {
+    id: "halloween", label: "Halloween special",
+    draft: {
+      campaignName: "Halloween special", subject: "Don't let your ride look haunted, {{firstName}} 🎃",
+      preheader: "A spooky-good deal on a spotless detail.", kicker: "Halloween Special 🎃",
+      headline: "Scary clean. Not scary dirty.",
+      body: "Hi {{firstName}},\n\nCobwebs belong on porches, not on your dash. Treat your car or boat to a fresh detail this Halloween season and save with the code below.\n\nWe come to you, we do the work, and you get to enjoy a ride that looks brand new. No tricks, just treats.",
+      couponCode: "", couponNote: "One use per client", ctaLabel: "Book My Detail", ctaUrl: BOOKING_URL,
+      smsMessage: "Hi {{firstName}}! ATX Prestige Detailing is running a Halloween special 🎃 Treat your ride to a fresh detail, no tricks.",
+      smsMentionCoupon: true, smsIncludeLink: true,
+    },
+  },
+  {
+    id: "halloween-lapsed", label: "Halloween: back from the dead",
+    draft: {
+      campaignName: "Halloween: back from the dead", subject: "We haven't seen you in a while, {{firstName}} 👻",
+      preheader: "Your ride misses us. A Halloween deal inside.", kicker: "Back From The Dead 👻",
+      headline: "Your car called. It misses us.",
+      body: "Hi {{firstName}},\n\nIt's been a while since your last detail and we'd love to bring your ride back from the dead. Book this Halloween season and save with the code below.\n\nEvery job is backed by our 100% Satisfaction Guarantee. If anything isn't up to your standards, we'll make it right.",
+      couponCode: "", couponNote: "One use per client", ctaLabel: "Book Now", ctaUrl: BOOKING_URL,
+      smsMessage: "Hi {{firstName}}, it's been a while! 👻 Bring your ride back from the dead with a Halloween detail special.",
+      smsMentionCoupon: true, smsIncludeLink: true,
+    },
+  },
   {
     id: "seasonal", label: "Seasonal promo",
     draft: {
@@ -151,9 +175,14 @@ function buildEmailPlain(d: Draft, coupon?: CouponLite): string {
   return lines.join("\n");
 }
 
+function prettyExpiry(ymd: string): string {
+  const [y, m, d] = ymd.split("-").map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
 function composeSms(d: Draft, coupon?: CouponLite): string {
   let t = d.smsMessage.trim();
-  if (coupon && d.smsMentionCoupon) t += ` Use code ${coupon.code} for ${coupon.discountPercent}% off.`;
+  if (coupon && d.smsMentionCoupon) t += ` Use code ${coupon.code} for ${coupon.discountPercent}% off${coupon.expiresOn ? ` through ${prettyExpiry(coupon.expiresOn)}` : ""}.`;
   if (d.smsIncludeLink && d.ctaUrl.trim()) t += ` Book: ${d.ctaUrl.trim().replace(/^https?:\/\//, "")}`;
   if (!/\bstop\b/i.test(t)) t += "\nReply STOP to opt out.";
   return t.trim();
@@ -390,6 +419,16 @@ export default function MarketingDashboard({ scriptUrl, googleClientId, coupons,
     setSelected((s) => { const n = new Set(s); if (allShownSelected) shown.forEach((c) => n.delete(c.key)); else shown.forEach((c) => n.add(c.key)); return n; });
   }
 
+  // Picking a coupon with an expiry fills in the fine print, unless it was customized.
+  function pickCoupon(code: string) {
+    const c = coupons.find((x) => x.code === code);
+    setDraft((d) => {
+      const stock = !d.couponNote.trim() || d.couponNote === "One use per client" || /^Valid through /.test(d.couponNote);
+      const note = c?.expiresOn && stock ? `Valid through ${prettyExpiry(c.expiresOn)} · one use per client` : d.couponNote;
+      return { ...d, couponCode: code, couponNote: note };
+    });
+  }
+
   function applyPreset(id: string) {
     const p = PRESETS.find((x) => x.id === id);
     if (!p) return;
@@ -589,11 +628,16 @@ export default function MarketingDashboard({ scriptUrl, googleClientId, coupons,
                   <input style={inputStyle} value={draft.campaignName} onChange={(e) => setField("campaignName", e.target.value)} />
                 </Field>
                 <Field label="Coupon" hint="(manage codes in the Coupons tab)">
-                  <select style={inputStyle} value={draft.couponCode} onChange={(e) => setField("couponCode", e.target.value)}>
+                  <select style={inputStyle} value={draft.couponCode} onChange={(e) => pickCoupon(e.target.value)}>
                     <option value="">No coupon</option>
-                    {coupons.map((c) => <option key={c.code} value={c.code}>{c.code} — {c.discountPercent}% off</option>)}
+                    {coupons.filter((c) => !c.expired).map((c) => <option key={c.code} value={c.code}>{c.code} — {c.discountPercent}% off{c.expiresOn ? ` (through ${prettyExpiry(c.expiresOn)})` : ""}</option>)}
                   </select>
                 </Field>
+                {draft.couponCode && !coupon && (
+                  <div style={{ fontSize: "0.82rem", color: "#fbbf24", lineHeight: 1.5 }}>
+                    The coupon "{draft.couponCode}" has expired or was removed, so it won't appear in this message. Pick another coupon, or choose "No coupon".
+                  </div>
+                )}
                 <div style={{ ...mutedText, lineHeight: 1.5 }}>Use <code>{"{{firstName}}"}</code> anywhere to insert the client's first name.</div>
 
                 {useEmail && (

@@ -130,6 +130,7 @@ function doPost(e) {
     if (action === "sendMarketingTest")          return sendMarketingTestPost(data);
     if (action === "sendMarketingBatch")         return sendMarketingBatchPost(data);
     if (action === "deleteCouponCode")           return deleteCouponCode(data);
+    if (action === "updateCouponExpiry")         return updateCouponExpiry(data);
     if (action === "approveReminder")            return approveReminderPost(data);
     if (action === "rejectReminder")              return rejectReminderPost(data);
     if (action === "preDecideReminder")           return preDecideReminder(data);
@@ -426,7 +427,29 @@ function deleteExpense(data) {
 // completion — same two touch points as before, just backed by a sheet
 // instead of a source-code array.
 const COUPONS_SHEET = "Coupons";
-const COUPONS_HEADER = ["Code", "DiscountPercent", "Label", "CreatedAt"];
+const COUPONS_HEADER = ["Code", "DiscountPercent", "Label", "CreatedAt", "ExpiresOn"];
+
+function couponJson(obj) {
+  return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
+}
+
+// Today in the script's time zone (America/Chicago), as YYYY-MM-DD.
+function couponToday() {
+  return Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd");
+}
+
+// Accepts YYYY-MM-DD or M/D/YYYY (what Sheets shows if someone types a date by hand);
+// returns YYYY-MM-DD, or "" if it isn't a real date.
+function couponNormDate(raw) {
+  var s = String(raw || "").trim();
+  var y, m, d, mt;
+  if ((mt = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(s))) { y = +mt[1]; m = +mt[2]; d = +mt[3]; }
+  else if ((mt = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(s))) { m = +mt[1]; d = +mt[2]; y = +mt[3]; }
+  else return "";
+  var dt = new Date(y, m - 1, d);
+  if (dt.getFullYear() !== y || dt.getMonth() !== m - 1 || dt.getDate() !== d) return "";
+  return y + "-" + (m < 10 ? "0" : "") + m + "-" + (d < 10 ? "0" : "") + d;
+}
 
 function getOrCreateCouponsSheet(ss) {
   var sheet = ss.getSheetByName(COUPONS_SHEET);
@@ -435,26 +458,48 @@ function getOrCreateCouponsSheet(ss) {
     sheet.appendRow(COUPONS_HEADER);
     // Preserves the one code that was previously hardcoded in the frontend,
     // so existing behavior doesn't change the moment this sheet is created.
-    sheet.appendRow(["LVISD25", 25, "LVISD Teacher/Staff Discount", new Date()]);
+    sheet.appendRow(["LVISD25", 25, "LVISD Teacher/Staff Discount", new Date(), ""]);
+  } else if (!String(sheet.getRange(1, 5).getValue() || "").trim()) {
+    sheet.getRange(1, 5).setValue("ExpiresOn"); // sheets made before expiry existed: add the column, no coupon expires
   }
   return sheet;
+}
+
+function couponRowIsExpired(expiresOn, today) {
+  return !!expiresOn && today > expiresOn;
 }
 
 function getCoupons() {
   var ss    = SpreadsheetApp.openById(SHEET_ID);
   var sheet = getOrCreateCouponsSheet(ss);
   var rows  = sheet.getDataRange().getDisplayValues();
+  var today = couponToday();
   var coupons = rows.slice(1)
     .map(function(row, index) {
+      var expiresOn = couponNormDate(row[4]);
       return {
         rowIndex:        index + 2,
         code:            String(row[0] || "").trim().toUpperCase(),
         discountPercent: parseFloat(row[1]) || 0,
         label:           String(row[2] || "").trim(),
+        expiresOn:       expiresOn,
+        expired:         couponRowIsExpired(expiresOn, today),
       };
     })
     .filter(function(c) { return c.code !== ""; });
-  return ContentService.createTextOutput(JSON.stringify({ coupons: coupons })).setMimeType(ContentService.MimeType.JSON);
+  return couponJson({ coupons: coupons });
+}
+
+// True only if the code exists and hasn't passed its expiry date (valid THROUGH that date).
+function couponUsableNow(code) {
+  var wanted = String(code || "").trim().toUpperCase();
+  if (!wanted) return false;
+  var rows = getOrCreateCouponsSheet(SpreadsheetApp.openById(SHEET_ID)).getDataRange().getDisplayValues();
+  var today = couponToday();
+  for (var i = 1; i < rows.length; i++) {
+    if (String(rows[i][0] || "").trim().toUpperCase() === wanted) return !couponRowIsExpired(couponNormDate(rows[i][4]), today);
+  }
+  return false;
 }
 
 function addCouponCode(data) {
@@ -462,44 +507,64 @@ function addCouponCode(data) {
     var code            = String(data.code || "").trim().toUpperCase();
     var discountPercent = parseFloat(data.discountPercent);
     var label            = String(data.label || "").trim();
+    var expiresRaw       = String(data.expiresOn || "").trim();
+    var expiresOn        = expiresRaw ? couponNormDate(expiresRaw) : "";
 
-    if (!code) {
-      return ContentService.createTextOutput(JSON.stringify({ success: false, error: "Code is required" })).setMimeType(ContentService.MimeType.JSON);
-    }
-    if (!(discountPercent > 0 && discountPercent <= 100)) {
-      return ContentService.createTextOutput(JSON.stringify({ success: false, error: "Discount must be a number between 1 and 100" })).setMimeType(ContentService.MimeType.JSON);
-    }
+    if (!code) return couponJson({ success: false, error: "Code is required" });
+    if (!(discountPercent > 0 && discountPercent <= 100)) return couponJson({ success: false, error: "Discount must be a number between 1 and 100" });
+    if (expiresRaw && !expiresOn) return couponJson({ success: false, error: "Expiry must be a real date" });
+    if (expiresOn && expiresOn < couponToday()) return couponJson({ success: false, error: "Expiry date can't be in the past" });
 
     var ss    = SpreadsheetApp.openById(SHEET_ID);
     var sheet = getOrCreateCouponsSheet(ss);
     var rows  = sheet.getDataRange().getDisplayValues();
     for (var i = 1; i < rows.length; i++) {
-      if (String(rows[i][0] || "").trim().toUpperCase() === code) {
-        return ContentService.createTextOutput(JSON.stringify({ success: false, error: "That code already exists" })).setMimeType(ContentService.MimeType.JSON);
-      }
+      if (String(rows[i][0] || "").trim().toUpperCase() === code) return couponJson({ success: false, error: "That code already exists" });
     }
 
-    sheet.appendRow([code, discountPercent, label || code, new Date()]);
-    return ContentService.createTextOutput(JSON.stringify({ success: true })).setMimeType(ContentService.MimeType.JSON);
+    sheet.appendRow([code, discountPercent, label || code, new Date(), ""]);
+    if (expiresOn) {
+      var cell = sheet.getRange(sheet.getLastRow(), 5);
+      cell.setNumberFormat("@"); // keep it exactly as typed (YYYY-MM-DD), not a date serial
+      cell.setValue(expiresOn);
+    }
+    return couponJson({ success: true });
   } catch (err) {
     Logger.log("addCouponCode error: " + err);
-    return ContentService.createTextOutput(JSON.stringify({ success: false, error: String(err) })).setMimeType(ContentService.MimeType.JSON);
+    return couponJson({ success: false, error: String(err) });
+  }
+}
+
+// Set, change or clear (blank) a coupon's expiry date.
+function updateCouponExpiry(data) {
+  try {
+    var row = parseInt(data.rowIndex);
+    var raw = String(data.expiresOn || "").trim();
+    var expiresOn = raw ? couponNormDate(raw) : "";
+    if (raw && !expiresOn) return couponJson({ success: false, error: "Expiry must be a real date" });
+    var sheet = getOrCreateCouponsSheet(SpreadsheetApp.openById(SHEET_ID));
+    if (!row || row < 2 || row > sheet.getLastRow() || !String(sheet.getRange(row, 1).getValue() || "").trim()) return couponJson({ success: false, error: "Invalid row" });
+    var cell = sheet.getRange(row, 5);
+    cell.setNumberFormat("@");
+    cell.setValue(expiresOn);
+    return couponJson({ success: true });
+  } catch (err) {
+    Logger.log("updateCouponExpiry error: " + err);
+    return couponJson({ success: false, error: String(err) });
   }
 }
 
 function deleteCouponCode(data) {
   try {
     var row = parseInt(data.rowIndex);
-    if (!row || row < 2) {
-      return ContentService.createTextOutput(JSON.stringify({ success: false, error: "Invalid row" })).setMimeType(ContentService.MimeType.JSON);
-    }
+    if (!row || row < 2) return couponJson({ success: false, error: "Invalid row" });
     var ss    = SpreadsheetApp.openById(SHEET_ID);
     var sheet = getOrCreateCouponsSheet(ss);
     sheet.deleteRow(row);
-    return ContentService.createTextOutput(JSON.stringify({ success: true })).setMimeType(ContentService.MimeType.JSON);
+    return couponJson({ success: true });
   } catch (err) {
     Logger.log("deleteCouponCode error: " + err);
-    return ContentService.createTextOutput(JSON.stringify({ success: false, error: String(err) })).setMimeType(ContentService.MimeType.JSON);
+    return couponJson({ success: false, error: String(err) });
   }
 }
 
@@ -1699,6 +1764,10 @@ function bookAppointment(data) {
   // Coupon code (e.g. LVISD25) — stored as entered; discount is applied manually
   // by admin at invoicing time since services are billed hourly.
   var couponCode = String(data.couponCode || "").trim();
+  if (couponCode && !couponUsableNow(couponCode)) {
+    Logger.log("Coupon " + couponCode + " is unknown or expired — not attached to this booking");
+    couponCode = "";
+  }
   if (couponCode) {
     bookingsSheet.getRange(newRowIndex, COUPON_CODE_COL).setValue(couponCode);
   }

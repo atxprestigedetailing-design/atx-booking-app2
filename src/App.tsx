@@ -198,10 +198,22 @@ const LVISD_EVENT: EventConfig = {
 // final invoice amount is set after the job is done.
 // Codes themselves are admin-managed (Admin → Coupons tab), backed by a
 // sheet — not a hardcoded list — so new ones can be added without a deploy.
-type Coupon = { rowIndex: number; code: string; discountPercent: number; label: string };
+// expiresOn is "YYYY-MM-DD" (valid THROUGH that day) or "" for no expiry.
+type Coupon = { rowIndex: number; code: string; discountPercent: number; label: string; expiresOn?: string; expired?: boolean };
 function findCoupon(coupons: Coupon[], code: string): Coupon | undefined {
   const normalized = code.trim().toUpperCase();
   return coupons.find((c) => c.code === normalized);
+}
+function todayYmd(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+function couponIsExpired(c: Coupon): boolean {
+  return !!c.expiresOn && todayYmd() > c.expiresOn;
+}
+function prettyYmd(ymd: string): string {
+  const [y, m, d] = ymd.split("-").map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
 // Static vehicle make/model data — shared by the main booking flow and the LVISD event flow.
@@ -826,6 +838,7 @@ export default function App() {
   const [newCouponCode, setNewCouponCode]               = useState("");
   const [newCouponDiscount, setNewCouponDiscount]       = useState("");
   const [newCouponLabel, setNewCouponLabel]             = useState("");
+  const [newCouponExpires, setNewCouponExpires]         = useState("");
   const [addingCoupon, setAddingCoupon]                 = useState(false);
   const [couponError, setCouponError]                   = useState("");
   const [adminBookings, setAdminBookings]               = useState<Booking[]>([]);
@@ -1403,17 +1416,31 @@ export default function App() {
           code: newCouponCode.trim(),
           discountPercent: newCouponDiscount,
           label: newCouponLabel.trim(),
+          expiresOn: newCouponExpires,
         }),
       });
       const data = await res.json();
       if (data.success) {
-        setNewCouponCode(""); setNewCouponDiscount(""); setNewCouponLabel("");
+        setNewCouponCode(""); setNewCouponDiscount(""); setNewCouponLabel(""); setNewCouponExpires("");
         await loadCoupons();
       } else {
         setCouponError(data.error || "Something went wrong saving that code.");
       }
     } catch { setCouponError("Network error — please try again."); }
     finally { setAddingCoupon(false); }
+  }
+
+  async function handleUpdateCouponExpiry(rowIndex: number, expiresOn: string) {
+    const prev = coupons;
+    setCoupons(p => p.map(c => c.rowIndex === rowIndex ? { ...c, expiresOn, expired: !!expiresOn && todayYmd() > expiresOn } : c));
+    try {
+      const res = await fetch(SCRIPT_URL, {
+        method: "POST",
+        body: JSON.stringify({ action: "updateCouponExpiry", rowIndex, expiresOn }),
+      });
+      const data = await res.json();
+      if (!data.success) { setCoupons(prev); alert(data.error || "Something went wrong saving that date."); }
+    } catch { setCoupons(prev); alert("Network error — please try again"); }
   }
 
   async function handleDeleteCoupon(rowIndex: number) {
@@ -5816,7 +5843,7 @@ export default function App() {
                   <MarketingDashboard
                     scriptUrl={SCRIPT_URL}
                     googleClientId={GOOGLE_CLIENT_ID}
-                    coupons={coupons}
+                    coupons={coupons.filter(c => !couponIsExpired(c))}
                     credential={googleCredential}
                     onCredential={storeGoogleCredential}
                   />
@@ -5851,6 +5878,12 @@ export default function App() {
                             onChange={e => setNewCouponLabel(e.target.value)}
                             style={{ ...S.input, padding: "8px 12px", width: "100%" }} />
                         </div>
+                        <div>
+                          <div style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.45)", marginBottom: 4 }}>Last good day <span style={{ opacity: 0.6 }}>(optional)</span></div>
+                          <input type="date" min={todayYmd()} value={newCouponExpires}
+                            onChange={e => setNewCouponExpires(e.target.value)}
+                            style={{ ...S.input, padding: "8px 12px", width: 160, colorScheme: "dark" }} />
+                        </div>
                         <button disabled={!newCouponCode.trim() || !newCouponDiscount || addingCoupon}
                           onClick={handleAddCoupon}
                           style={{ background: "linear-gradient(135deg, #ec4899, #be185d)", color: "#fff", border: "none", borderRadius: 10, padding: "9px 18px", fontWeight: 700, fontSize: "0.88rem", cursor: "pointer", opacity: !newCouponCode.trim() || !newCouponDiscount ? 0.4 : 1 }}>
@@ -5871,13 +5904,21 @@ export default function App() {
                     ) : (
                       <div style={{ display: "grid", gap: 8 }}>
                         {coupons.map(c => (
-                          <div key={c.rowIndex} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, padding: "10px 14px", gap: 10, flexWrap: "wrap" as const }}>
+                          <div key={c.rowIndex} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, padding: "10px 14px", gap: 10, flexWrap: "wrap" as const, opacity: couponIsExpired(c) ? 0.6 : 1 }}>
                             <div style={{ display: "flex", flexDirection: "column" as const }}>
-                              <span style={{ fontWeight: 700, color: "#f1f5f9", fontSize: "0.88rem" }}>{c.code}</span>
-                              <span style={{ fontSize: "0.72rem", color: "rgba(255,255,255,0.4)" }}>{c.label}</span>
+                              <span style={{ fontWeight: 700, color: "#f1f5f9", fontSize: "0.88rem" }}>
+                                {c.code}
+                                {couponIsExpired(c) && <span style={{ marginLeft: 8, fontSize: "0.68rem", fontWeight: 800, color: "#f87171", border: "1px solid rgba(239,68,68,0.4)", borderRadius: 6, padding: "1px 6px" }}>EXPIRED</span>}
+                              </span>
+                              <span style={{ fontSize: "0.72rem", color: "rgba(255,255,255,0.4)" }}>
+                                {c.label}{c.expiresOn ? ` · ${couponIsExpired(c) ? "expired" : "good through"} ${prettyYmd(c.expiresOn)}` : " · no expiry"}
+                              </span>
                             </div>
-                            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" as const }}>
                               <span style={{ fontWeight: 800, color: "#f472b6" }}>{c.discountPercent}% off</span>
+                              <input type="date" value={c.expiresOn || ""} title="Last good day (clear to remove the expiry)"
+                                onChange={e => handleUpdateCouponExpiry(c.rowIndex, e.target.value)}
+                                style={{ ...S.input, padding: "4px 8px", width: 140, fontSize: "0.75rem", colorScheme: "dark" }} />
                               <button onClick={() => handleDeleteCoupon(c.rowIndex)} style={{ background: "rgba(239,68,68,0.12)", color: "#f87171", border: "1px solid rgba(239,68,68,0.3)", borderRadius: 8, padding: "5px 10px", fontSize: "0.75rem", fontWeight: 700, cursor: "pointer" }}>Delete</button>
                             </div>
                           </div>
@@ -6858,9 +6899,14 @@ export default function App() {
                   value={couponCode} onChange={(e) => setCouponCode(e.target.value)} />
                 {couponCode.trim() && (() => {
                   const c = findCoupon(coupons, couponCode);
+                  if (c && couponIsExpired(c)) return (
+                    <div style={{ marginTop: 10, padding: "10px 14px", background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.3)", borderRadius: 10, fontSize: "0.85rem", color: "#f87171" }}>
+                      Sorry, that code expired on {prettyYmd(c.expiresOn!)}. You can still book at our regular rate.
+                    </div>
+                  );
                   return c ? (
                     <div style={{ marginTop: 10, padding: "10px 14px", background: "rgba(16,185,129,0.1)", border: "1px solid rgba(16,185,129,0.3)", borderRadius: 10, fontSize: "0.85rem", color: "#34d399" }}>
-                      ✓ {c.label} applied — {c.discountPercent}% off will be calculated on your final invoice once service is completed.
+                      ✓ {c.label} applied — {c.discountPercent}% off will be calculated on your final invoice once service is completed.{c.expiresOn ? ` (Good through ${prettyYmd(c.expiresOn)}.)` : ""}
                     </div>
                   ) : (
                     <div style={{ marginTop: 10, padding: "10px 14px", background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.3)", borderRadius: 10, fontSize: "0.85rem", color: "#f87171" }}>
@@ -6906,7 +6952,7 @@ export default function App() {
                           recurringFrequency: frequency,
                           smsConsent: smsConsent,
                           smsMarketingConsent: smsMarketingConsent,
-                          couponCode: findCoupon(coupons, couponCode) ? couponCode.trim().toUpperCase() : "",
+                          couponCode: (() => { const c = findCoupon(coupons, couponCode); return c && !couponIsExpired(c) ? couponCode.trim().toUpperCase() : ""; })(),
                         }),
                       });
                       const data = await res.json();
