@@ -317,5 +317,9 @@ function calendarSyncTick() {
 
 // Never lets a calendar problem affect the job that calls it.
 function calendarSyncSafe() {
-  try { return calendarSyncTick(); } catch (err) { Logger.log("calendarSyncSafe: " + err); return "error"; }
+  var result;
+  try { result = calendarSyncTick(); } catch (err) { Logger.log("calendarSyncSafe: " + err); result = "error: " + String(err).slice(0, 200); }
+  // "Last ran" marker so a stalled sync is visible (script property CAL_SYNC_LAST).
+  try { PropertiesService.getScriptProperties().setProperty("CAL_SYNC_LAST", new Date().toISOString() + " " + result); } catch (e) { /* marker only */ }
+  return result;
 }

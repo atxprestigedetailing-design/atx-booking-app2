@@ -3057,6 +3057,7 @@ function processReminderCandidate(name, phone, message, bookingDate, reminderTyp
 // queue before they were due) once their scheduledSendAt arrives. Clearing
 // scheduledSendAt after sending doubles as the "already delivered" marker.
 function sendDueApprovedReminders() {
+  try { PropertiesService.getScriptProperties().setProperty("LAST_15MIN_TICK", new Date().toISOString()); } catch (e) { /* marker only */ }
   try {
     // Retire rows whose booking was moved/cancelled before anything is sent.
     sweepStaleReminders();
