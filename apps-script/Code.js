@@ -93,26 +93,34 @@ function doGet(e) {
     .setMimeType(ContentService.MimeType.JSON);
 }
 
+// After any action that adds/moves/cancels a booking, bring the Google Calendar up to date
+// right away (the 15-minute job remains the safety net). Never blocks or breaks the action:
+// the action's result is computed first, and calendarSyncSafe() swallows its own errors.
+function calSync(result) {
+  if (typeof calendarSyncSafe === "function") calendarSyncSafe();
+  return result;
+}
+
 function doPost(e) {
   try {
     var data   = JSON.parse(e.postData.contents || "{}");
     var action = data.action;
-    if (action === "bookAppointment" || !action) return bookAppointment(data);
-    if (action === "requestChange")              return requestChange(data);
-    if (action === "updateBooking")              return updateBooking(data);
+    if (action === "bookAppointment" || !action) return calSync(bookAppointment(data));
+    if (action === "requestChange")              return calSync(requestChange(data));
+    if (action === "updateBooking")              return calSync(updateBooking(data));
     if (action === "sendInvoiceEmail")           return sendInvoiceEmail(data);
     if (action === "sendPaymentConfirmedEmail")      return sendPaymentConfirmedEmail(data);
-    if (action === "createNextMaintenanceBooking") return createNextMaintenanceBooking(data);
-    if (action === "updateBookingFields")          return updateBookingFields(data);
+    if (action === "createNextMaintenanceBooking") return calSync(createNextMaintenanceBooking(data));
+    if (action === "updateBookingFields")          return calSync(updateBookingFields(data));
     if (action === "squareInvoiceRequest")       return squareInvoiceRequest(data);
     if (action === "sendJobStartedSMS")          return sendJobStartedSMS(data);
     if (action === "sendJobCompletedSMS")        return sendJobCompletedSMS(data);
     if (action === "toggleAvailabilitySlot")     return toggleAvailabilitySlot(data);
-    if (action === "cancelBooking")              return cancelBooking(data);
-    if (action === "skipMaintenanceBooking")      return skipMaintenanceBooking(data);
-    if (action === "pauseMaintenancePlan")        return pauseMaintenancePlan(data);
-    if (action === "resumeMaintenancePlan")       return resumeMaintenancePlan(data);
-    if (action === "updateMaintenanceTime")       return updateMaintenanceTime(data);
+    if (action === "cancelBooking")              return calSync(cancelBooking(data));
+    if (action === "skipMaintenanceBooking")      return calSync(skipMaintenanceBooking(data));
+    if (action === "pauseMaintenancePlan")        return calSync(pauseMaintenancePlan(data));
+    if (action === "resumeMaintenancePlan")       return calSync(resumeMaintenancePlan(data));
+    if (action === "updateMaintenanceTime")       return calSync(updateMaintenanceTime(data));
     if (action === "checkMaintenanceTimeConflicts") return checkMaintenanceTimeConflicts(data);
     if (action === "uploadJobPhoto")             return uploadJobPhoto(data);
     if (action === "addAvailabilitySlot")        return addAvailabilitySlot(data);

@@ -31,7 +31,7 @@ function csKey(kind, date, time, name, make, model) {
 
 function csPackageLabel(pkg, vehicleType) {
   if (vehicleType === "boat") return "Boat Detail";
-  var map = { lvisdFreeWash: "Free Wash (Event)", basic: "Basic Detail", premium: "Premium Detail", exterior: "Exterior Only - Basic", interior: "Interior Only - Basic", exteriorPremium: "Exterior Only - Premium", interiorPremium: "Interior Only - Premium" };
+  var map = { lvisdFreeWash: "Free Wash (Event)", custom: "Custom Detail", basic: "Basic Detail", premium: "Premium Detail", exterior: "Exterior Only - Basic", interior: "Interior Only - Basic", exteriorPremium: "Exterior Only - Premium", interiorPremium: "Interior Only - Premium" };
   return map[pkg] || "Detail";
 }
 
