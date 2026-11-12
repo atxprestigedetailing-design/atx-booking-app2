@@ -2583,24 +2583,11 @@ export default function App() {
           @keyframes glowPulse{0%,100%{box-shadow:0 0 20px rgba(59,130,246,0.5),0 4px 24px rgba(0,0,0,0.5)}50%{box-shadow:0 0 44px rgba(59,130,246,0.85),0 4px 24px rgba(0,0,0,0.5)}}
         `}</style>
 
-        {/* Spline 3D — scaled down on mobile */}
+        {/* Spline 3D snow globe — its own teal background fills the screen on every device */}
         <div style={{ position:"absolute", inset:0, overflow:"hidden", background:"#000" }}>
-          <style>{`
-            @media (max-width: 640px) {
-              .spline-frame {
-                inset: auto !important;
-                left: 0 !important;
-                top: 23% !important;
-                width: 100% !important;
-                height: 54% !important;
-                -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 12%, #000 88%, transparent 100%);
-                mask-image: linear-gradient(to bottom, transparent 0, #000 12%, #000 88%, transparent 100%);
-              }
-            }
-          `}</style>
           <iframe
   className="spline-frame"
-  src="https://my.spline.design/halloweenpumpkin-SQ2g5DIaylgzoHyqRE9hCqLQ/"
+  src="https://my.spline.design/snowball-ZQ5K4YYKqX48i29luufPOFHh/"
   frameBorder={0}
   style={{ position:"absolute", inset:0, width:"100%", height:"100%", border:"none", background:"#000" }}
 />
