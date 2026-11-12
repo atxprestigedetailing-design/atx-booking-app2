@@ -806,6 +806,10 @@ export default function App() {
   const [googleScriptLoaded, setGoogleScriptLoaded]     = useState(false);
   const [splashDone, setSplashDone]                     = useState(false);
   const [splashPhase, setSplashPhase]                   = useState(0); // 0=logo, 1=tagline, 2=fadeout
+  // The 3D scene is heavy: it is only started AFTER the logo + button are on screen, otherwise
+  // the browser stays blank while the scene boots. sceneReady fades it in once it has loaded.
+  const [splashScene, setSplashScene]                   = useState(false);
+  const [sceneReady, setSceneReady]                     = useState(false);
   const [view, setView]                                 = useState<"booking" | "myBookings" | "admin" | "balance" | "inventory" | "lvisdEvent">("booking");
   const [googleCredential, setGoogleCredential]   = useState<string>(() => { try { return sessionStorage.getItem("atx_gcred") || ""; } catch { return ""; } });
   const [adminTab, setAdminTab]                         = useState<"bookings" | "invoices" | "revenue" | "availability" | "clients" | "finances" | "reminders" | "coupons" | "marketing">("bookings");
@@ -967,7 +971,8 @@ export default function App() {
   // ── Splash screen sequencing ──
   useEffect(() => {
     const t1 = setTimeout(() => setSplashPhase(1), 1200);   // tagline + button appears
-    return () => { clearTimeout(t1); };
+    const t2 = setTimeout(() => setSplashScene(true), 1800); // then start the 3D scene
+    return () => { clearTimeout(t1); clearTimeout(t2); };
   }, []);
 
   // ── Prompt sign-in once when a signed-out visitor lands on the home page ──
@@ -2584,13 +2589,17 @@ export default function App() {
         `}</style>
 
         {/* Spline 3D snow globe — its own teal background fills the screen on every device */}
-        <div style={{ position:"absolute", inset:0, overflow:"hidden", background:"#000" }}>
-          <iframe
-  className="spline-frame"
-  src="https://my.spline.design/snowball-ZQ5K4YYKqX48i29luufPOFHh/"
-  frameBorder={0}
-  style={{ position:"absolute", inset:0, width:"100%", height:"100%", border:"none", background:"#000" }}
-/>
+        <div style={{ position:"absolute", inset:0, overflow:"hidden", background:"radial-gradient(ellipse at 50% 45%, #12302f 0%, #0b1c1d 55%, #070f10 100%)" }}>
+          {splashScene && (
+            <iframe
+              className="spline-frame"
+              title="ATX Prestige Detailing"
+              src="https://my.spline.design/snowball-ZQ5K4YYKqX48i29luufPOFHh/"
+              frameBorder={0}
+              onLoad={() => setSceneReady(true)}
+              style={{ position:"absolute", inset:0, width:"100%", height:"100%", border:"none", background:"transparent", opacity: sceneReady ? 1 : 0, transition:"opacity 1.2s ease" }}
+            />
+          )}
         </div>
 
         {/* TOP — Logo + name, free text no pill */}
