@@ -903,6 +903,8 @@ export default function App() {
   const [localPhotoPreviews, setLocalPhotoPreviews]     = useState<{[key: string]: string[]}>({});
   const [processingRows, setProcessingRows]             = useState<Set<number>>(new Set());
   const [userBookings, setUserBookings]                 = useState<Booking[]>([]);
+  // Admin-only "View as client": shows that client's My Bookings screen, read-only. Never persisted.
+  const [viewAsClient, setViewAsClient]                 = useState<{ name: string; email: string } | null>(null);
   const [bookingsLoading, setBookingsLoading]           = useState(false);
   const [clientEditBooking, setClientEditBooking]       = useState<Booking | null>(null);
   const [clientEditFields, setClientEditFields]         = useState<Partial<Booking>>({});
@@ -1307,21 +1309,40 @@ export default function App() {
     storeGoogleCredential("");
     if (window.google?.accounts?.id) window.google.accounts.id.disableAutoSelect();
     localStorage.removeItem("atx_google_user");
-    setGoogleUser(null); setEmail(""); setView("booking"); setUserBookings([]);
+    setGoogleUser(null); setEmail(""); setView("booking"); setUserBookings([]); setViewAsClient(null);
   }
 
-  const loadMyBookings = useCallback(async () => {
-    if (!googleUser) return;
+  const loadMyBookings = useCallback(async (emailOverride?: string) => {
+    const target = emailOverride || googleUser?.email;
+    if (!target) return;
     setBookingsLoading(true);
     try {
-      const bookings = await fetchBookingsForEmail(googleUser.email);
+      const bookings = await fetchBookingsForEmail(target);
       setUserBookings(bookings);
     } catch (e) { console.error("Failed to load bookings", e); }
     finally { setBookingsLoading(false); }
   }, [googleUser]);
 
   function openMyBookings() {
+    setViewAsClient(null);
     setView("myBookings"); setBookingsTab("appointments"); loadMyBookings();
+  }
+
+  // Admin only: see exactly what this client sees. Read-only; nothing is sent to the client.
+  function startViewAsClient(client: { name: string; email: string }) {
+    if (googleUser?.email !== ADMIN_EMAIL || !client.email) return;
+    setViewAsClient({ name: client.name, email: client.email });
+    setUserBookings([]);
+    setClientEditBooking(null);
+    setView("myBookings"); setBookingsTab("appointments");
+    loadMyBookings(client.email);
+  }
+
+  function exitViewAsClient() {
+    setViewAsClient(null);
+    setUserBookings([]);
+    setClientEditBooking(null);
+    setView("admin");
   }
 
   const loadAdminBookings = useCallback(async () => {
@@ -2698,19 +2719,30 @@ export default function App() {
           <CardPaymentModal />
           <div style={S.card} key={step}>
             <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 24, flexWrap: "wrap" as const }}>
-              <button onClick={() => setView("booking")} style={{ ...S.secondary, padding: "9px 14px", fontSize: "0.9rem" }}>Back</button>
+              <button onClick={() => (viewAsClient ? exitViewAsClient() : setView("booking"))} style={{ ...S.secondary, padding: "9px 14px", fontSize: "0.9rem" }}>Back</button>
               <h2 style={{ ...S.title, margin: 0, fontSize: "1.8rem" }}>My Bookings</h2>
               <div style={{ display: "flex", gap: 8, marginLeft: "auto" }}>
-                {googleUser?.email === ADMIN_EMAIL && (
+                {!viewAsClient && googleUser?.email === ADMIN_EMAIL && (
                   <button onClick={() => { setView("admin"); setAdminFilter("upcoming"); loadAdminBookings(); }} style={{ ...S.secondary, padding: "10px 16px", fontSize: "0.9rem" }}>Admin</button>
                 )}
-                <button onClick={() => { setView("booking"); setStep(1); }} style={{ ...S.primary, padding: "10px 16px", fontSize: "0.9rem" }}>Book New Service</button>
+                {!viewAsClient && (
+                  <button onClick={() => { setView("booking"); setStep(1); }} style={{ ...S.primary, padding: "10px 16px", fontSize: "0.9rem" }}>Book New Service</button>
+                )}
               </div>
             </div>
 
-            {googleUser?.name && (
-              <div style={{ fontSize: "1.05rem", color: "#93c5fd", fontWeight: 600, marginBottom: 4, marginTop: -12 }}>
-                Hello, {googleUser.name.split(" ")[0]} here's what's on your schedule.
+            {viewAsClient && (
+              <div role="status" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" as const, background: "rgba(251,191,36,0.14)", border: "1px solid rgba(251,191,36,0.5)", borderRadius: 12, padding: "10px 14px", marginTop: -8, marginBottom: 18 }}>
+                <div style={{ fontSize: "0.88rem", color: "#fde68a", lineHeight: 1.45 }}>
+                  <strong>👁 Viewing as {viewAsClient.name}</strong> ({viewAsClient.email}) — read-only. Nothing you do here changes their account or messages them.
+                </div>
+                <button onClick={exitViewAsClient} style={{ background: "#fbbf24", color: "#1f2937", border: "none", borderRadius: 8, padding: "7px 14px", fontWeight: 800, fontSize: "0.82rem", cursor: "pointer" }}>Exit</button>
+              </div>
+            )}
+
+            {(viewAsClient || googleUser?.name) && (
+              <div style={{ fontSize: "1.05rem", color: "#93c5fd", fontWeight: 600, marginBottom: 4, marginTop: viewAsClient ? 0 : -12 }}>
+                Hello, {(viewAsClient ? viewAsClient.name : googleUser!.name).split(" ")[0]} here's what's on your schedule.
               </div>
             )}
             <div style={{ fontSize: "0.85rem", color: "#a78bfa", marginBottom: 20 }}>
@@ -2762,8 +2794,8 @@ export default function App() {
                     <>
                       {allUpcoming.length === 0 && allPast.length === 0 && (
                         <div style={{ textAlign: "center", padding: 40, color: "rgba(255,255,255,0.45)" }}>
-                          No bookings found for {googleUser?.email}.<br />
-                          <button onClick={() => { setView("booking"); setStep(1); }} style={{ ...S.primary, marginTop: 16, display: "inline-block" }}>Book Your First Service</button>
+                          No bookings found for {viewAsClient?.email || googleUser?.email}.<br />
+                          {!viewAsClient && <button onClick={() => { setView("booking"); setStep(1); }} style={{ ...S.primary, marginTop: 16, display: "inline-block" }}>Book Your First Service</button>}
                         </div>
                       )}
                       {allUpcoming.length > 0 && (
@@ -2771,10 +2803,10 @@ export default function App() {
                           <div style={{ fontWeight: 700, color: "rgba(255,255,255,0.7)", fontSize: "0.95rem", marginBottom: 12, textTransform: "uppercase" as const, letterSpacing: "0.04em" }}>Upcoming</div>
                           <div style={{ display: "grid", gap: 14, marginBottom: 28 }}>
                             {allUpcoming.map((b, i) => (
-                              <BookingCard key={i} booking={b} upcoming onCancel={handleClientCancel}
+                              <BookingCard key={i} booking={b} upcoming onCancel={viewAsClient ? undefined : handleClientCancel}
                                 isEditing={clientEditBooking?.rowIndex === b.rowIndex}
                                 editFields={clientEditFields}
-                                onStartEdit={handleStartClientEdit}
+                                onStartEdit={viewAsClient ? undefined : handleStartClientEdit}
                                 onEditField={(patch) => setClientEditFields(prev => ({ ...prev, ...patch }))}
                                 onSaveEdit={handleClientSaveEdit}
                                 onCancelEdit={handleClientCancelEdit}
@@ -2789,7 +2821,7 @@ export default function App() {
                         <>
                           <div style={{ fontWeight: 700, color: "rgba(255,255,255,0.35)", fontSize: "0.95rem", marginBottom: 12, textTransform: "uppercase" as const, letterSpacing: "0.04em" }}>Past Services</div>
                           <div style={{ display: "grid", gap: 14 }}>
-                            {allPast.map((b, i) => <BookingCard key={i} booking={b} upcoming={false} onBookAgain={handleBookAgain} />)}
+                            {allPast.map((b, i) => <BookingCard key={i} booking={b} upcoming={false} onBookAgain={viewAsClient ? undefined : handleBookAgain} />)}
                           </div>
                         </>
                       )}
@@ -2983,7 +3015,9 @@ export default function App() {
                                   <div style={{ fontSize: "1.6rem", fontWeight: 900, color: "#eff6ff", letterSpacing: "-0.5px" }}>${squareAmt}</div>
                                 </div>
                                 <button
-                                  onClick={() => { setCardPaymentBooking(b); setCardPaymentError(""); setCardPaymentOpen(true); }}
+                                  disabled={!!viewAsClient}
+                                  title={viewAsClient ? "View-only: the client pays from their own account" : undefined}
+                                  onClick={() => { if (viewAsClient) return; setCardPaymentBooking(b); setCardPaymentError(""); setCardPaymentOpen(true); }}
                                   style={{ width: "100%", background: "linear-gradient(135deg, #3b82f6, #1d4ed8)", color: "#fff", border: "none", borderRadius: 10, padding: "12px 8px", fontWeight: 700, fontSize: "0.9rem", cursor: "pointer", boxShadow: "0 4px 18px rgba(37,99,235,0.4)" }}
                                 >
                                   Pay ${squareAmt} with Card
@@ -5252,9 +5286,18 @@ export default function App() {
                       <>
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap" as const, gap: 8 }}>
                           <button onClick={() => { setSelectedClientKey(null); setEditingClientConsent(false); }} style={{ ...S.secondary, padding: "7px 14px", fontSize: "0.85rem" }}>← All Clients</button>
+                          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" as const }}>
+                          <button
+                            disabled={!selected.email}
+                            title={selected.email ? "See their My Bookings screen, read-only" : "No email on file for this client"}
+                            onClick={() => startViewAsClient({ name: selected.name, email: selected.email })}
+                            style={{ background: "rgba(251,191,36,0.14)", color: "#fbbf24", border: "1px solid rgba(251,191,36,0.4)", borderRadius: 10, padding: "7px 16px", fontSize: "0.85rem", fontWeight: 700, cursor: selected.email ? "pointer" : "not-allowed", opacity: selected.email ? 1 : 0.4 }}>
+                            👁 View as client
+                          </button>
                           <button onClick={() => openClientNotes(selected.email)} style={{ background: "rgba(167,139,250,0.15)", color: "#a78bfa", border: "1px solid rgba(167,139,250,0.35)", borderRadius: 10, padding: "7px 16px", fontSize: "0.85rem", fontWeight: 700, cursor: "pointer" }}>
                             Notes
                           </button>
+                          </div>
                         </div>
 
                         <div style={{ background: "rgba(167,139,250,0.08)", border: "1px solid rgba(167,139,250,0.3)", borderRadius: 16, padding: 20, marginBottom: 16 }}>
