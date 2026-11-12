@@ -971,7 +971,7 @@ export default function App() {
   // ── Splash screen sequencing ──
   useEffect(() => {
     const t1 = setTimeout(() => setSplashPhase(1), 1200);   // tagline + button appears
-    const t2 = setTimeout(() => setSplashScene(true), 1800); // then start the 3D scene
+    const t2 = setTimeout(() => setSplashScene(true), 2500); // then start the 3D scene (after the button has finished appearing)
     return () => { clearTimeout(t1); clearTimeout(t2); };
   }, []);
 
@@ -2588,16 +2588,29 @@ export default function App() {
           @keyframes glowPulse{0%,100%{box-shadow:0 0 20px rgba(59,130,246,0.5),0 4px 24px rgba(0,0,0,0.5)}50%{box-shadow:0 0 44px rgba(59,130,246,0.85),0 4px 24px rgba(0,0,0,0.5)}}
         `}</style>
 
-        {/* Spline 3D snow globe — its own teal background fills the screen on every device */}
-        <div style={{ position:"absolute", inset:0, overflow:"hidden", background:"radial-gradient(ellipse at 50% 45%, #12302f 0%, #0b1c1d 55%, #070f10 100%)" }}>
+        {/* Spline 3D greeting robot — scaled down on mobile. Started after the logo/button are
+            on screen (the scene is heavy) and faded in when loaded. */}
+        <div style={{ position:"absolute", inset:0, overflow:"hidden", background:"#080c12" }}>
+          <style>{`
+            @media (max-width: 640px) {
+              .spline-frame {
+                transform: scale(0.65);
+                transform-origin: center center;
+                width: 154% !important;
+                height: 154% !important;
+                top: -27% !important;
+                left: -27% !important;
+              }
+            }
+          `}</style>
           {splashScene && (
             <iframe
               className="spline-frame"
               title="ATX Prestige Detailing"
-              src="https://my.spline.design/snowball-ZQ5K4YYKqX48i29luufPOFHh/"
+              src="https://my.spline.design/genkubgreetingrobot-NgmkAjIFK5UZXMhKVt6jVhFW/"
               frameBorder={0}
               onLoad={() => setSceneReady(true)}
-              style={{ position:"absolute", inset:0, width:"100%", height:"100%", border:"none", background:"transparent", opacity: sceneReady ? 1 : 0, transition:"opacity 1.2s ease" }}
+              style={{ position:"absolute", inset:0, width:"100%", height:"100%", border:"none", background:"#080c12", opacity: sceneReady ? 1 : 0, transition:"opacity 1.2s ease" }}
             />
           )}
         </div>
