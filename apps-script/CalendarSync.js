@@ -14,6 +14,7 @@ var CS_HORIZON_DAYS = 90;
 // once their booking or expected visit is gone.
 var CS_SYNC_ENABLED = true;
 var CS_MAX_REMOVALS = 15;   // more than this in one run is held for review, not removed
+var CS_RECENT_DAYS = 14;   // completed jobs this recent are watched: if one is re-dated, its calendar event follows
 var CS_MAX_CREATES = 60;    // bounded work per run; the rest follows on the next run
 var CS_FULL_REFRESH_MS = 6 * 3600000;
 
@@ -27,6 +28,12 @@ function csTag(key) { return "[ATX-SYNC:" + key + "]"; }
 
 function csKey(kind, date, time, name, make, model) {
   return [kind, date, avNormTime(time), caNorm(name), caNorm(make), caNorm(model)].join("|");
+}
+
+// Whole days between two yyyy-mm-dd dates (absolute).
+function csDayGap(a, b) {
+  var pa = avParts(a), pb = avParts(b);
+  return Math.abs(Math.round((Date.UTC(pa.y, pa.m - 1, pa.d) - Date.UTC(pb.y, pb.m - 1, pb.d)) / 86400000));
 }
 
 function csPackageLabel(pkg, vehicleType) {
@@ -79,7 +86,7 @@ function csPlan(bookingRows, events, projections, today, horizonDays) {
   var tagged = {};
   ours.forEach(function(ev) { var m = /\[ATX-SYNC:([^\]]+)\]/.exec(ev.desc || ""); if (m) tagged[m[1]] = ev; });
 
-  var plan = { create: [], adopt: [], skip: [], remove: [] };
+  var plan = { create: [], adopt: [], skip: [], remove: [], move: [] };
   var wanted = [];
   var desiredKeys = {};
   // A finished visit stays on the calendar as history: never remove the event of a
@@ -145,11 +152,38 @@ function csPlan(bookingRows, events, projections, today, horizonDays) {
     plan.create.push(item);
   });
 
+  // A recently COMPLETED job whose date/time was corrected after the fact (e.g. done a day early):
+  // its old event is the same job, so move it instead of leaving it behind / deleting it.
+  // Only matches a tagged "booking" event of the same client + vehicle within CS_RECENT_DAYS of the new date.
+  var movedIds = {};
+  var recentFrom = avAddDays(today, -CS_RECENT_DAYS);
+  for (var m = 1; m < bookingRows.length; m++) {
+    var mr = bookingRows[m];
+    var md = String(mr[4] || "").trim();
+    if (String(mr[28] || "").trim() !== "Completed" || !/^\d{4}-\d{2}-\d{2}$/.test(md) || md < recentFrom || md > today) continue;
+    var mName = String(mr[1] || "").trim();
+    var toKey = csKey("booking", md, mr[5], mName, mr[7], mr[8]);
+    if (tagged[toKey]) continue;                       // its event is already on the right date
+    var best = null, bestGap = 1e9;
+    Object.keys(tagged).forEach(function(k) {
+      var ev = tagged[k], parts = k.split("|");
+      if (parts[0] !== "booking" || desiredKeys[k] || movedIds[ev.id]) return;
+      if (parts[3] !== caNorm(mName) || parts[4] !== caNorm(mr[7]) || parts[5] !== caNorm(mr[8])) return;
+      var gap = csDayGap(ev.date, md);
+      if (gap <= CS_RECENT_DAYS && gap < bestGap) { best = { ev: ev, k: k }; bestGap = gap; }
+    });
+    if (best) {
+      movedIds[best.ev.id] = true;
+      desiredKeys[toKey] = true;
+      plan.move.push({ id: best.ev.id, fromKey: best.k, toKey: toKey, fromDate: best.ev.date, fromTime: avNormTime(best.ev.time), date: md, time: avNormTime(mr[5]), client: mName, title: best.ev.title, durationH: best.ev.durationH });
+    }
+  }
+
   // Events this sync made (tagged) whose booking / expected visit no longer exists.
   // Never untagged events, never past events. (Guests / recurrence are re-checked at delete time.)
   Object.keys(tagged).forEach(function(k) {
     var ev = tagged[k];
-    if (desiredKeys[k] || ev.date < today) return;
+    if (desiredKeys[k] || ev.date < today || movedIds[ev.id]) return;
     plan.remove.push({ id: ev.id, client: (/^[a-z]+\|[0-9-]+\|[^|]*\|([^|]*)\|/.exec(k) || [])[1] || "", date: ev.date, time: avNormTime(ev.time), durationH: ev.durationH, title: ev.title,
       why: "its booking or expected visit is gone (" + k.split("|")[0] + ")", event: { desc: ev.desc || "", location: ev.location || "" }, key: k });
   });
@@ -173,7 +207,22 @@ function csDates(item) {
 }
 
 function csApply(cal, ss, plan, colors) {
-  var stamp = new Date().toISOString(), log = [], done = { created: 0, adopted: 0, failed: 0 };
+  var stamp = new Date().toISOString(), log = [], done = { created: 0, adopted: 0, moved: 0, failed: 0 };
+  (plan.move || []).forEach(function(mv) {
+    try {
+      var ev = cal.getEventById(mv.id);
+      if (!ev) throw new Error("event not found");
+      var guests = 0; try { guests = ev.getGuestList(true).length; } catch (e) { guests = 99; }
+      if (guests > 0 || ev.isRecurringEvent()) { log.push([stamp, "kept (has guests or recurrence)", "booking", mv.client, mv.date, mv.time, mv.durationH, mv.title, mv.id, "not moved"]); return; }
+      var dur = ev.getEndTime().getTime() - ev.getStartTime().getTime();
+      var d = csDates({ date: mv.date, time: mv.time, durationH: 0 });
+      ev.setTime(d.start, new Date(d.start.getTime() + dur));
+      ev.setDescription(String(ev.getDescription() || "").replace(csTag(mv.fromKey), csTag(mv.toKey)));
+      done.moved++;
+      log.push([stamp, "moved (job date was corrected)", "booking", mv.client, mv.date, mv.time, mv.durationH, mv.title, mv.id, "ok; was " + mv.fromDate + " " + mv.fromTime]);
+      Utilities.sleep(120);
+    } catch (err) { done.failed++; log.push([stamp, "move", "booking", mv.client, mv.date, mv.time, mv.durationH, mv.title, mv.id, "FAILED: " + String(err).slice(0, 150)]); }
+  });
   plan.create.forEach(function(item) {
     try {
       var d = csDates(item);
@@ -209,8 +258,8 @@ function csRun(apply) {
   var today = avToday();
   var cal = CalendarApp.getCalendarById(CALENDAR_ID);
   if (!cal) throw new Error("Calendar not found: " + CALENDAR_ID);
-  var start = new Date(); start.setHours(0, 0, 0, 0);
-  var end = new Date(start); end.setFullYear(end.getFullYear() + 1); end.setDate(end.getDate() + 45);
+  var start = new Date(); start.setHours(0, 0, 0, 0); start.setDate(start.getDate() - CS_RECENT_DAYS);
+  var end = new Date(); end.setHours(0, 0, 0, 0); end.setFullYear(end.getFullYear() + 1); end.setDate(end.getDate() + 45);
   var events = cal.getEvents(start, end).map(function(ev) {
     return { id: ev.getId(), title: ev.getTitle(), desc: ev.getDescription() || "", allDay: ev.isAllDayEvent(), location: ev.getLocation() || "",
       date: Utilities.formatDate(ev.getStartTime(), tz, "yyyy-MM-dd"), time: Utilities.formatDate(ev.getStartTime(), tz, "h:mm a"),
@@ -263,8 +312,8 @@ function csRunAuto() {
     if (bookingRows.length < 2) return { ok: false, why: "bookings sheet read empty; nothing touched" };
     var cal = CalendarApp.getCalendarById(CALENDAR_ID);
     if (!cal) return { ok: false, why: "calendar not found" };
-    var start = new Date(); start.setHours(0, 0, 0, 0);
-    var end = new Date(start); end.setFullYear(end.getFullYear() + 1); end.setDate(end.getDate() + 45);
+    var start = new Date(); start.setHours(0, 0, 0, 0); start.setDate(start.getDate() - CS_RECENT_DAYS);
+    var end = new Date(); end.setHours(0, 0, 0, 0); end.setFullYear(end.getFullYear() + 1); end.setDate(end.getDate() + 45);
     var events = cal.getEvents(start, end).map(function(ev) {
       return { id: ev.getId(), title: ev.getTitle(), desc: ev.getDescription() || "", allDay: ev.isAllDayEvent(), location: ev.getLocation() || "",
         date: Utilities.formatDate(ev.getStartTime(), tz, "yyyy-MM-dd"), time: Utilities.formatDate(ev.getStartTime(), tz, "h:mm a"),
@@ -273,11 +322,11 @@ function csRunAuto() {
     var projections = avProjectPlans(bookingRows, today, avAddDays(today, CS_HORIZON_DAYS));
     var plan = csPlan(bookingRows, events, projections, today, CS_HORIZON_DAYS);
 
-    var result = { ok: true, created: 0, adopted: 0, removed: 0, held: 0 };
+    var result = { ok: true, created: 0, adopted: 0, moved: 0, removed: 0, held: 0 };
     var colors = { GREEN: CalendarApp.EventColor.GREEN, PALE_GREEN: CalendarApp.EventColor.PALE_GREEN };
-    var work = { create: plan.create.slice(0, CS_MAX_CREATES), adopt: plan.adopt };
+    var work = { create: plan.create.slice(0, CS_MAX_CREATES), adopt: plan.adopt, move: plan.move };
     if (plan.create.length > CS_MAX_CREATES) result.ok = false;
-    if (work.create.length || work.adopt.length) { var d = csApply(cal, ss, work, colors); result.created = d.created; result.adopted = d.adopted; }
+    if (work.create.length || work.adopt.length || work.move.length) { var d = csApply(cal, ss, work, colors); result.created = d.created; result.adopted = d.adopted; result.moved = d.moved; }
 
     if (plan.remove.length > CS_MAX_REMOVALS) {
       result.held = plan.remove.length;
@@ -294,7 +343,7 @@ function csFingerprint(bookingRows, today) {
   var parts = [];
   for (var i = 1; i < bookingRows.length; i++) {
     var r = bookingRows[i], d = String(r[4] || "").trim();
-    if (d < today) continue;
+    if (d < avAddDays(today, -CS_RECENT_DAYS)) continue;   // recent past counts too: a re-dated completed job must trigger a sync
     parts.push([r[28], d, avNormTime(r[5]), r[1], r[7], r[8], r[26], r[27], r[11], r[10]].join("~"));
   }
   parts.sort();
